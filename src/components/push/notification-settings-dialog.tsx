@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useIdentity } from "@/lib/identity";
 import { useT } from "@/lib/i18n/store";
 import { usePush } from "@/lib/push/use-push";
+import { useStandalone } from "@/lib/pwa/use-standalone";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -44,7 +45,17 @@ export function NotificationSettingsDialog({
   const t = useT();
   const memberId = useIdentity((s) => s.actingMemberId);
   const { supported, permission, subscribed, loading, subscribe, unsubscribe } = usePush();
+  const isStandalone = useStandalone();
   const [prefs, setPrefs] = useState<PrefsState>(DEFAULT_PREFS);
+
+  // iOS Safari only delivers Web Push (including while the app is fully
+  // closed) to a PWA installed via "Add to Home Screen" — a plain Safari
+  // tab can look feature-capable (Notification/PushManager both exist) but
+  // pushManager.subscribe() silently never works there. Gate on that
+  // instead of just feature-detecting, so iPhone users are pointed at
+  // installing first rather than hitting a toggle that does nothing.
+  const isIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const needsInstallFirst = isIOS && !isStandalone;
 
   useEffect(() => {
     if (!open || !memberId) return;
@@ -83,7 +94,9 @@ export function NotificationSettingsDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {!supported ? (
+        {needsInstallFirst ? (
+          <p className="py-4 text-sm text-muted-foreground">{t("notificationsNeedInstallIOS")}</p>
+        ) : !supported ? (
           <p className="py-4 text-sm text-muted-foreground">{t("notificationsUnsupported")}</p>
         ) : (
           <div className="flex flex-col gap-4 py-2">
