@@ -21,6 +21,8 @@ export type Chore = Omit<Tables<"chores">, "freq" | "assignee_kind"> & {
 export type ChoreCompletion = Tables<"chore_completions">;
 export type Attachment = Tables<"attachments">;
 export type ActivityLog = Tables<"activity_log">;
+export type PushSubscriptionRow = Tables<"push_subscriptions">;
+export type NotificationPrefs = Tables<"notification_prefs">;
 
 /** A task with its children materialized into a tree (client-side only). */
 export type TaskNode = Task & { children: TaskNode[] };
