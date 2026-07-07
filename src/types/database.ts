@@ -1,0 +1,482 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
+  public: {
+    Tables: {
+      activity_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          summary: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          summary?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          summary?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attachments: {
+        Row: {
+          chore_id: string | null
+          created_at: string
+          created_by: string | null
+          file_name: string
+          height: number | null
+          id: string
+          kind: string
+          mime_type: string | null
+          size_bytes: number | null
+          storage_path: string
+          task_id: string | null
+          width: number | null
+        }
+        Insert: {
+          chore_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_name: string
+          height?: number | null
+          id?: string
+          kind?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path: string
+          task_id?: string | null
+          width?: number | null
+        }
+        Update: {
+          chore_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_name?: string
+          height?: number | null
+          id?: string
+          kind?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path?: string
+          task_id?: string | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attachments_chore_id_fkey"
+            columns: ["chore_id"]
+            isOneToOne: false
+            referencedRelation: "chores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attachments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chore_completions: {
+        Row: {
+          chore_id: string
+          completed_at: string
+          completed_by: string
+          created_at: string
+          due_at: string
+          id: string
+        }
+        Insert: {
+          chore_id: string
+          completed_at?: string
+          completed_by: string
+          created_at?: string
+          due_at: string
+          id?: string
+        }
+        Update: {
+          chore_id?: string
+          completed_at?: string
+          completed_by?: string
+          created_at?: string
+          due_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chore_completions_chore_id_fkey"
+            columns: ["chore_id"]
+            isOneToOne: false
+            referencedRelation: "chores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chore_completions_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chores: {
+        Row: {
+          anchor_date: string
+          assignee_kind: string
+          assignee_member_id: string | null
+          created_at: string
+          custom_cron: string | null
+          deleted_at: string | null
+          emoji: string | null
+          freq: string
+          id: string
+          interval_n: number
+          month_day: number | null
+          next_due_at: string
+          notes: string | null
+          position: string
+          section_id: string
+          title: string
+          updated_at: string
+          weekdays: number[] | null
+        }
+        Insert: {
+          anchor_date?: string
+          assignee_kind?: string
+          assignee_member_id?: string | null
+          created_at?: string
+          custom_cron?: string | null
+          deleted_at?: string | null
+          emoji?: string | null
+          freq: string
+          id?: string
+          interval_n?: number
+          month_day?: number | null
+          next_due_at?: string
+          notes?: string | null
+          position: string
+          section_id: string
+          title: string
+          updated_at?: string
+          weekdays?: number[] | null
+        }
+        Update: {
+          anchor_date?: string
+          assignee_kind?: string
+          assignee_member_id?: string | null
+          created_at?: string
+          custom_cron?: string | null
+          deleted_at?: string | null
+          emoji?: string | null
+          freq?: string
+          id?: string
+          interval_n?: number
+          month_day?: number | null
+          next_due_at?: string
+          notes?: string | null
+          position?: string
+          section_id?: string
+          title?: string
+          updated_at?: string
+          weekdays?: number[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chores_assignee_member_id_fkey"
+            columns: ["assignee_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chores_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      members: {
+        Row: {
+          avatar_emoji: string | null
+          color: string
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          locale: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          avatar_emoji?: string | null
+          color?: string
+          created_at?: string
+          display_name: string
+          email: string
+          id?: string
+          locale?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          avatar_emoji?: string | null
+          color?: string
+          created_at?: string
+          display_name?: string
+          email?: string
+          id?: string
+          locale?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      sections: {
+        Row: {
+          color: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          description: string | null
+          emoji: string | null
+          id: string
+          kind: string
+          name: string
+          position: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          emoji?: string | null
+          id?: string
+          kind?: string
+          name: string
+          position: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          emoji?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          position?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sections_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          assignee_kind: string
+          assignee_member_id: string | null
+          brand: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          deleted_at: string | null
+          detected_links: string[]
+          due_at: string | null
+          emoji: string | null
+          id: string
+          image_url: string | null
+          is_completed: boolean
+          is_note: boolean
+          notes: string | null
+          parent_task_id: string | null
+          position: string
+          price: number | null
+          priority: number | null
+          quantity: number | null
+          recurrence: Json | null
+          section_id: string
+          tags: string[]
+          title: string
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          assignee_kind?: string
+          assignee_member_id?: string | null
+          brand?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          deleted_at?: string | null
+          detected_links?: string[]
+          due_at?: string | null
+          emoji?: string | null
+          id?: string
+          image_url?: string | null
+          is_completed?: boolean
+          is_note?: boolean
+          notes?: string | null
+          parent_task_id?: string | null
+          position: string
+          price?: number | null
+          priority?: number | null
+          quantity?: number | null
+          recurrence?: Json | null
+          section_id: string
+          tags?: string[]
+          title?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assignee_kind?: string
+          assignee_member_id?: string | null
+          brand?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          deleted_at?: string | null
+          detected_links?: string[]
+          due_at?: string | null
+          emoji?: string | null
+          id?: string
+          image_url?: string | null
+          is_completed?: boolean
+          is_note?: boolean
+          notes?: string | null
+          parent_task_id?: string | null
+          position?: string
+          price?: number | null
+          priority?: number | null
+          quantity?: number | null
+          recurrence?: Json | null
+          section_id?: string
+          tags?: string[]
+          title?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assignee_member_id_fkey"
+            columns: ["assignee_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      complete_chore: {
+        Args: { p_chore_id: string; p_completed_by: string }
+        Returns: undefined
+      }
+      is_member: { Args: Record<string, never>; Returns: boolean }
+      restore_task: { Args: { p_task_id: string }; Returns: undefined }
+      soft_delete_task: { Args: { p_task_id: string }; Returns: undefined }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DefaultSchema = DatabaseWithoutInternals["public"]
+
+export type Tables<T extends keyof DefaultSchema["Tables"]> = DefaultSchema["Tables"][T]["Row"]
+export type TablesInsert<T extends keyof DefaultSchema["Tables"]> = DefaultSchema["Tables"][T]["Insert"]
+export type TablesUpdate<T extends keyof DefaultSchema["Tables"]> = DefaultSchema["Tables"][T]["Update"]
