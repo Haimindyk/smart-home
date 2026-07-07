@@ -20,6 +20,7 @@ export type Database = {
           entity_id: string
           entity_type: string
           id: string
+          seq: number
           summary: string | null
         }
         Insert: {
@@ -29,6 +30,7 @@ export type Database = {
           entity_id: string
           entity_type: string
           id?: string
+          seq?: never
           summary?: string | null
         }
         Update: {
@@ -38,6 +40,7 @@ export type Database = {
           entity_id?: string
           entity_type?: string
           id?: string
+          seq?: never
           summary?: string | null
         }
         Relationships: [
@@ -164,6 +167,7 @@ export type Database = {
           anchor_date: string
           assignee_kind: string
           assignee_member_id: string | null
+          assignee_member_ids: string[]
           created_at: string
           created_by: string | null
           custom_cron: string | null
@@ -186,6 +190,7 @@ export type Database = {
           anchor_date?: string
           assignee_kind?: string
           assignee_member_id?: string | null
+          assignee_member_ids?: string[]
           created_at?: string
           created_by?: string | null
           custom_cron?: string | null
@@ -208,6 +213,7 @@ export type Database = {
           anchor_date?: string
           assignee_kind?: string
           assignee_member_id?: string | null
+          assignee_member_ids?: string[]
           created_at?: string
           created_by?: string | null
           custom_cron?: string | null
@@ -360,6 +366,7 @@ export type Database = {
         Row: {
           assignee_kind: string
           assignee_member_id: string | null
+          assignee_member_ids: string[]
           brand: string | null
           completed_at: string | null
           completed_by: string | null
@@ -391,6 +398,7 @@ export type Database = {
         Insert: {
           assignee_kind?: string
           assignee_member_id?: string | null
+          assignee_member_ids?: string[]
           brand?: string | null
           completed_at?: string | null
           completed_by?: string | null
@@ -422,6 +430,7 @@ export type Database = {
         Update: {
           assignee_kind?: string
           assignee_member_id?: string | null
+          assignee_member_ids?: string[]
           brand?: string | null
           completed_at?: string | null
           completed_by?: string | null
