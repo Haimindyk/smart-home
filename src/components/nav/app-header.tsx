@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Moon, Sun, Laptop, Download, Users, Pencil, History } from "lucide-react";
+import { Search, Moon, Sun, Laptop, Download, Users, Pencil, History, Bell } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useIdentity } from "@/lib/identity";
 import { useAppStore } from "@/lib/store/app-store";
@@ -12,6 +12,7 @@ import { useInstallPrompt } from "@/lib/pwa/use-install-prompt";
 import { Button } from "@/components/ui/button";
 import { ProfileEditDialog } from "@/components/identity/profile-edit-dialog";
 import { HistoryDialog } from "@/components/history/history-dialog";
+import { NotificationSettingsDialog } from "@/components/push/notification-settings-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,7 @@ export function AppHeader() {
   const { canInstall, promptInstall } = useInstallPrompt();
   const [profileOpen, setProfileOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const me = actingMemberId ? members[actingMemberId] : undefined;
 
@@ -74,6 +76,9 @@ export function AppHeader() {
               <DropdownMenuItem onClick={() => setHistoryOpen(true)}>
                 <History className="size-4" /> {t("history")}
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setNotificationsOpen(true)}>
+                <Bell className="size-4" /> {t("notifications")}
+              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
@@ -100,6 +105,7 @@ export function AppHeader() {
 
       <ProfileEditDialog memberId={actingMemberId} open={profileOpen} onOpenChange={setProfileOpen} />
       <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
+      <NotificationSettingsDialog open={notificationsOpen} onOpenChange={setNotificationsOpen} />
     </header>
   );
 }
