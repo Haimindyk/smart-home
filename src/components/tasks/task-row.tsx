@@ -89,7 +89,7 @@ function TaskRowContent({
 
   return (
     <div>
-      <div className="group flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-accent/50">
+      <div className="group flex items-center gap-2 rounded-xl px-2.5 py-2.5 transition-colors hover:bg-accent/40">
         {dragHandleProps ? (
           <button
             {...dragHandleProps.attributes}

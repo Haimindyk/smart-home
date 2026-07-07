@@ -34,7 +34,7 @@ export function QuickAddInput({
 
   return (
     <form
-      className="mb-2 flex items-center gap-2 rounded-lg border bg-card px-2 py-1.5 shadow-sm"
+      className="glass mb-3 flex items-center gap-2 rounded-2xl px-3 py-2.5 ring-1 ring-border/60 transition-shadow focus-within:shadow-md focus-within:ring-ring/50"
       onSubmit={(e) => {
         e.preventDefault();
         submit();

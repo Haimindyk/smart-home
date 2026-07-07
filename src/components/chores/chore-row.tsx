@@ -31,11 +31,11 @@ export function ChoreRow({ chore }: { chore: Chore }) {
   );
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2.5">
+    <div className="glass flex items-center gap-2.5 rounded-2xl px-3.5 py-3 ring-1 ring-border/60 transition-shadow hover:shadow-md">
       <Button
         size="icon"
         variant={isDue ? "default" : "outline"}
-        className="size-8 shrink-0 rounded-full"
+        className={cn("size-9 shrink-0 rounded-full", isDue && "bg-gradient-to-br from-indigo-500 to-violet-600")}
         disabled={!actingMemberId}
         title={actingMemberId ? t("markDone") : t("whoAreYou")}
         onClick={() => actingMemberId && completeChore(chore.id, actingMemberId)}

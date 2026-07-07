@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Search, Moon, Sun, Laptop, Download, Users } from "lucide-react";
+import { Search, Moon, Sun, Laptop, Download, Users, Pencil } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useIdentity } from "@/lib/identity";
 import { useAppStore } from "@/lib/store/app-store";
@@ -9,6 +10,7 @@ import { useSearchOpen } from "@/lib/search-ui-state";
 import { useLocaleStore, useT } from "@/lib/i18n/store";
 import { useInstallPrompt } from "@/lib/pwa/use-install-prompt";
 import { Button } from "@/components/ui/button";
+import { ProfileEditDialog } from "@/components/identity/profile-edit-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,23 +30,16 @@ export function AppHeader() {
   const members = useAppStore((s) => s.members);
   const t = useT();
   const { canInstall, promptInstall } = useInstallPrompt();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const me = actingMemberId ? members[actingMemberId] : undefined;
 
   return (
-    <header className="sticky top-0 z-40 flex items-center gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-md">
+    <header className="glass sticky top-0 z-40 flex items-center gap-3 px-4 py-3 shadow-xs supports-backdrop-filter:shadow-none">
       <Link href="/" className="flex items-center gap-2 text-lg font-bold">
-        <span className="text-xl">💙</span>
-        {t("appName")}
+        <span className="bg-gradient-to-br from-indigo-500 to-violet-600 bg-clip-text text-xl text-transparent">💙</span>
+        <span className="bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">{t("appName")}</span>
       </Link>
-      <nav className="flex items-center gap-1 text-sm">
-        <Link href="/" className="rounded-md px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground">
-          {t("dashboard")}
-        </Link>
-        <Link href="/chores" className="rounded-md px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground">
-          {t("chores")}
-        </Link>
-      </nav>
 
       <div className="ms-auto flex items-center gap-1">
         {canInstall && (
@@ -75,6 +70,11 @@ export function AppHeader() {
               </DropdownMenuItem>
             ))}
             <DropdownMenuItem onClick={() => setActingMemberId(null)}>{t("guest")}</DropdownMenuItem>
+            {me && (
+              <DropdownMenuItem onClick={() => setProfileOpen(true)}>
+                <Pencil className="size-4" /> {t("editProfile")}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuLabel>{t("language")}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => setLocale("he")}>{locale === "he" ? "✓ " : ""}עברית</DropdownMenuItem>
@@ -93,6 +93,8 @@ export function AppHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <ProfileEditDialog memberId={actingMemberId} open={profileOpen} onOpenChange={setProfileOpen} />
     </header>
   );
 }

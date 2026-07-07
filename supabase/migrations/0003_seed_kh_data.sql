@@ -2,9 +2,12 @@
 -- Idempotent: only runs the bulk import if `sections` is still empty, so
 -- re-running migrations against an already-seeded project is a no-op.
 
+-- Neutral defaults on purpose: don't assume anyone's gender from their name.
+-- Each person customizes their own avatar/color/name from the app (Header ->
+-- profile menu -> "Edit profile").
 insert into public.members (email, display_name, avatar_emoji, color) values
-  ('haim_indyk@icloud.com', 'חיים', '🧔', '#3b82f6'),
-  ('Koren8761@gmail.com',   'קורן', '👩', '#ec4899')
+  ('haim_indyk@icloud.com', 'חיים', '🙂', '#3b82f6'),
+  ('Koren8761@gmail.com',   'קורן', '🙂', '#10b981')
 on conflict (email) do nothing;
 
 do $$

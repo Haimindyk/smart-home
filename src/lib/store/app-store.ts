@@ -44,6 +44,8 @@ type AppState = {
     oldRow: Record<string, unknown> | null
   ) => void;
 
+  updateMember: (id: string, patch: Partial<Pick<Member, "display_name" | "avatar_emoji" | "color">>) => Promise<void>;
+
   createSection: (input: { name: string; emoji?: string; kind: SectionKind; createdBy: string | null }) => Promise<void>;
   renameSection: (id: string, name: string, emoji?: string) => Promise<void>;
   reorderSection: (id: string, beforeId: string | null, afterId: string | null) => Promise<void>;
@@ -150,6 +152,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       return { [stateKey]: bucket } as unknown as Partial<AppState>;
     });
+  },
+
+  updateMember: async (id, patch) => {
+    const prev = get().members[id];
+    set((s) => ({ members: { ...s.members, [id]: { ...s.members[id], ...patch } } }));
+    await runMutation(
+      { table: "members", op: "update", payload: patch, match: { id } },
+      () => prev && set((s) => ({ members: { ...s.members, [id]: prev } })),
+      "לא הצלחנו לעדכן את הפרופיל"
+    );
   },
 
   // ---------------------------------------------------------------------

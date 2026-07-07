@@ -28,28 +28,32 @@ export function IdentityGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-background via-background to-muted p-6">
-      <Card className="w-full max-w-sm gap-6 p-6 text-center shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-background p-6">
+      <div className="pointer-events-none absolute -top-24 start-1/2 size-96 -translate-x-1/2 rounded-full bg-gradient-to-br from-indigo-400/25 to-violet-500/20 blur-3xl" />
+      <Card className="glass relative w-full max-w-sm gap-6 rounded-3xl p-7 text-center shadow-2xl ring-1 ring-border/60">
         <div>
-          <div className="mb-2 text-4xl">💙</div>
-          <h1 className="text-xl font-semibold">{t("whoAreYou")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("whoAreYouSubtitle")}</p>
+          <div className="mb-3 text-5xl">💙</div>
+          <h1 className="text-xl font-semibold tracking-tight">{t("whoAreYou")}</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">{t("whoAreYouSubtitle")}</p>
         </div>
         <div className="flex flex-col gap-2">
           {memberList.map((member) => (
-            <Button
+            <button
               key={member.id}
-              variant="outline"
-              size="lg"
-              className="justify-start gap-3 text-base"
-              style={{ borderColor: member.color }}
               onClick={() => setActingMemberId(member.id)}
+              className="flex items-center gap-3 rounded-2xl border border-transparent bg-accent/40 px-4 py-3 text-start text-base font-medium transition-all hover:-translate-y-0.5 hover:shadow-md"
+              style={{ boxShadow: `inset 0 0 0 1.5px ${member.color}40` }}
             >
-              <span className="text-xl">{member.avatar_emoji}</span>
-              {member.display_name}
-            </Button>
+              <span
+                className="flex size-9 shrink-0 items-center justify-center rounded-full text-lg"
+                style={{ backgroundColor: `${member.color}22` }}
+              >
+                {member.avatar_emoji}
+              </span>
+              <span dir="auto">{member.display_name}</span>
+            </button>
           ))}
-          <Button variant="ghost" size="lg" onClick={() => setPickedGuest(true)}>
+          <Button variant="ghost" size="lg" className="rounded-2xl" onClick={() => setPickedGuest(true)}>
             {t("guest")}
           </Button>
         </div>

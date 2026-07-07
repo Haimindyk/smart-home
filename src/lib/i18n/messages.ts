@@ -54,6 +54,12 @@ export const messages = {
     section_chores: "מטלות",
     emptySearch: "לא נמצאו תוצאות",
     installApp: "התקנת האפליקציה",
+    myProfile: "הפרופיל שלי",
+    name: "שם",
+    avatar: "אווטאר",
+    color: "צבע",
+    save: "שמירה",
+    editProfile: "עריכת פרופיל",
   },
   en: {
     appName: "K&H",
@@ -110,6 +116,12 @@ export const messages = {
     section_chores: "Chores",
     emptySearch: "No results found",
     installApp: "Install app",
+    myProfile: "My profile",
+    name: "Name",
+    avatar: "Avatar",
+    color: "Color",
+    save: "Save",
+    editProfile: "Edit profile",
   },
 } as const;
 
