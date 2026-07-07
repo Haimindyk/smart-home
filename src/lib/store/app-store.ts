@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
+import { useIdentity } from "@/lib/identity";
 import { enqueueMutation, type QueuedMutation } from "@/lib/offline/db";
 import { execGenericWrite } from "@/lib/supabase/generic-write";
 import { rankAtEnd, rankBetween } from "@/lib/ordering/rank";
@@ -14,6 +15,7 @@ import type {
   Chore,
   ChoreCompletion,
   Attachment,
+  ActivityLog,
 } from "@/types/domain";
 import { toast } from "sonner";
 
@@ -26,6 +28,7 @@ type AppState = {
   chores: ById<Chore>;
   choreCompletions: ById<ChoreCompletion>;
   attachments: ById<Attachment>;
+  activityLog: ById<ActivityLog>;
   hydrated: boolean;
 
   hydrate: (data: {
@@ -35,10 +38,11 @@ type AppState = {
     chores: Chore[];
     choreCompletions: ChoreCompletion[];
     attachments: Attachment[];
+    activityLog: ActivityLog[];
   }) => void;
 
   applyRemote: (
-    table: "members" | "sections" | "tasks" | "chores" | "chore_completions" | "attachments",
+    table: "members" | "sections" | "tasks" | "chores" | "chore_completions" | "attachments" | "activity_log",
     eventType: "INSERT" | "UPDATE" | "DELETE",
     row: Record<string, unknown> | null,
     oldRow: Record<string, unknown> | null
@@ -82,6 +86,11 @@ function shouldApply(existing: { updated_at?: string } | undefined, incoming: { 
   return incoming.updated_at >= existing.updated_at;
 }
 
+/** Who's acting on this device right now — read directly so callers don't have to thread it through every action. */
+function currentActorId(): string | null {
+  return useIdentity.getState().actingMemberId;
+}
+
 /**
  * Runs a write against Supabase. If the device is offline, the mutation is
  * queued in IndexedDB (and replayed in order once connectivity returns, see
@@ -89,8 +98,17 @@ function shouldApply(existing: { updated_at?: string } | undefined, incoming: { 
  * optimistic state already applied to the store is left standing. If the
  * device is online and the write genuinely fails (validation, RLS, etc.),
  * the caller's rollback runs and an error toast is shown.
+ *
+ * Update payloads are stamped with `updated_by` (the current identity) unless
+ * the caller already set one — this is what the DB's activity-log trigger
+ * uses to attribute "who changed this", so every update stays attributable
+ * without every call site having to remember to pass an actor.
  */
 async function runMutation(entry: Omit<QueuedMutation, "seq" | "createdAt">, rollback: () => void, errorMessage: string) {
+  if (entry.op === "update" && !("updated_by" in entry.payload)) {
+    entry = { ...entry, payload: { ...entry.payload, updated_by: currentActorId() } };
+  }
+
   if (typeof navigator !== "undefined" && !navigator.onLine) {
     await enqueueMutation({ ...entry, createdAt: new Date().toISOString() });
     return;
@@ -112,6 +130,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   chores: {},
   choreCompletions: {},
   attachments: {},
+  activityLog: {},
   hydrated: false,
 
   hydrate: (data) =>
@@ -122,6 +141,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       chores: keyify(data.chores),
       choreCompletions: keyify(data.choreCompletions),
       attachments: keyify(data.attachments),
+      activityLog: keyify(data.activityLog),
       hydrated: true,
     }),
 
@@ -133,8 +153,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       chores: "chores",
       chore_completions: "choreCompletions",
       attachments: "attachments",
+      activity_log: "activityLog",
     };
-    const stateKey = map[table] as "members" | "sections" | "tasks" | "chores" | "choreCompletions" | "attachments";
+    const stateKey = map[table] as "members" | "sections" | "tasks" | "chores" | "choreCompletions" | "attachments" | "activityLog";
 
     set((state) => {
       const bucket = { ...(state[stateKey] as ById<{ id: string; updated_at?: string }>) };
@@ -185,6 +206,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       position,
       deleted_at: null,
       created_by: createdBy,
+      updated_by: createdBy,
       created_at: now,
       updated_at: now,
     };
@@ -274,6 +296,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       image_url: null,
       deleted_at: null,
       created_by: createdBy,
+      updated_by: createdBy,
       created_at: now,
       updated_at: now,
       ...extra,
@@ -342,7 +365,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { tasks: next };
     });
     await runMutation(
-      { table: "tasks", op: "rpc", rpcName: "soft_delete_task", payload: { p_task_id: id } },
+      { table: "tasks", op: "rpc", rpcName: "soft_delete_task", payload: { p_task_id: id, p_actor_id: currentActorId() } },
       () =>
         set((s) => {
           const next = { ...s.tasks };
@@ -365,7 +388,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { tasks: next };
     });
     await runMutation(
-      { table: "tasks", op: "rpc", rpcName: "restore_task", payload: { p_task_id: id } },
+      { table: "tasks", op: "rpc", rpcName: "restore_task", payload: { p_task_id: id, p_actor_id: currentActorId() } },
       () =>
         set((s) => {
           const next = { ...s.tasks };
@@ -381,6 +404,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ---------------------------------------------------------------------
   createChore: async (input) => {
     const id = crypto.randomUUID();
+    const actorId = currentActorId();
     const siblings = Object.values(get().chores).filter((c) => c.section_id === input.sectionId && !c.deleted_at);
     const lastPosition = siblings.sort((a, b) => (a.position > b.position ? -1 : 1))[0]?.position;
     const position = rankAtEnd(lastPosition);
@@ -403,6 +427,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       anchor_date: input.anchor_date ?? now.slice(0, 10),
       next_due_at: input.next_due_at ?? now,
       deleted_at: null,
+      created_by: actorId,
+      updated_by: actorId,
       created_at: now,
       updated_at: now,
     };
@@ -418,6 +444,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           title: input.title,
           freq: input.freq,
           position,
+          created_by: actorId,
           assignee_kind: optimistic.assignee_kind,
           assignee_member_id: optimistic.assignee_member_id,
           weekdays: optimistic.weekdays,

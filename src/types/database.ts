@@ -165,6 +165,7 @@ export type Database = {
           assignee_kind: string
           assignee_member_id: string | null
           created_at: string
+          created_by: string | null
           custom_cron: string | null
           deleted_at: string | null
           emoji: string | null
@@ -178,6 +179,7 @@ export type Database = {
           section_id: string
           title: string
           updated_at: string
+          updated_by: string | null
           weekdays: number[] | null
         }
         Insert: {
@@ -185,6 +187,7 @@ export type Database = {
           assignee_kind?: string
           assignee_member_id?: string | null
           created_at?: string
+          created_by?: string | null
           custom_cron?: string | null
           deleted_at?: string | null
           emoji?: string | null
@@ -198,6 +201,7 @@ export type Database = {
           section_id: string
           title: string
           updated_at?: string
+          updated_by?: string | null
           weekdays?: number[] | null
         }
         Update: {
@@ -205,6 +209,7 @@ export type Database = {
           assignee_kind?: string
           assignee_member_id?: string | null
           created_at?: string
+          created_by?: string | null
           custom_cron?: string | null
           deleted_at?: string | null
           emoji?: string | null
@@ -218,6 +223,7 @@ export type Database = {
           section_id?: string
           title?: string
           updated_at?: string
+          updated_by?: string | null
           weekdays?: number[] | null
         }
         Relationships: [
@@ -229,10 +235,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "chores_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "chores_section_id_fkey"
             columns: ["section_id"]
             isOneToOne: false
             referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chores_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "members"
             referencedColumns: ["id"]
           },
         ]
@@ -246,6 +266,7 @@ export type Database = {
           email: string
           id: string
           locale: string
+          pin: string | null
           updated_at: string
           user_id: string | null
         }
@@ -257,6 +278,7 @@ export type Database = {
           email: string
           id?: string
           locale?: string
+          pin?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -268,6 +290,7 @@ export type Database = {
           email?: string
           id?: string
           locale?: string
+          pin?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -286,6 +309,7 @@ export type Database = {
           name: string
           position: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           color?: string | null
@@ -299,6 +323,7 @@ export type Database = {
           name: string
           position: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           color?: string | null
@@ -312,11 +337,19 @@ export type Database = {
           name?: string
           position?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "sections_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sections_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "members"
             referencedColumns: ["id"]
@@ -353,6 +386,7 @@ export type Database = {
           title: string
           unit: string | null
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           assignee_kind?: string
@@ -383,6 +417,7 @@ export type Database = {
           title?: string
           unit?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           assignee_kind?: string
@@ -413,6 +448,7 @@ export type Database = {
           title?: string
           unit?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -450,6 +486,13 @@ export type Database = {
             referencedRelation: "sections"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "tasks_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -462,8 +505,14 @@ export type Database = {
         Returns: undefined
       }
       is_member: { Args: Record<string, never>; Returns: boolean }
-      restore_task: { Args: { p_task_id: string }; Returns: undefined }
-      soft_delete_task: { Args: { p_task_id: string }; Returns: undefined }
+      restore_task: {
+        Args: { p_task_id: string } | { p_actor_id?: string; p_task_id: string }
+        Returns: undefined
+      }
+      soft_delete_task: {
+        Args: { p_task_id: string } | { p_actor_id?: string; p_task_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
