@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Moon, Sun, Laptop, Download, Users, Pencil, History, Bell } from "lucide-react";
+import { Search, Moon, Sun, Laptop, Download, Users, Pencil, History, Bell, ChevronDown } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useIdentity } from "@/lib/identity";
 import { useAppStore } from "@/lib/store/app-store";
@@ -55,9 +55,12 @@ export function AppHeader() {
         <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)} aria-label={t("search")}>
           <Search className="size-4" />
         </Button>
+        <Button variant="ghost" size="icon" onClick={() => setNotificationsOpen(true)} aria-label={t("notifications")} title={t("notifications")}>
+          <Bell className="size-4" />
+        </Button>
 
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="ghost" className="gap-2 px-2" aria-label={t("settings")} />}>
+          <DropdownMenuTrigger render={<Button variant="ghost" className="gap-1 px-2" aria-label={t("settings")} />}>
             {me ? (
               <>
                 <MemberAvatar member={me} className="size-5" />
@@ -66,6 +69,7 @@ export function AppHeader() {
             ) : (
               <Users className="size-4" />
             )}
+            <ChevronDown className="size-3.5 opacity-60" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuGroup>
@@ -76,9 +80,6 @@ export function AppHeader() {
               )}
               <DropdownMenuItem onClick={() => setHistoryOpen(true)}>
                 <History className="size-4" /> {t("history")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setNotificationsOpen(true)}>
-                <Bell className="size-4" /> {t("notifications")}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
