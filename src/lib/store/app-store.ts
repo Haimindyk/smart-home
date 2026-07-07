@@ -1,0 +1,474 @@
+"use client";
+
+import { create } from "zustand";
+import { createClient } from "@/lib/supabase/client";
+import { enqueueMutation, type QueuedMutation } from "@/lib/offline/db";
+import { execGenericWrite } from "@/lib/supabase/generic-write";
+import { rankAtEnd, rankBetween } from "@/lib/ordering/rank";
+import type {
+  Member,
+  Section,
+  SectionKind,
+  Task,
+  AssigneeKind,
+  Chore,
+  ChoreCompletion,
+  Attachment,
+} from "@/types/domain";
+import { toast } from "sonner";
+
+type ById<T> = Record<string, T>;
+
+type AppState = {
+  members: ById<Member>;
+  sections: ById<Section>;
+  tasks: ById<Task>;
+  chores: ById<Chore>;
+  choreCompletions: ById<ChoreCompletion>;
+  attachments: ById<Attachment>;
+  hydrated: boolean;
+
+  hydrate: (data: {
+    members: Member[];
+    sections: Section[];
+    tasks: Task[];
+    chores: Chore[];
+    choreCompletions: ChoreCompletion[];
+    attachments: Attachment[];
+  }) => void;
+
+  applyRemote: (
+    table: "members" | "sections" | "tasks" | "chores" | "chore_completions" | "attachments",
+    eventType: "INSERT" | "UPDATE" | "DELETE",
+    row: Record<string, unknown> | null,
+    oldRow: Record<string, unknown> | null
+  ) => void;
+
+  createSection: (input: { name: string; emoji?: string; kind: SectionKind; createdBy: string | null }) => Promise<void>;
+  renameSection: (id: string, name: string, emoji?: string) => Promise<void>;
+  reorderSection: (id: string, beforeId: string | null, afterId: string | null) => Promise<void>;
+  deleteSection: (id: string) => Promise<void>;
+
+  createTask: (input: {
+    sectionId: string;
+    parentTaskId?: string | null;
+    title: string;
+    createdBy: string | null;
+    extra?: Partial<Task>;
+  }) => Promise<string>;
+  updateTask: (id: string, patch: Partial<Task>) => Promise<void>;
+  toggleTaskCompleted: (id: string, completedBy: string | null) => Promise<void>;
+  reorderTask: (id: string, sectionId: string, parentTaskId: string | null, beforeId: string | null, afterId: string | null) => Promise<void>;
+  softDeleteTask: (id: string) => Promise<void>;
+  restoreTask: (id: string) => Promise<void>;
+
+  createChore: (input: Partial<Chore> & { sectionId: string; title: string; freq: Chore["freq"] }) => Promise<void>;
+  updateChore: (id: string, patch: Partial<Chore>) => Promise<void>;
+  completeChore: (id: string, completedBy: string) => Promise<void>;
+  deleteChore: (id: string) => Promise<void>;
+};
+
+function keyify<T extends { id: string }>(rows: T[]): ById<T> {
+  const out: ById<T> = {};
+  for (const row of rows) out[row.id] = row;
+  return out;
+}
+
+/** Merge an incoming row only if it isn't older than what we already have (LWW by updated_at). */
+function shouldApply(existing: { updated_at?: string } | undefined, incoming: { updated_at?: string }) {
+  if (!existing?.updated_at || !incoming.updated_at) return true;
+  return incoming.updated_at >= existing.updated_at;
+}
+
+/**
+ * Runs a write against Supabase. If the device is offline, the mutation is
+ * queued in IndexedDB (and replayed in order once connectivity returns, see
+ * lib/offline/queue.ts) instead of being attempted and failing — the
+ * optimistic state already applied to the store is left standing. If the
+ * device is online and the write genuinely fails (validation, RLS, etc.),
+ * the caller's rollback runs and an error toast is shown.
+ */
+async function runMutation(entry: Omit<QueuedMutation, "seq" | "createdAt">, rollback: () => void, errorMessage: string) {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    await enqueueMutation({ ...entry, createdAt: new Date().toISOString() });
+    return;
+  }
+
+  const supabase = createClient();
+  const { error } = await execGenericWrite(supabase, entry);
+
+  if (error) {
+    rollback();
+    toast.error(errorMessage);
+  }
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
+  members: {},
+  sections: {},
+  tasks: {},
+  chores: {},
+  choreCompletions: {},
+  attachments: {},
+  hydrated: false,
+
+  hydrate: (data) =>
+    set({
+      members: keyify(data.members),
+      sections: keyify(data.sections),
+      tasks: keyify(data.tasks),
+      chores: keyify(data.chores),
+      choreCompletions: keyify(data.choreCompletions),
+      attachments: keyify(data.attachments),
+      hydrated: true,
+    }),
+
+  applyRemote: (table, eventType, row, oldRow) => {
+    const map: Record<typeof table, keyof AppState> = {
+      members: "members",
+      sections: "sections",
+      tasks: "tasks",
+      chores: "chores",
+      chore_completions: "choreCompletions",
+      attachments: "attachments",
+    };
+    const stateKey = map[table] as "members" | "sections" | "tasks" | "chores" | "choreCompletions" | "attachments";
+
+    set((state) => {
+      const bucket = { ...(state[stateKey] as ById<{ id: string; updated_at?: string }>) };
+
+      if (eventType === "DELETE") {
+        const id = (oldRow?.id as string) ?? undefined;
+        if (id) delete bucket[id];
+        return { [stateKey]: bucket } as unknown as Partial<AppState>;
+      }
+
+      const incoming = row as unknown as { id: string; updated_at?: string };
+      if (!incoming?.id) return {} as Partial<AppState>;
+      if (shouldApply(bucket[incoming.id], incoming)) {
+        bucket[incoming.id] = incoming;
+      }
+      return { [stateKey]: bucket } as unknown as Partial<AppState>;
+    });
+  },
+
+  // ---------------------------------------------------------------------
+  // Sections
+  // ---------------------------------------------------------------------
+  createSection: async ({ name, emoji, kind, createdBy }) => {
+    const id = crypto.randomUUID();
+    const lastPosition = Object.values(get().sections)
+      .filter((s) => !s.deleted_at)
+      .sort((a, b) => (a.position > b.position ? -1 : 1))[0]?.position;
+    const position = rankAtEnd(lastPosition);
+    const now = new Date().toISOString();
+
+    const optimistic: Section = {
+      id,
+      name,
+      emoji: emoji ?? null,
+      kind,
+      color: null,
+      description: null,
+      position,
+      deleted_at: null,
+      created_by: createdBy,
+      created_at: now,
+      updated_at: now,
+    };
+    set((s) => ({ sections: { ...s.sections, [id]: optimistic } }));
+
+    await runMutation(
+      { table: "sections", op: "insert", payload: { id, name, emoji, kind, position, created_by: createdBy } },
+      () =>
+        set((s) => {
+          const next = { ...s.sections };
+          delete next[id];
+          return { sections: next };
+        }),
+      "לא הצלחנו ליצור את הקטגוריה"
+    );
+  },
+
+  renameSection: async (id, name, emoji) => {
+    const prev = get().sections[id];
+    set((s) => ({ sections: { ...s.sections, [id]: { ...s.sections[id], name, emoji: emoji ?? s.sections[id].emoji } } }));
+    await runMutation(
+      { table: "sections", op: "update", payload: { name, emoji }, match: { id } },
+      () => prev && set((s) => ({ sections: { ...s.sections, [id]: prev } })),
+      "לא הצלחנו לשנות את השם"
+    );
+  },
+
+  reorderSection: async (id, beforeId, afterId) => {
+    const sections = get().sections;
+    const position = rankBetween(beforeId ? sections[beforeId]?.position : null, afterId ? sections[afterId]?.position : null);
+    const prev = sections[id];
+    set((s) => ({ sections: { ...s.sections, [id]: { ...s.sections[id], position } } }));
+    await runMutation(
+      { table: "sections", op: "update", payload: { position }, match: { id } },
+      () => prev && set((s) => ({ sections: { ...s.sections, [id]: prev } })),
+      "לא הצלחנו לסדר מחדש"
+    );
+  },
+
+  deleteSection: async (id) => {
+    const now = new Date().toISOString();
+    const prev = get().sections[id];
+    set((s) => ({ sections: { ...s.sections, [id]: { ...s.sections[id], deleted_at: now } } }));
+    await runMutation(
+      { table: "sections", op: "update", payload: { deleted_at: now }, match: { id } },
+      () => prev && set((s) => ({ sections: { ...s.sections, [id]: prev } })),
+      "לא הצלחנו למחוק את הקטגוריה"
+    );
+  },
+
+  // ---------------------------------------------------------------------
+  // Tasks
+  // ---------------------------------------------------------------------
+  createTask: async ({ sectionId, parentTaskId = null, title, createdBy, extra }) => {
+    const id = crypto.randomUUID();
+    const siblings = Object.values(get().tasks).filter(
+      (t) => t.section_id === sectionId && t.parent_task_id === parentTaskId && !t.deleted_at
+    );
+    const lastPosition = siblings.sort((a, b) => (a.position > b.position ? -1 : 1))[0]?.position;
+    const position = rankAtEnd(lastPosition);
+    const now = new Date().toISOString();
+
+    const optimistic: Task = {
+      id,
+      section_id: sectionId,
+      parent_task_id: parentTaskId,
+      position,
+      title,
+      notes: null,
+      emoji: null,
+      priority: null,
+      due_at: null,
+      recurrence: null,
+      tags: [],
+      detected_links: [],
+      is_note: false,
+      assignee_kind: "unassigned" as AssigneeKind,
+      assignee_member_id: null,
+      is_completed: false,
+      completed_at: null,
+      completed_by: null,
+      quantity: null,
+      unit: null,
+      price: null,
+      currency: "ILS",
+      brand: null,
+      image_url: null,
+      deleted_at: null,
+      created_by: createdBy,
+      created_at: now,
+      updated_at: now,
+      ...extra,
+    };
+    set((s) => ({ tasks: { ...s.tasks, [id]: optimistic } }));
+
+    await runMutation(
+      {
+        table: "tasks",
+        op: "insert",
+        payload: { id, section_id: sectionId, parent_task_id: parentTaskId, position, title, created_by: createdBy, ...extra },
+      },
+      () =>
+        set((s) => {
+          const next = { ...s.tasks };
+          delete next[id];
+          return { tasks: next };
+        }),
+      "לא הצלחנו ליצור את המשימה"
+    );
+    return id;
+  },
+
+  updateTask: async (id, patch) => {
+    const prev = get().tasks[id];
+    set((s) => ({ tasks: { ...s.tasks, [id]: { ...s.tasks[id], ...patch } } }));
+    await runMutation(
+      { table: "tasks", op: "update", payload: patch, match: { id } },
+      () => prev && set((s) => ({ tasks: { ...s.tasks, [id]: prev } })),
+      "לא הצלחנו לעדכן את המשימה"
+    );
+  },
+
+  toggleTaskCompleted: async (id, completedBy) => {
+    const task = get().tasks[id];
+    if (!task) return;
+    const willComplete = !task.is_completed;
+    await get().updateTask(id, {
+      is_completed: willComplete,
+      completed_at: willComplete ? new Date().toISOString() : null,
+      completed_by: willComplete ? completedBy : null,
+    });
+  },
+
+  reorderTask: async (id, sectionId, parentTaskId, beforeId, afterId) => {
+    const tasks = get().tasks;
+    const position = rankBetween(beforeId ? tasks[beforeId]?.position : null, afterId ? tasks[afterId]?.position : null);
+    const prev = tasks[id];
+    set((s) => ({
+      tasks: { ...s.tasks, [id]: { ...s.tasks[id], section_id: sectionId, parent_task_id: parentTaskId, position } },
+    }));
+    await runMutation(
+      { table: "tasks", op: "update", payload: { section_id: sectionId, parent_task_id: parentTaskId, position }, match: { id } },
+      () => prev && set((s) => ({ tasks: { ...s.tasks, [id]: prev } })),
+      "לא הצלחנו לסדר מחדש"
+    );
+  },
+
+  softDeleteTask: async (id) => {
+    const now = new Date().toISOString();
+    const affected = Object.values(get().tasks).filter((t) => t.id === id || isDescendant(get().tasks, t, id));
+    const prevValues = affected.map((t) => [t.id, t] as const);
+    set((s) => {
+      const next = { ...s.tasks };
+      for (const t of affected) next[t.id] = { ...t, deleted_at: now };
+      return { tasks: next };
+    });
+    await runMutation(
+      { table: "tasks", op: "rpc", rpcName: "soft_delete_task", payload: { p_task_id: id } },
+      () =>
+        set((s) => {
+          const next = { ...s.tasks };
+          for (const [tid, t] of prevValues) next[tid] = t;
+          return { tasks: next };
+        }),
+      "לא הצלחנו למחוק את המשימה"
+    );
+    toast("המשימה נמחקה", {
+      action: { label: "בטל", onClick: () => get().restoreTask(id) },
+    });
+  },
+
+  restoreTask: async (id) => {
+    const affected = Object.values(get().tasks).filter((t) => t.deleted_at && (t.id === id || isDescendant(get().tasks, t, id)));
+    const prevValues = affected.map((t) => [t.id, t] as const);
+    set((s) => {
+      const next = { ...s.tasks };
+      for (const t of affected) next[t.id] = { ...t, deleted_at: null };
+      return { tasks: next };
+    });
+    await runMutation(
+      { table: "tasks", op: "rpc", rpcName: "restore_task", payload: { p_task_id: id } },
+      () =>
+        set((s) => {
+          const next = { ...s.tasks };
+          for (const [tid, t] of prevValues) next[tid] = t;
+          return { tasks: next };
+        }),
+      "לא הצלחנו לשחזר את המשימה"
+    );
+  },
+
+  // ---------------------------------------------------------------------
+  // Chores
+  // ---------------------------------------------------------------------
+  createChore: async (input) => {
+    const id = crypto.randomUUID();
+    const siblings = Object.values(get().chores).filter((c) => c.section_id === input.sectionId && !c.deleted_at);
+    const lastPosition = siblings.sort((a, b) => (a.position > b.position ? -1 : 1))[0]?.position;
+    const position = rankAtEnd(lastPosition);
+    const now = new Date().toISOString();
+
+    const optimistic: Chore = {
+      id,
+      section_id: input.sectionId,
+      title: input.title,
+      notes: input.notes ?? null,
+      emoji: input.emoji ?? null,
+      position,
+      assignee_member_id: input.assignee_member_id ?? null,
+      assignee_kind: input.assignee_kind ?? "anyone",
+      freq: input.freq,
+      interval_n: input.interval_n ?? 1,
+      weekdays: input.weekdays ?? null,
+      month_day: input.month_day ?? null,
+      custom_cron: input.custom_cron ?? null,
+      anchor_date: input.anchor_date ?? now.slice(0, 10),
+      next_due_at: input.next_due_at ?? now,
+      deleted_at: null,
+      created_at: now,
+      updated_at: now,
+    };
+    set((s) => ({ chores: { ...s.chores, [id]: optimistic } }));
+
+    await runMutation(
+      {
+        table: "chores",
+        op: "insert",
+        payload: {
+          id,
+          section_id: input.sectionId,
+          title: input.title,
+          freq: input.freq,
+          position,
+          assignee_kind: optimistic.assignee_kind,
+          assignee_member_id: optimistic.assignee_member_id,
+          weekdays: optimistic.weekdays,
+          emoji: optimistic.emoji,
+        },
+      },
+      () =>
+        set((s) => {
+          const next = { ...s.chores };
+          delete next[id];
+          return { chores: next };
+        }),
+      "לא הצלחנו ליצור את המטלה"
+    );
+  },
+
+  updateChore: async (id, patch) => {
+    const prev = get().chores[id];
+    set((s) => ({ chores: { ...s.chores, [id]: { ...s.chores[id], ...patch } } }));
+    await runMutation(
+      { table: "chores", op: "update", payload: patch, match: { id } },
+      () => prev && set((s) => ({ chores: { ...s.chores, [id]: prev } })),
+      "לא הצלחנו לעדכן את המטלה"
+    );
+  },
+
+  completeChore: async (id, completedBy) => {
+    const prev = get().chores[id];
+    // Optimistically bump next_due_at forward by a day so the UI reflects "done for now";
+    // the RPC computes the real next occurrence and the realtime echo corrects it.
+    set((s) => ({
+      chores: {
+        ...s.chores,
+        [id]: { ...s.chores[id], next_due_at: new Date(Date.now() + 86400000).toISOString() },
+      },
+    }));
+    await runMutation(
+      { table: "chores", op: "rpc", rpcName: "complete_chore", payload: { p_chore_id: id, p_completed_by: completedBy } },
+      () => prev && set((s) => ({ chores: { ...s.chores, [id]: prev } })),
+      "לא הצלחנו לסמן את המטלה כבוצעה"
+    );
+  },
+
+  deleteChore: async (id) => {
+    const now = new Date().toISOString();
+    const prev = get().chores[id];
+    set((s) => ({ chores: { ...s.chores, [id]: { ...s.chores[id], deleted_at: now } } }));
+    await runMutation(
+      { table: "chores", op: "update", payload: { deleted_at: now }, match: { id } },
+      () => prev && set((s) => ({ chores: { ...s.chores, [id]: prev } })),
+      "לא הצלחנו למחוק את המטלה"
+    );
+  },
+}));
+
+function isDescendant(tasks: ById<Task>, candidate: Task, ancestorId: string): boolean {
+  let current: Task | undefined = candidate;
+  const seen = new Set<string>();
+  while (current?.parent_task_id) {
+    if (seen.has(current.id)) return false;
+    seen.add(current.id);
+    if (current.parent_task_id === ancestorId) return true;
+    current = tasks[current.parent_task_id];
+  }
+  return false;
+}

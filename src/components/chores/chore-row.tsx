@@ -1,0 +1,86 @@
+"use client";
+
+import { useMemo } from "react";
+import { Check, History } from "lucide-react";
+import { useAppStore } from "@/lib/store/app-store";
+import { useIdentity } from "@/lib/identity";
+import { useT } from "@/lib/i18n/store";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AssigneeBadge } from "@/components/tasks/assignee-badge";
+import { cn } from "@/lib/utils";
+import type { Chore } from "@/types/domain";
+
+export function ChoreRow({ chore }: { chore: Chore }) {
+  const completeChore = useAppStore((s) => s.completeChore);
+  const choreCompletions = useAppStore((s) => s.choreCompletions);
+  const members = useAppStore((s) => s.members);
+  const actingMemberId = useIdentity((s) => s.actingMemberId);
+  const t = useT();
+
+  const isDue = new Date(chore.next_due_at).getTime() <= Date.now();
+
+  const history = useMemo(
+    () =>
+      Object.values(choreCompletions)
+        .filter((c) => c.chore_id === chore.id)
+        .sort((a, b) => (a.completed_at > b.completed_at ? -1 : 1))
+        .slice(0, 10),
+    [choreCompletions, chore.id]
+  );
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2.5">
+      <Button
+        size="icon"
+        variant={isDue ? "default" : "outline"}
+        className="size-8 shrink-0 rounded-full"
+        disabled={!actingMemberId}
+        title={actingMemberId ? t("markDone") : t("whoAreYou")}
+        onClick={() => actingMemberId && completeChore(chore.id, actingMemberId)}
+      >
+        <Check className="size-4" />
+      </Button>
+
+      <div className="flex flex-1 flex-col gap-0.5">
+        <div className="flex items-center gap-2">
+          {chore.emoji && <span>{chore.emoji}</span>}
+          <span dir="auto" className={cn("text-sm font-medium", !isDue && "text-muted-foreground")}>
+            {chore.title}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Badge variant="secondary" className="h-5 text-[11px]">
+            {t(chore.freq)}
+          </Badge>
+          {!isDue && (
+            <span className="text-[11px] text-muted-foreground">
+              {new Date(chore.next_due_at).toLocaleDateString("he-IL")}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <AssigneeBadge assigneeKind={chore.assignee_kind} assigneeMemberId={chore.assignee_member_id} />
+
+      <Popover>
+        <PopoverTrigger render={<Button variant="ghost" size="icon" className="size-7" />}>
+          <History className="size-3.5" />
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-64">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">{t("history")}</p>
+          {history.length === 0 && <p className="text-xs text-muted-foreground">—</p>}
+          <ul className="flex flex-col gap-1.5">
+            {history.map((h) => (
+              <li key={h.id} className="flex justify-between text-xs">
+                <span>{members[h.completed_by]?.display_name ?? "?"}</span>
+                <span className="text-muted-foreground">{new Date(h.completed_at).toLocaleDateString("he-IL")}</span>
+              </li>
+            ))}
+          </ul>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
