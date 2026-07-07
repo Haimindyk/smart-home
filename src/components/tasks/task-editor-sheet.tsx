@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AssigneeMultiSelect } from "@/components/tasks/assignee-multi-select";
+import { MemberAvatar } from "@/components/identity/member-avatar";
 import type { Task, SectionKind } from "@/types/domain";
 
 const PRIORITIES = [
@@ -151,10 +152,15 @@ export function TaskEditorSheet({
 
             <div className="grid gap-2">
               <Label>{t("doneBy")}</Label>
-              <p className="flex h-8 items-center text-sm text-muted-foreground">
-                {local.completed_by
-                  ? `${members[local.completed_by]?.avatar_emoji ?? ""} ${members[local.completed_by]?.display_name ?? "?"}`
-                  : "—"}
+              <p className="flex h-8 items-center gap-1.5 text-sm text-muted-foreground">
+                {local.completed_by ? (
+                  <>
+                    <MemberAvatar member={members[local.completed_by]} className="size-5" />
+                    {members[local.completed_by]?.display_name ?? "?"}
+                  </>
+                ) : (
+                  "—"
+                )}
               </p>
             </div>
           </div>

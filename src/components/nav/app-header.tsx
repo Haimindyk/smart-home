@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ProfileEditDialog } from "@/components/identity/profile-edit-dialog";
 import { HistoryDialog } from "@/components/history/history-dialog";
 import { NotificationSettingsDialog } from "@/components/push/notification-settings-dialog";
+import { MemberAvatar } from "@/components/identity/member-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,7 +60,7 @@ export function AppHeader() {
           <DropdownMenuTrigger render={<Button variant="ghost" className="gap-2 px-2" aria-label={t("settings")} />}>
             {me ? (
               <>
-                <span>{me.avatar_emoji}</span>
+                <MemberAvatar member={me} className="size-5" />
                 <span className="hidden sm:inline">{me.display_name}</span>
               </>
             ) : (

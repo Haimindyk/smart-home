@@ -266,6 +266,7 @@ export type Database = {
       members: {
         Row: {
           avatar_emoji: string | null
+          avatar_photo_url: string | null
           color: string
           created_at: string
           display_name: string
@@ -278,6 +279,7 @@ export type Database = {
         }
         Insert: {
           avatar_emoji?: string | null
+          avatar_photo_url?: string | null
           color?: string
           created_at?: string
           display_name: string
@@ -290,6 +292,7 @@ export type Database = {
         }
         Update: {
           avatar_emoji?: string | null
+          avatar_photo_url?: string | null
           color?: string
           created_at?: string
           display_name?: string
