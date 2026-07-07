@@ -28,7 +28,6 @@ export function AppHeader() {
   const locale = useLocaleStore((s) => s.locale);
   const setLocale = useLocaleStore((s) => s.setLocale);
   const actingMemberId = useIdentity((s) => s.actingMemberId);
-  const setActingMemberId = useIdentity((s) => s.setActingMemberId);
   const members = useAppStore((s) => s.members);
   const t = useT();
   const { canInstall, promptInstall } = useInstallPrompt();
@@ -55,7 +54,7 @@ export function AppHeader() {
         </Button>
 
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="ghost" className="gap-2 px-2" aria-label={t("changeIdentity")} />}>
+          <DropdownMenuTrigger render={<Button variant="ghost" className="gap-2 px-2" aria-label={t("settings")} />}>
             {me ? (
               <>
                 <span>{me.avatar_emoji}</span>
@@ -67,13 +66,6 @@ export function AppHeader() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuGroup>
-              <DropdownMenuLabel>{t("changeIdentity")}</DropdownMenuLabel>
-              {Object.values(members).map((m) => (
-                <DropdownMenuItem key={m.id} onClick={() => setActingMemberId(m.id)}>
-                  {m.avatar_emoji} {m.display_name}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuItem onClick={() => setActingMemberId(null)}>{t("guest")}</DropdownMenuItem>
               {me && (
                 <DropdownMenuItem onClick={() => setProfileOpen(true)}>
                   <Pencil className="size-4" /> {t("editProfile")}

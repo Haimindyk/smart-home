@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Delete } from "lucide-react";
 import { useIdentity } from "@/lib/identity";
 import { useAppStore } from "@/lib/store/app-store";
 import { useT } from "@/lib/i18n/store";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -18,39 +17,37 @@ export function IdentityGate({ children }: { children: React.ReactNode }) {
   const members = useAppStore((s) => s.members);
   const hydrated = useAppStore((s) => s.hydrated);
   const t = useT();
-  const [pickedGuest, setPickedGuest] = useState(false);
   const [pin, setPin] = useState("");
   const [shake, setShake] = useState(false);
 
   const memberList = Object.values(members);
 
-  useEffect(() => {
-    if (pin.length < PIN_LENGTH) return;
-    const match = memberList.find((m) => m.pin && m.pin === pin);
+  function press(key: string) {
+    if (key === "back") {
+      setPin((p) => p.slice(0, -1));
+      return;
+    }
+    if (!key || pin.length >= PIN_LENGTH) return;
+
+    const next = pin + key;
+    setPin(next);
+    if (next.length < PIN_LENGTH) return;
+
+    const match = memberList.find((m) => m.pin && m.pin === next);
     if (match) {
       setActingMemberId(match.id);
     } else {
       setShake(true);
-      const timeout = setTimeout(() => {
+      setTimeout(() => {
         setShake(false);
         setPin("");
       }, 500);
-      return () => clearTimeout(timeout);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin]);
-
-  function press(key: string) {
-    if (key === "back") {
-      setPin((p) => p.slice(0, -1));
-    } else if (key && pin.length < PIN_LENGTH) {
-      setPin((p) => p + key);
     }
   }
 
   // Don't block on a slow network — once we know who's here, or once data has
   // hydrated with nobody chosen yet, decide; otherwise just render the app.
-  if (actingMemberId || pickedGuest || (!hydrated && memberList.length === 0)) {
+  if (actingMemberId || (!hydrated && memberList.length === 0)) {
     return <>{children}</>;
   }
 
@@ -96,10 +93,6 @@ export function IdentityGate({ children }: { children: React.ReactNode }) {
             )
           )}
         </div>
-
-        <Button variant="ghost" size="lg" className="rounded-2xl" onClick={() => setPickedGuest(true)}>
-          {t("guest")}
-        </Button>
       </Card>
     </div>
   );
