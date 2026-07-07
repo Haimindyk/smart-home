@@ -8,25 +8,65 @@ import type { AssigneeKind } from "@/types/domain";
 export function AssigneeBadge({
   assigneeKind,
   assigneeMemberId,
+  assigneeMemberIds,
 }: {
   assigneeKind: AssigneeKind;
-  assigneeMemberId: string | null;
+  /** Legacy single-assignee id — used as a fallback for rows the array backfill somehow missed. */
+  assigneeMemberId?: string | null;
+  assigneeMemberIds?: string[];
 }) {
-  const member = useAppStore((s) => (assigneeMemberId ? s.members[assigneeMemberId] : undefined));
+  const members = useAppStore((s) => s.members);
   const t = useT();
 
   if (assigneeKind === "unassigned") return null;
 
-  if (assigneeKind === "member" && member) {
+  if (assigneeKind === "member") {
+    const ids =
+      assigneeMemberIds && assigneeMemberIds.length > 0
+        ? assigneeMemberIds
+        : assigneeMemberId
+          ? [assigneeMemberId]
+          : [];
+
+    if (ids.length === 0) return null;
+
+    if (ids.length === 1) {
+      const member = members[ids[0]];
+      if (!member) return null;
+      return (
+        <Badge
+          variant="outline"
+          className="gap-1 border-0"
+          style={{ backgroundColor: `${member.color}22`, color: member.color }}
+        >
+          <span>{member.avatar_emoji}</span>
+          {member.display_name}
+        </Badge>
+      );
+    }
+
     return (
-      <Badge
-        variant="outline"
-        className="gap-1 border-0"
-        style={{ backgroundColor: `${member.color}22`, color: member.color }}
-      >
-        <span>{member.avatar_emoji}</span>
-        {member.display_name}
-      </Badge>
+      <div className="flex items-center -space-x-1.5 rtl:space-x-reverse">
+        {ids.slice(0, 4).map((id) => {
+          const member = members[id];
+          if (!member) return null;
+          return (
+            <span
+              key={id}
+              title={member.display_name}
+              className="flex size-5 items-center justify-center rounded-full text-xs ring-2 ring-background"
+              style={{ backgroundColor: `${member.color}33` }}
+            >
+              {member.avatar_emoji}
+            </span>
+          );
+        })}
+        {ids.length > 4 && (
+          <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[10px] ring-2 ring-background">
+            +{ids.length - 4}
+          </span>
+        )}
+      </div>
     );
   }
 

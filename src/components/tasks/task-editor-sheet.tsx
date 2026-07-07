@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { CalendarIcon, Trash2, X } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
-import { useIdentity } from "@/lib/identity";
 import { useT } from "@/lib/i18n/store";
 import {
   Sheet,
@@ -26,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AssigneeMultiSelect } from "@/components/tasks/assignee-multi-select";
 import type { Task, SectionKind } from "@/types/domain";
 
 const PRIORITIES = [
@@ -49,13 +49,18 @@ export function TaskEditorSheet({
   const sections = useAppStore((s) => s.sections);
   const updateTask = useAppStore((s) => s.updateTask);
   const softDeleteTask = useAppStore((s) => s.softDeleteTask);
-  const actingMemberId = useIdentity((s) => s.actingMemberId);
   const t = useT();
 
   const [local, setLocal] = useState<Task | undefined>(task);
   const [tagInput, setTagInput] = useState("");
-
-  useEffect(() => setLocal(task), [task]);
+  // Re-sync `local` whenever the store's task reference changes (own commits or
+  // a realtime echo from another device) — adjusting state during render per
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const [syncedTask, setSyncedTask] = useState(task);
+  if (task !== syncedTask) {
+    setSyncedTask(task);
+    setLocal(task);
+  }
 
   if (!task || !local) return null;
 
@@ -134,43 +139,24 @@ export function TaskEditorSheet({
             </div>
           </div>
 
-          <div className="grid gap-2">
-            <Label>{t("assignee")}</Label>
-            <Select
-              value={local.assignee_kind === "member" ? `member:${local.assignee_member_id}` : local.assignee_kind}
-              onValueChange={(v) => {
-                if (!v) return;
-                if (v.startsWith("member:")) {
-                  commit({ assignee_kind: "member", assignee_member_id: v.split(":")[1] });
-                } else {
-                  commit({ assignee_kind: v as Task["assignee_kind"], assignee_member_id: null });
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue>
-                  {(v: string) => {
-                    if (v.startsWith("member:")) {
-                      const m = members[v.split(":")[1]];
-                      return m ? `${m.avatar_emoji} ${m.display_name}` : v;
-                    }
-                    if (v === "anyone") return t("anyone");
-                    if (v === "louis") return t("louis");
-                    return t("unassigned");
-                  }}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unassigned">{t("unassigned")}</SelectItem>
-                <SelectItem value="anyone">{t("anyone")}</SelectItem>
-                <SelectItem value="louis">{t("louis")}</SelectItem>
-                {Object.values(members).map((m) => (
-                  <SelectItem key={m.id} value={`member:${m.id}`}>
-                    {m.avatar_emoji} {m.display_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label>{t("assignee")}</Label>
+              <AssigneeMultiSelect
+                assigneeKind={local.assignee_kind}
+                assigneeMemberIds={local.assignee_member_ids}
+                onChange={(next) => commit(next)}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>{t("doneBy")}</Label>
+              <p className="flex h-8 items-center text-sm text-muted-foreground">
+                {local.completed_by
+                  ? `${members[local.completed_by]?.avatar_emoji ?? ""} ${members[local.completed_by]?.display_name ?? "?"}`
+                  : "—"}
+              </p>
+            </div>
           </div>
 
           {sectionKind === "shopping" && (
@@ -268,9 +254,6 @@ export function TaskEditorSheet({
             <Trash2 className="size-4" />
             {t("delete")}
           </Button>
-          <div className="text-xs text-muted-foreground">
-            {local.completed_by && actingMemberId ? `${t("doneBy")}: ${members[local.completed_by]?.display_name ?? ""}` : null}
-          </div>
         </SheetFooter>
       </SheetContent>
     </Sheet>

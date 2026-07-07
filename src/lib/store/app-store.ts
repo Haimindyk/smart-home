@@ -91,6 +91,9 @@ function currentActorId(): string | null {
   return useIdentity.getState().actingMemberId;
 }
 
+/** Tables with an `updated_by` column (fed into the activity_log trigger) — see runMutation. */
+const TABLES_WITH_UPDATED_BY = new Set(["sections", "tasks", "chores"]);
+
 /**
  * Runs a write against Supabase. If the device is offline, the mutation is
  * queued in IndexedDB (and replayed in order once connectivity returns, see
@@ -99,13 +102,17 @@ function currentActorId(): string | null {
  * device is online and the write genuinely fails (validation, RLS, etc.),
  * the caller's rollback runs and an error toast is shown.
  *
- * Update payloads are stamped with `updated_by` (the current identity) unless
- * the caller already set one — this is what the DB's activity-log trigger
- * uses to attribute "who changed this", so every update stays attributable
- * without every call site having to remember to pass an actor.
+ * Update payloads for tables that have an `updated_by` column are stamped
+ * with the current identity unless the caller already set one — this is
+ * what the DB's activity-log trigger uses to attribute "who changed this",
+ * so every update stays attributable without every call site having to
+ * remember to pass an actor. Tables without that column (e.g. `members`,
+ * which is self-edited, not attributed) are left untouched — stamping an
+ * unknown column onto the payload would make PostgREST reject the whole
+ * write.
  */
 async function runMutation(entry: Omit<QueuedMutation, "seq" | "createdAt">, rollback: () => void, errorMessage: string) {
-  if (entry.op === "update" && !("updated_by" in entry.payload)) {
+  if (entry.op === "update" && TABLES_WITH_UPDATED_BY.has(entry.table) && !("updated_by" in entry.payload)) {
     entry = { ...entry, payload: { ...entry.payload, updated_by: currentActorId() } };
   }
 
@@ -285,6 +292,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       is_note: false,
       assignee_kind: "unassigned" as AssigneeKind,
       assignee_member_id: null,
+      assignee_member_ids: [],
       is_completed: false,
       completed_at: null,
       completed_by: null,
@@ -418,6 +426,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       emoji: input.emoji ?? null,
       position,
       assignee_member_id: input.assignee_member_id ?? null,
+      assignee_member_ids: input.assignee_member_ids ?? [],
       assignee_kind: input.assignee_kind ?? "anyone",
       freq: input.freq,
       interval_n: input.interval_n ?? 1,
@@ -447,6 +456,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           created_by: actorId,
           assignee_kind: optimistic.assignee_kind,
           assignee_member_id: optimistic.assignee_member_id,
+          assignee_member_ids: optimistic.assignee_member_ids,
           weekdays: optimistic.weekdays,
           emoji: optimistic.emoji,
         },

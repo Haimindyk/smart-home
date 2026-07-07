@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { he, enUS } from "date-fns/locale";
 import { History as HistoryIcon } from "lucide-react";
@@ -24,7 +25,14 @@ export function HistoryDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const locale = useLocaleStore((s) => s.locale);
   const t = useT();
 
-  const entries = Object.values(activityLog).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  const entries = useMemo(
+    () =>
+      Object.values(activityLog).sort((a, b) => {
+        if (a.seq !== b.seq) return a.seq < b.seq ? 1 : -1;
+        return a.created_at < b.created_at ? 1 : -1;
+      }),
+    [activityLog]
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

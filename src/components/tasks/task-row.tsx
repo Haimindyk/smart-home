@@ -137,7 +137,11 @@ function TaskRowContent({
           )}
         </button>
 
-        <AssigneeBadge assigneeKind={node.assignee_kind} assigneeMemberId={node.assignee_member_id} />
+        <AssigneeBadge
+          assigneeKind={node.assignee_kind}
+          assigneeMemberId={node.assignee_member_id}
+          assigneeMemberIds={node.assignee_member_ids}
+        />
 
         <Button variant="ghost" size="icon" className="size-6 opacity-0 group-hover:opacity-100" onClick={() => setAddingSubtask((v) => !v)}>
           <Plus className="size-3.5" />

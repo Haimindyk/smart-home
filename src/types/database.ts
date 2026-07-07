@@ -20,6 +20,7 @@ export type Database = {
           entity_id: string
           entity_type: string
           id: string
+          seq: number
           summary: string | null
         }
         Insert: {
@@ -29,6 +30,7 @@ export type Database = {
           entity_id: string
           entity_type: string
           id?: string
+          seq?: never
           summary?: string | null
         }
         Update: {
@@ -38,6 +40,7 @@ export type Database = {
           entity_id?: string
           entity_type?: string
           id?: string
+          seq?: never
           summary?: string | null
         }
         Relationships: [
@@ -164,6 +167,7 @@ export type Database = {
           anchor_date: string
           assignee_kind: string
           assignee_member_id: string | null
+          assignee_member_ids: string[]
           created_at: string
           created_by: string | null
           custom_cron: string | null
@@ -186,6 +190,7 @@ export type Database = {
           anchor_date?: string
           assignee_kind?: string
           assignee_member_id?: string | null
+          assignee_member_ids?: string[]
           created_at?: string
           created_by?: string | null
           custom_cron?: string | null
@@ -208,6 +213,7 @@ export type Database = {
           anchor_date?: string
           assignee_kind?: string
           assignee_member_id?: string | null
+          assignee_member_ids?: string[]
           created_at?: string
           created_by?: string | null
           custom_cron?: string | null
@@ -296,6 +302,82 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_prefs: {
+        Row: {
+          member_id: string
+          on_create: boolean
+          on_complete: boolean
+          on_assigned_me: boolean
+          on_shopping: boolean
+          muted: boolean
+          updated_at: string
+        }
+        Insert: {
+          member_id: string
+          on_create?: boolean
+          on_complete?: boolean
+          on_assigned_me?: boolean
+          on_shopping?: boolean
+          muted?: boolean
+          updated_at?: string
+        }
+        Update: {
+          member_id?: string
+          on_create?: boolean
+          on_complete?: boolean
+          on_assigned_me?: boolean
+          on_shopping?: boolean
+          muted?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_prefs_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          id: string
+          member_id: string | null
+          endpoint: string
+          p256dh: string
+          auth: string
+          user_agent: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          member_id?: string | null
+          endpoint: string
+          p256dh: string
+          auth: string
+          user_agent?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          member_id?: string | null
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+          user_agent?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sections: {
         Row: {
           color: string | null
@@ -360,6 +442,7 @@ export type Database = {
         Row: {
           assignee_kind: string
           assignee_member_id: string | null
+          assignee_member_ids: string[]
           brand: string | null
           completed_at: string | null
           completed_by: string | null
@@ -391,6 +474,7 @@ export type Database = {
         Insert: {
           assignee_kind?: string
           assignee_member_id?: string | null
+          assignee_member_ids?: string[]
           brand?: string | null
           completed_at?: string | null
           completed_by?: string | null
@@ -422,6 +506,7 @@ export type Database = {
         Update: {
           assignee_kind?: string
           assignee_member_id?: string | null
+          assignee_member_ids?: string[]
           brand?: string | null
           completed_at?: string | null
           completed_by?: string | null

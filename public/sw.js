@@ -55,3 +55,40 @@ self.addEventListener("fetch", (event) => {
     )
   );
 });
+
+// Web Push notifications (see supabase/functions/send-push/index.ts, which
+// sends `{ title, body, url, tag }` as the push message payload).
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    return;
+  }
+
+  const { title, body, url, tag } = payload;
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      tag,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window" }).then((list) => {
+      const existing = list.find((client) => client.url.includes(url));
+      if (existing) return existing.focus();
+      return clients.openWindow(url);
+    })
+  );
+});
