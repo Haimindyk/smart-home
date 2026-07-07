@@ -1,0 +1,69 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+import type { Section } from "@/types/domain";
+
+export function CategoryTabs({ sections }: { sections: Section[] }) {
+  const [activeId, setActiveId] = useState<string | null>(sections[0]?.id ?? null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  useEffect(() => {
+    const elements = sections
+      .map((s) => document.getElementById(`section-${s.id}`))
+      .filter((el): el is HTMLElement => !!el);
+    if (elements.length === 0) return;
+
+    observerRef.current?.disconnect();
+    const visible = new Map<string, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          visible.set(entry.target.id, entry.intersectionRatio);
+        }
+        let bestId: string | null = null;
+        let bestRatio = 0;
+        for (const [id, ratio] of visible) {
+          if (ratio > bestRatio) {
+            bestRatio = ratio;
+            bestId = id;
+          }
+        }
+        if (bestId) setActiveId(bestId.replace("section-", ""));
+      },
+      { rootMargin: "-120px 0px -60% 0px", threshold: [0, 0.25, 0.5, 0.75, 1] }
+    );
+    elements.forEach((el) => observer.observe(el));
+    observerRef.current = observer;
+    return () => observer.disconnect();
+  }, [sections]);
+
+  function jumpTo(id: string) {
+    setActiveId(id);
+    document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  if (sections.length === 0) return null;
+
+  return (
+    <div className="glass sticky top-[57px] z-30 -mx-4 mb-4 overflow-x-auto px-4 py-2.5 ring-1 ring-border/60">
+      <div className="flex w-max gap-1.5">
+        {sections.map((section) => (
+          <button
+            key={section.id}
+            onClick={() => jumpTo(section.id)}
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+              activeId === section.id
+                ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+            )}
+          >
+            <span>{section.emoji}</span>
+            <span dir="auto">{section.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

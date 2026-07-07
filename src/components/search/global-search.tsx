@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Fuse from "fuse.js";
 import { useAppStore } from "@/lib/store/app-store";
 import { useSearchOpen } from "@/lib/search-ui-state";
@@ -33,6 +33,7 @@ export function GlobalSearch() {
   const chores = useAppStore((s) => s.chores);
   const members = useAppStore((s) => s.members);
   const router = useRouter();
+  const pathname = usePathname();
   const t = useT();
 
   useEffect(() => {
@@ -85,8 +86,14 @@ export function GlobalSearch() {
   function go(item: SearchItem) {
     setOpen(false);
     setQuery("");
-    if (item.kind === "chore") router.push("/chores");
-    else router.push(`/section/${item.sectionId}`);
+    const scroll = () =>
+      document.getElementById(`section-${item.sectionId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (pathname === "/") {
+      scroll();
+    } else {
+      router.push("/");
+      requestAnimationFrame(() => setTimeout(scroll, 300));
+    }
   }
 
   return (

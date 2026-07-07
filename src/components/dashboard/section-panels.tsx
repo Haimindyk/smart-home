@@ -10,32 +10,32 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { SortableContext, useSortable, rectSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useAppStore } from "@/lib/store/app-store";
 import { sortByPosition } from "@/lib/ordering/rank";
-import { SectionCard } from "@/components/dashboard/section-card";
+import { SectionPanel } from "@/components/dashboard/section-panel";
 import type { Section } from "@/types/domain";
 
-function SortableSectionCard({ section }: { section: Section }) {
+function SortablePanel({ section, index }: { section: Section; index: number }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    animationDelay: `${Math.min(index, 8) * 40}ms`,
+  };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <SectionCard section={section} />
+    <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-backwards duration-500">
+      <SectionPanel section={section} dragHandleProps={{ attributes, listeners }} style={style} ref={setNodeRef} />
     </div>
   );
 }
 
-export function DashboardGrid() {
-  const sections = useAppStore((s) => s.sections);
+export function SectionPanels({ sections }: { sections: Section[] }) {
   const reorderSection = useAppStore((s) => s.reorderSection);
-
-  const ordered = useMemo(
-    () => sortByPosition(Object.values(sections).filter((s) => !s.deleted_at)),
-    [sections]
-  );
+  const ordered = useMemo(() => sortByPosition(sections), [sections]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -63,10 +63,10 @@ export function DashboardGrid() {
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={ordered.map((s) => s.id)} strategy={rectSortingStrategy}>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {ordered.map((section) => (
-            <SortableSectionCard key={section.id} section={section} />
+      <SortableContext items={ordered.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+        <div className="flex flex-col gap-4">
+          {ordered.map((section, index) => (
+            <SortablePanel key={section.id} section={section} index={index} />
           ))}
         </div>
       </SortableContext>
