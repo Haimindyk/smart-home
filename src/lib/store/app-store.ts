@@ -48,7 +48,7 @@ type AppState = {
     oldRow: Record<string, unknown> | null
   ) => void;
 
-  updateMember: (id: string, patch: Partial<Pick<Member, "display_name" | "avatar_emoji" | "color">>) => Promise<void>;
+  updateMember: (id: string, patch: Partial<Pick<Member, "display_name" | "avatar_emoji" | "avatar_photo_url" | "color">>) => Promise<void>;
 
   createSection: (input: { name: string; emoji?: string; kind: SectionKind; createdBy: string | null }) => Promise<void>;
   renameSection: (id: string, name: string, emoji?: string) => Promise<void>;

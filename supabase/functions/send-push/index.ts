@@ -49,6 +49,7 @@ type MemberRow = {
   id: string;
   display_name: string;
   avatar_emoji: string | null;
+  avatar_photo_url: string | null;
   locale: string | null;
 };
 
@@ -156,7 +157,7 @@ Deno.serve(async (req) => {
   const [{ data: subscriptions }, { data: prefsRows }, { data: members }] = await Promise.all([
     supabase.from("push_subscriptions").select("id, member_id, endpoint, p256dh, auth"),
     supabase.from("notification_prefs").select("*"),
-    supabase.from("members").select("id, display_name, avatar_emoji, locale"),
+    supabase.from("members").select("id, display_name, avatar_emoji, avatar_photo_url, locale"),
   ]);
 
   const prefsByMember = new Map<string, NotificationPrefsRow>();
@@ -230,6 +231,7 @@ Deno.serve(async (req) => {
         body,
         url: "/",
         tag: `${entityType}-${entityId}`,
+        icon: actor?.avatar_photo_url ?? undefined,
       };
 
       try {

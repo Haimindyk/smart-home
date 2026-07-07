@@ -3,6 +3,7 @@
 import { useAppStore } from "@/lib/store/app-store";
 import { useT } from "@/lib/i18n/store";
 import { Badge } from "@/components/ui/badge";
+import { MemberAvatar } from "@/components/identity/member-avatar";
 import type { AssigneeKind } from "@/types/domain";
 
 export function AssigneeBadge({
@@ -39,7 +40,7 @@ export function AssigneeBadge({
           className="gap-1 border-0"
           style={{ backgroundColor: `${member.color}22`, color: member.color }}
         >
-          <span>{member.avatar_emoji}</span>
+          <MemberAvatar member={member} className="size-4" />
           {member.display_name}
         </Badge>
       );
@@ -54,10 +55,10 @@ export function AssigneeBadge({
             <span
               key={id}
               title={member.display_name}
-              className="flex size-5 items-center justify-center rounded-full text-xs ring-2 ring-background"
+              className="flex size-5 items-center justify-center overflow-hidden rounded-full text-xs ring-2 ring-background"
               style={{ backgroundColor: `${member.color}33` }}
             >
-              {member.avatar_emoji}
+              <MemberAvatar member={member} className="size-5" />
             </span>
           );
         })}

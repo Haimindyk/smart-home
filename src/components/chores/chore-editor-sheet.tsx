@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AssigneeMultiSelect } from "@/components/tasks/assignee-multi-select";
+import { MemberAvatar } from "@/components/identity/member-avatar";
 import type { Chore, ChoreFreq } from "@/types/domain";
 
 // Sunday-first weekday indices (matches JS Date#getDay()); Jan 1 2023 was a Sunday.
@@ -182,8 +183,8 @@ export function ChoreEditorSheet({
             {lastCompletion && (
               <div className="grid gap-2">
                 <Label>{t("doneBy")}</Label>
-                <p className="flex h-8 items-center text-sm text-muted-foreground">
-                  {members[lastCompletion.completed_by]?.avatar_emoji ?? ""}{" "}
+                <p className="flex h-8 items-center gap-1.5 text-sm text-muted-foreground">
+                  <MemberAvatar member={members[lastCompletion.completed_by]} className="size-5" />
                   {members[lastCompletion.completed_by]?.display_name ?? "?"}
                 </p>
               </div>

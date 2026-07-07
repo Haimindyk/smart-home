@@ -57,7 +57,9 @@ self.addEventListener("fetch", (event) => {
 });
 
 // Web Push notifications (see supabase/functions/send-push/index.ts, which
-// sends `{ title, body, url, tag }` as the push message payload).
+// sends `{ title, body, url, tag, icon }` as the push message payload —
+// `icon` is the acting member's uploaded photo when they have one, falling
+// back to the app icon).
 self.addEventListener("push", (event) => {
   if (!event.data) return;
 
@@ -68,12 +70,12 @@ self.addEventListener("push", (event) => {
     return;
   }
 
-  const { title, body, url, tag } = payload;
+  const { title, body, url, tag, icon } = payload;
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
       tag,
-      icon: "/icons/icon-192.png",
+      icon: icon || "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
       data: { url },
     })

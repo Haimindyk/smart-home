@@ -7,6 +7,7 @@ import { History as HistoryIcon } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { useLocaleStore, useT } from "@/lib/i18n/store";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { MemberAvatar } from "@/components/identity/member-avatar";
 import type { MessageKey } from "@/lib/i18n/messages";
 
 const ACTION_KEYS: Record<string, MessageKey> = {
@@ -52,7 +53,12 @@ export function HistoryDialog({ open, onOpenChange }: { open: boolean; onOpenCha
               const actionKey = ACTION_KEYS[entry.action] ?? "action_updated";
               return (
                 <li key={entry.id} className="flex items-start gap-2.5 rounded-lg px-2 py-2 hover:bg-accent/50">
-                  <span className="text-lg leading-none">{actor?.avatar_emoji ?? "❔"}</span>
+                  <MemberAvatar
+                    member={actor}
+                    className="size-6"
+                    emojiClassName="text-lg leading-none"
+                    fallbackEmoji="❔"
+                  />
                   <div className="flex min-w-0 flex-col">
                     <p className="text-sm">
                       <span className="font-medium" style={actor ? { color: actor.color } : undefined}>

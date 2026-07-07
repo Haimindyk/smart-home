@@ -49,7 +49,6 @@ export default function DashboardPage() {
                 {greeting}
                 {me ? `, ${me.display_name}` : ""} {me?.avatar_emoji}
               </p>
-              <h1 className="mt-1 text-3xl font-bold tracking-tight">{t("dashboard")}</h1>
             </div>
             <NewSectionDialog />
           </div>
