@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Check, History } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { useIdentity } from "@/lib/identity";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AssigneeBadge } from "@/components/tasks/assignee-badge";
+import { ChoreEditorSheet } from "@/components/chores/chore-editor-sheet";
 import { cn } from "@/lib/utils";
 import type { Chore } from "@/types/domain";
 
@@ -18,6 +19,7 @@ export function ChoreRow({ chore }: { chore: Chore }) {
   const members = useAppStore((s) => s.members);
   const actingMemberId = useIdentity((s) => s.actingMemberId);
   const t = useT();
+  const [editing, setEditing] = useState(false);
 
   const isDue = new Date(chore.next_due_at).getTime() <= Date.now();
 
@@ -43,7 +45,11 @@ export function ChoreRow({ chore }: { chore: Chore }) {
         <Check className="size-4" />
       </Button>
 
-      <div className="flex flex-1 flex-col gap-0.5">
+      <button
+        type="button"
+        className="flex flex-1 flex-col gap-0.5 text-start"
+        onClick={() => setEditing(true)}
+      >
         <div className="flex items-center gap-2">
           {chore.emoji && <span>{chore.emoji}</span>}
           <span dir="auto" className={cn("text-sm font-medium", !isDue && "text-muted-foreground")}>
@@ -60,9 +66,13 @@ export function ChoreRow({ chore }: { chore: Chore }) {
             </span>
           )}
         </div>
-      </div>
+      </button>
 
-      <AssigneeBadge assigneeKind={chore.assignee_kind} assigneeMemberId={chore.assignee_member_id} />
+      <AssigneeBadge
+        assigneeKind={chore.assignee_kind}
+        assigneeMemberId={chore.assignee_member_id}
+        assigneeMemberIds={chore.assignee_member_ids}
+      />
 
       <Popover>
         <PopoverTrigger render={<Button variant="ghost" size="icon" className="size-7" />}>
@@ -81,6 +91,8 @@ export function ChoreRow({ chore }: { chore: Chore }) {
           </ul>
         </PopoverContent>
       </Popover>
+
+      <ChoreEditorSheet choreId={editing ? chore.id : null} onOpenChange={setEditing} />
     </div>
   );
 }
