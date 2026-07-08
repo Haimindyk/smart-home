@@ -1,10 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
 import { useAppStore } from "@/lib/store/app-store";
 import { useT } from "@/lib/i18n/store";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { sortByPosition } from "@/lib/ordering/rank";
 import { toast } from "sonner";
 
 /**
@@ -37,11 +46,24 @@ export function BarcodeScannerDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  sectionId: string;
+  /** Fixed target list (e.g. opened from that section's own quick-add). If
+   * omitted (e.g. opened from the header), the user picks from the
+   * available shopping-kind sections instead. */
+  sectionId?: string;
   createdBy: string | null;
 }) {
   const createTask = useAppStore((s) => s.createTask);
+  const sections = useAppStore((s) => s.sections);
   const t = useT();
+
+  const shoppingSections = useMemo(
+    () => sortByPosition(Object.values(sections).filter((s) => s.kind === "shopping" && !s.deleted_at)),
+    [sections]
+  );
+
+  const [pickedSectionId, setPickedSectionId] = useState<string | null>(null);
+  const targetSectionId = sectionId ?? pickedSectionId ?? shoppingSections[0]?.id ?? null;
+
   // A plain useRef read inside an effect keyed on `open` is unreliable here:
   // Base UI's Dialog.Popup (like Radix/MUI dialogs) doesn't mount its
   // children synchronously the instant `open` flips true — it controls
@@ -61,7 +83,7 @@ export function BarcodeScannerDialog({
   }
 
   useEffect(() => {
-    if (!open || !videoRef.current) return;
+    if (!open || !videoRef.current || !targetSectionId) return;
 
     let cancelled = false;
     let busy = false;
@@ -75,7 +97,7 @@ export function BarcodeScannerDialog({
       const name = await lookupProductName(code);
       if (cancelled) return;
       void createTask({
-        sectionId,
+        sectionId: targetSectionId!,
         title: name ?? code,
         createdBy,
         extra: { notes: `${t("scannedBarcode")}: ${code}` },
@@ -132,7 +154,7 @@ export function BarcodeScannerDialog({
     // (bound once by zustand) but doesn't need to restart scanning either;
     // both are read via closure instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, videoMounted, sectionId, createdBy]);
+  }, [open, videoMounted, targetSectionId, createdBy]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -140,30 +162,58 @@ export function BarcodeScannerDialog({
         <DialogHeader>
           <DialogTitle>{t("scanBarcode")}</DialogTitle>
         </DialogHeader>
-        <div className="relative overflow-hidden rounded-xl bg-black">
-          <video
-            ref={(el) => {
-              videoRef.current = el;
-              setVideoMounted(!!el);
-            }}
-            className="aspect-square w-full object-cover"
-            autoPlay
-            muted
-            playsInline
-          />
-          <div className="pointer-events-none absolute inset-8 rounded-lg border-2 border-white/70" />
-          {status === "looking-up" && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm text-white">
-              {t("lookingUpProduct")}
+
+        {!sectionId && shoppingSections.length > 1 && (
+          <div className="grid gap-2">
+            <Label>{t("section_shopping")}</Label>
+            <Select
+              value={targetSectionId ?? undefined}
+              onValueChange={(v) => v && setPickedSectionId(v)}
+            >
+              <SelectTrigger>
+                <SelectValue>{(v: string) => sections[v] ? `${sections[v].emoji ?? ""} ${sections[v].name}` : v}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {shoppingSections.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.emoji} {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {!targetSectionId ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">{t("noShoppingListYet")}</p>
+        ) : (
+          <>
+            <div className="relative overflow-hidden rounded-xl bg-black">
+              <video
+                ref={(el) => {
+                  videoRef.current = el;
+                  setVideoMounted(!!el);
+                }}
+                className="aspect-square w-full object-cover"
+                autoPlay
+                muted
+                playsInline
+              />
+              <div className="pointer-events-none absolute inset-8 rounded-lg border-2 border-white/70" />
+              {status === "looking-up" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm text-white">
+                  {t("lookingUpProduct")}
+                </div>
+              )}
+              {status === "error" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-4 text-center text-sm text-white">
+                  {t("cameraUnavailable")}
+                </div>
+              )}
             </div>
-          )}
-          {status === "error" && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-4 text-center text-sm text-white">
-              {t("cameraUnavailable")}
-            </div>
-          )}
-        </div>
-        <p className="text-center text-xs text-muted-foreground">{t("scanBarcodeHint")}</p>
+            <p className="text-center text-xs text-muted-foreground">{t("scanBarcodeHint")}</p>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
