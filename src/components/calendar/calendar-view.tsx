@@ -62,26 +62,12 @@ export function CalendarView() {
     return map;
   }, [familyEvents, tasks, month]);
 
-  const upcoming = useMemo(() => {
-    const now = new Date();
-    const items: CalendarItem[] = [];
-    for (const event of Object.values(familyEvents)) {
-      if (event.deleted_at) continue;
-      items.push({
-        id: event.id,
-        date: nextOccurrence(event.event_date, event.recurrence, now),
-        title: event.title,
-        emoji: event.emoji,
-        kind: "event",
-        event,
-      });
-    }
-    for (const task of Object.values(tasks)) {
-      if (task.deleted_at || task.is_note || !task.due_at) continue;
-      items.push({ id: task.id, date: new Date(task.due_at), title: task.title, emoji: task.emoji, kind: "task" });
-    }
-    return items.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 20);
-  }, [familyEvents, tasks]);
+  // Scoped to the currently displayed month, same as the grid's dots — keeps
+  // this list and the calendar above it in sync as the user navigates months.
+  const upcoming = useMemo(
+    () => Array.from(itemsByDate.values()).flat().sort((a, b) => a.date.getTime() - b.date.getTime()),
+    [itemsByDate]
+  );
 
   const selectedItems = itemsByDate.get(dateKey(selectedDate)) ?? [];
 
