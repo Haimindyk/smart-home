@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { Loader2 } from "lucide-react";
 import { AppHeader } from "@/components/nav/app-header";
 import { CategoryTabs } from "@/components/dashboard/category-tabs";
 import { SectionPanels } from "@/components/dashboard/section-panels";
@@ -30,6 +31,7 @@ export default function DashboardPage() {
   const actingMemberId = useIdentity((s) => s.actingMemberId);
   const members = useAppStore((s) => s.members);
   const sectionsById = useAppStore((s) => s.sections);
+  const hydrated = useAppStore((s) => s.hydrated);
   const me = actingMemberId ? members[actingMemberId] : undefined;
 
   const sections = useMemo(
@@ -72,7 +74,12 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {sections.length > 0 ? (
+        {!hydrated ? (
+          <div className="glass surface-shadow flex flex-col items-center gap-3 rounded-3xl p-12 text-center ring-1 ring-border/40">
+            <Loader2 className="size-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">{t("loadingApp")}</p>
+          </div>
+        ) : sections.length > 0 ? (
           <>
             <CategoryTabs sections={sections} />
             <SectionPanels sections={sections} />

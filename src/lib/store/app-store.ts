@@ -52,6 +52,12 @@ type AppState = {
   ) => void;
 
   updateMember: (id: string, patch: Partial<Pick<Member, "display_name" | "avatar_emoji" | "avatar_photo_url" | "color">>) => Promise<void>;
+  addMember: (input: {
+    displayName: string;
+    pin: string;
+    avatarEmoji: string;
+    color: string;
+  }) => Promise<{ member: Member } | { error: "pin_taken" | "unknown" }>;
 
   createSection: (input: { name: string; emoji?: string; kind: SectionKind; createdBy: string | null }) => Promise<void>;
   renameSection: (id: string, name: string, emoji?: string) => Promise<void>;
@@ -222,6 +228,37 @@ export const useAppStore = create<AppState>((set, get) => ({
       () => prev && set((s) => ({ members: { ...s.members, [id]: prev } })),
       "לא הצלחנו לעדכן את הפרופיל"
     );
+  },
+
+  // Adding a member needs an immediate, specific result (was the PIN taken?
+  // did it actually work?) to drive the add-member/share-link UI, so — like
+  // addAttachment — this talks to Supabase directly instead of going through
+  // runMutation/the offline queue, which only ever reports success/failure
+  // generically.
+  addMember: async ({ displayName, pin, avatarEmoji, color }) => {
+    if (Object.values(get().members).some((m) => m.pin === pin)) {
+      return { error: "pin_taken" };
+    }
+
+    const id = crypto.randomUUID();
+    // `email` only ever serves as a unique row key in this app (see
+    // 0002_open_access.sql) — there's no email-based auth, so a placeholder
+    // is fine as long as it's unique, same as the "yariv@kh.family" seed.
+    const email = `member-${id}@kh.family`;
+
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("members")
+      .insert({ id, email, display_name: displayName, avatar_emoji: avatarEmoji, color, pin })
+      .select()
+      .single();
+
+    if (error) {
+      return { error: error.code === "23505" ? "pin_taken" : "unknown" };
+    }
+
+    set((s) => ({ members: { ...s.members, [id]: data } }));
+    return { member: data };
   },
 
   // ---------------------------------------------------------------------
