@@ -25,18 +25,31 @@ export function MemberAvatar({
   fallbackEmoji?: string;
 }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
   const photoUrl = member?.avatar_photo_url;
+  const emoji = <span className={emojiClassName}>{member?.avatar_emoji ?? fallbackEmoji}</span>;
 
-  if (photoUrl && photoUrl !== failedUrl) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element -- small inline avatar, not worth next/image's layout ceremony here
+  if (!photoUrl || photoUrl === failedUrl) return emoji;
+
+  return (
+    <span
+      className={cn(
+        "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full",
+        className
+      )}
+    >
+      {/* Shown until the photo has fully decoded — without this, a slow
+          connection painted whatever partial/garbled pixel data it had
+          received so far instead of just waiting for a clean image. */}
+      {photoUrl !== loadedUrl && emoji}
+      {/* eslint-disable-next-line @next/next/no-img-element -- small inline avatar, not worth next/image's layout ceremony here */}
       <img
         src={photoUrl}
         alt=""
-        className={cn("shrink-0 rounded-full object-cover", className)}
+        className={cn("absolute inset-0 size-full object-cover", photoUrl === loadedUrl ? "opacity-100" : "opacity-0")}
+        onLoad={() => setLoadedUrl(photoUrl)}
         onError={() => setFailedUrl(photoUrl)}
       />
-    );
-  }
-  return <span className={emojiClassName}>{member?.avatar_emoji ?? fallbackEmoji}</span>;
+    </span>
+  );
 }

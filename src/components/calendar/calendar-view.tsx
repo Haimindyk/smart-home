@@ -74,10 +74,24 @@ export function CalendarView() {
 
   // Scoped to the currently displayed month, same as the grid's dots — keeps
   // this list and the calendar above it in sync as the user navigates months.
-  const upcoming = useMemo(
-    () => Array.from(itemsByDate.values()).flat().sort((a, b) => a.date.getTime() - b.date.getTime()),
-    [itemsByDate]
-  );
+  // A multi-day item has one CalendarItem per day it spans (so the grid's
+  // dots show up on every one of those days) — grouped back into a single
+  // row here spanning its start to end date, instead of repeating the same
+  // event once per day it covers.
+  const upcoming = useMemo(() => {
+    const grouped = new Map<string, { item: CalendarItem; start: Date; end: Date }>();
+    for (const item of Array.from(itemsByDate.values()).flat()) {
+      const key = `${item.kind}-${item.id}`;
+      const existing = grouped.get(key);
+      if (!existing) {
+        grouped.set(key, { item, start: item.date, end: item.date });
+      } else {
+        if (item.date < existing.start) existing.start = item.date;
+        if (item.date > existing.end) existing.end = item.date;
+      }
+    }
+    return Array.from(grouped.values()).sort((a, b) => a.start.getTime() - b.start.getTime());
+  }, [itemsByDate]);
 
   const selectedItems = itemsByDate.get(dateKey(selectedDate)) ?? [];
 
@@ -137,25 +151,28 @@ export function CalendarView() {
         {upcoming.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground">{t("noEventsYet")}</p>
         ) : (
-          upcoming.map((item) => (
-            <button
-              key={`${item.kind}-${item.id}`}
-              disabled={item.kind === "task"}
-              onClick={() => {
-                if (item.kind === "event" && item.event) {
-                  setEditingEvent(item.event);
-                  setDialogOpen(true);
-                }
-              }}
-              className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-start text-sm hover:bg-accent/40 disabled:cursor-default disabled:hover:bg-transparent"
-            >
-              <span>{item.emoji ?? (item.kind === "task" ? "✅" : "📌")}</span>
-              <span dir="auto" className="flex-1">{item.title}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {item.date.toLocaleDateString(locale === "he" ? "he-IL" : "en-US", { day: "numeric", month: "short" })}
-              </span>
-            </button>
-          ))
+          upcoming.map(({ item, start, end }) => {
+            const fmt = (d: Date) => d.toLocaleDateString(locale === "he" ? "he-IL" : "en-US", { day: "numeric", month: "short" });
+            return (
+              <button
+                key={`${item.kind}-${item.id}`}
+                disabled={item.kind === "task"}
+                onClick={() => {
+                  if (item.kind === "event" && item.event) {
+                    setEditingEvent(item.event);
+                    setDialogOpen(true);
+                  }
+                }}
+                className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-start text-sm hover:bg-accent/40 disabled:cursor-default disabled:hover:bg-transparent"
+              >
+                <span>{item.emoji ?? (item.kind === "task" ? "✅" : "📌")}</span>
+                <span dir="auto" className="flex-1">{item.title}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {dateKey(start) === dateKey(end) ? fmt(start) : `${fmt(start)} – ${fmt(end)}`}
+                </span>
+              </button>
+            );
+          })
         )}
       </div>
 
