@@ -163,6 +163,7 @@ export const messages = {
     copyLink: "העתקת הודעה",
     linkCopied: "ההודעה הועתקה",
     done: "סיום",
+    loadingApp: "טוענים...",
   },
   en: {
     appName: "K&H",
@@ -328,6 +329,7 @@ export const messages = {
     copyLink: "Copy message",
     linkCopied: "Message copied",
     done: "Done",
+    loadingApp: "Loading...",
   },
 } as const;
 
