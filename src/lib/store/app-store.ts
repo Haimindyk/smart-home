@@ -89,6 +89,9 @@ type AppState = {
   deleteFamilyEvent: (id: string) => Promise<void>;
 
   sendBroadcastMessage: (message: string, actorId: string | null) => Promise<void>;
+
+  addAttachment: (input: { taskId?: string; choreId?: string; file: File; createdBy: string | null }) => Promise<void>;
+  deleteAttachment: (id: string) => Promise<void>;
 };
 
 function keyify<T extends { id: string }>(rows: T[]): ById<T> {
@@ -615,7 +618,74 @@ export const useAppStore = create<AppState>((set, get) => ({
       "לא הצלחנו לשלוח את ההודעה"
     );
   },
+
+  // ---------------------------------------------------------------------
+  // Attachments — a real file upload, not a queueable payload, so this
+  // talks to Supabase directly rather than through runMutation/the offline
+  // queue (matches how the avatar photo upload works in profile-edit-dialog).
+  // ---------------------------------------------------------------------
+  addAttachment: async ({ taskId, choreId, file, createdBy }) => {
+    const supabase = createClient();
+    const id = crypto.randomUUID();
+    const storagePath = `${taskId ?? choreId}/${id}-${file.name}`;
+
+    const { error: uploadError } = await supabase.storage.from("attachments").upload(storagePath, file);
+    if (uploadError) {
+      toast.error("לא הצלחנו להעלות את הקובץ");
+      return;
+    }
+
+    const attachment: Attachment = {
+      id,
+      task_id: taskId ?? null,
+      chore_id: choreId ?? null,
+      storage_path: storagePath,
+      file_name: file.name,
+      mime_type: file.type || null,
+      size_bytes: file.size,
+      kind: attachmentKindFor(file.type),
+      width: null,
+      height: null,
+      created_by: createdBy,
+      created_at: new Date().toISOString(),
+    };
+
+    const { error: insertError } = await supabase.from("attachments").insert(attachment);
+    if (insertError) {
+      await supabase.storage.from("attachments").remove([storagePath]);
+      toast.error("לא הצלחנו לשמור את הקובץ");
+      return;
+    }
+
+    set((s) => ({ attachments: { ...s.attachments, [id]: attachment } }));
+  },
+
+  deleteAttachment: async (id) => {
+    const attachment = get().attachments[id];
+    if (!attachment) return;
+    set((s) => {
+      const next = { ...s.attachments };
+      delete next[id];
+      return { attachments: next };
+    });
+
+    const supabase = createClient();
+    await supabase.storage.from("attachments").remove([attachment.storage_path]);
+    const { error } = await supabase.from("attachments").delete().eq("id", id);
+    if (error) {
+      set((s) => ({ attachments: { ...s.attachments, [id]: attachment } }));
+      toast.error("לא הצלחנו למחוק את הקובץ");
+    }
+  },
 }));
+
+function attachmentKindFor(mimeType: string): Attachment["kind"] {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType === "application/pdf") return "pdf";
+  if (mimeType.startsWith("audio/")) return "audio";
+  if (mimeType.startsWith("video/")) return "video";
+  return "file";
+}
 
 function isDescendant(tasks: ById<Task>, candidate: Task, ancestorId: string): boolean {
   let current: Task | undefined = candidate;

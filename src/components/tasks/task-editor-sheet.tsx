@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Trash2, X } from "lucide-react";
+import { CalendarIcon, Paperclip, Trash2, X } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
+import { useIdentity } from "@/lib/identity";
 import { useT } from "@/lib/i18n/store";
+import { AttachmentRow } from "@/components/attachments/attachment-row";
 import {
   Sheet,
   SheetContent,
@@ -53,9 +55,14 @@ export function TaskEditorSheet({
   const task = useAppStore((s) => (taskId ? s.tasks[taskId] : undefined));
   const members = useAppStore((s) => s.members);
   const sections = useAppStore((s) => s.sections);
+  const attachments = useAppStore((s) => s.attachments);
   const updateTask = useAppStore((s) => s.updateTask);
   const softDeleteTask = useAppStore((s) => s.softDeleteTask);
+  const addAttachment = useAppStore((s) => s.addAttachment);
+  const actingMemberId = useIdentity((s) => s.actingMemberId);
   const t = useT();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const [local, setLocal] = useState<Task | undefined>(task);
   const [tagInput, setTagInput] = useState("");
@@ -70,10 +77,21 @@ export function TaskEditorSheet({
 
   if (!task || !local) return null;
 
+  const taskAttachments = Object.values(attachments).filter((a) => a.task_id === taskId);
+
   function commit(patch: Partial<Task>) {
     if (!taskId) return;
     setLocal((prev) => (prev ? { ...prev, ...patch } : prev));
     void updateTask(taskId, patch);
+  }
+
+  async function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !taskId) return;
+    setUploading(true);
+    await addAttachment({ taskId, file, createdBy: actingMemberId });
+    setUploading(false);
   }
 
   return (
@@ -111,6 +129,31 @@ export function TaskEditorSheet({
               onBlur={(e) => commit({ notes: e.target.value || null })}
               rows={3}
             />
+          </div>
+
+          <div className="grid gap-2">
+            <Label>{t("attachments")}</Label>
+            <div className="flex flex-wrap items-start gap-2">
+              {taskAttachments.map((attachment) => (
+                <AttachmentRow key={attachment.id} attachment={attachment} />
+              ))}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="flex size-16 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-muted-foreground transition-colors hover:bg-accent/40 disabled:opacity-50"
+              >
+                <Paperclip className="size-4" />
+                <span className="text-[10px]">{t("addAttachment")}</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf,video/*,audio/*"
+                className="hidden"
+                onChange={(e) => void handleFilePicked(e)}
+              />
+            </div>
           </div>
 
           {sectionKind !== "info" && (
