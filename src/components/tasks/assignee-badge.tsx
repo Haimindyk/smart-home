@@ -37,17 +37,17 @@ export function AssigneeBadge({
       return (
         <Badge
           variant="outline"
-          className="h-7 gap-1.5 border-0 ps-0.5"
+          className="h-8 gap-1.5 border-0 ps-0.5"
           style={{ backgroundColor: `${member.color}22`, color: member.color }}
         >
-          <MemberAvatar member={member} className="size-6" emojiClassName="text-base" />
+          <MemberAvatar member={member} className="size-7" emojiClassName="text-lg" />
           {member.display_name}
         </Badge>
       );
     }
 
     return (
-      <div className="flex items-center -space-x-2 rtl:space-x-reverse">
+      <div className="flex items-center -space-x-2.5 rtl:space-x-reverse">
         {ids.slice(0, 4).map((id) => {
           const member = members[id];
           if (!member) return null;
@@ -55,15 +55,15 @@ export function AssigneeBadge({
             <span
               key={id}
               title={member.display_name}
-              className="flex size-7 items-center justify-center overflow-hidden rounded-full text-sm ring-2 ring-background"
+              className="flex size-8 items-center justify-center overflow-hidden rounded-full text-sm ring-2 ring-background"
               style={{ backgroundColor: `${member.color}33` }}
             >
-              <MemberAvatar member={member} className="size-7" emojiClassName="text-base" />
+              <MemberAvatar member={member} className="size-8" emojiClassName="text-lg" />
             </span>
           );
         })}
         {ids.length > 4 && (
-          <span className="flex size-7 items-center justify-center rounded-full bg-muted text-xs ring-2 ring-background">
+          <span className="flex size-8 items-center justify-center rounded-full bg-muted text-xs ring-2 ring-background">
             +{ids.length - 4}
           </span>
         )}

@@ -7,6 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -116,6 +118,35 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      barcode_products: {
+        Row: {
+          barcode: string
+          created_at: string
+          created_by: string | null
+          product_name: string
+        }
+        Insert: {
+          barcode: string
+          created_at?: string
+          created_by?: string | null
+          product_name: string
+        }
+        Update: {
+          barcode?: string
+          created_at?: string
+          created_by?: string | null
+          product_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barcode_products_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "members"
             referencedColumns: ["id"]
           },
         ]
@@ -371,35 +402,35 @@ export type Database = {
       notification_prefs: {
         Row: {
           member_id: string
-          on_create: boolean
-          on_complete: boolean
-          on_assigned_me: boolean
-          on_shopping: boolean
-          on_due: boolean
-          on_broadcast: boolean
           muted: boolean
+          on_assigned_me: boolean
+          on_broadcast: boolean
+          on_complete: boolean
+          on_create: boolean
+          on_due: boolean
+          on_shopping: boolean
           updated_at: string
         }
         Insert: {
           member_id: string
-          on_create?: boolean
-          on_complete?: boolean
-          on_assigned_me?: boolean
-          on_shopping?: boolean
-          on_due?: boolean
-          on_broadcast?: boolean
           muted?: boolean
+          on_assigned_me?: boolean
+          on_broadcast?: boolean
+          on_complete?: boolean
+          on_create?: boolean
+          on_due?: boolean
+          on_shopping?: boolean
           updated_at?: string
         }
         Update: {
           member_id?: string
-          on_create?: boolean
-          on_complete?: boolean
-          on_assigned_me?: boolean
-          on_shopping?: boolean
-          on_due?: boolean
-          on_broadcast?: boolean
           muted?: boolean
+          on_assigned_me?: boolean
+          on_broadcast?: boolean
+          on_complete?: boolean
+          on_create?: boolean
+          on_due?: boolean
+          on_shopping?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -414,31 +445,31 @@ export type Database = {
       }
       push_subscriptions: {
         Row: {
+          auth: string
+          created_at: string
+          endpoint: string
           id: string
           member_id: string | null
-          endpoint: string
           p256dh: string
-          auth: string
           user_agent: string | null
-          created_at: string
         }
         Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
           id?: string
           member_id?: string | null
-          endpoint: string
           p256dh: string
-          auth: string
           user_agent?: string | null
-          created_at?: string
         }
         Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
           id?: string
           member_id?: string | null
-          endpoint?: string
           p256dh?: string
-          auth?: string
           user_agent?: string | null
-          created_at?: string
         }
         Relationships: [
           {
@@ -660,19 +691,36 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_due_tasks: { Args: never; Returns: undefined }
+      check_family_events: { Args: never; Returns: undefined }
       complete_chore: {
         Args: { p_chore_id: string; p_completed_by: string }
         Returns: undefined
       }
-      is_member: { Args: Record<string, never>; Returns: boolean }
-      restore_task: {
-        Args: { p_task_id: string } | { p_actor_id?: string; p_task_id: string }
-        Returns: undefined
+      family_event_next_occurrence: {
+        Args: { p_as_of?: string; p_event_date: string; p_recurrence: string }
+        Returns: string
       }
-      soft_delete_task: {
-        Args: { p_task_id: string } | { p_actor_id?: string; p_task_id: string }
-        Returns: undefined
+      get_push_config: {
+        Args: { p_secret: string }
+        Returns: {
+          vapid_private_key: string
+          vapid_public_key: string
+        }[]
       }
+      is_member: { Args: never; Returns: boolean }
+      restore_task:
+        | { Args: { p_task_id: string }; Returns: undefined }
+        | {
+            Args: { p_actor_id?: string; p_task_id: string }
+            Returns: undefined
+          }
+      soft_delete_task:
+        | { Args: { p_task_id: string }; Returns: undefined }
+        | {
+            Args: { p_actor_id?: string; p_task_id: string }
+            Returns: undefined
+          }
     }
     Enums: {
       [_ in never]: never
@@ -684,8 +732,124 @@ export type Database = {
 }
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-type DefaultSchema = DatabaseWithoutInternals["public"]
 
-export type Tables<T extends keyof DefaultSchema["Tables"]> = DefaultSchema["Tables"][T]["Row"]
-export type TablesInsert<T extends keyof DefaultSchema["Tables"]> = DefaultSchema["Tables"][T]["Insert"]
-export type TablesUpdate<T extends keyof DefaultSchema["Tables"]> = DefaultSchema["Tables"][T]["Update"]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const
