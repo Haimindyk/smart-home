@@ -141,9 +141,9 @@ export function TaskEditorSheet({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="flex size-16 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-muted-foreground transition-colors hover:bg-accent/40 disabled:opacity-50"
+                className="flex size-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-muted-foreground transition-colors hover:bg-accent/40 disabled:opacity-50"
               >
-                <Paperclip className="size-4" />
+                <Paperclip className="size-5" />
                 <span className="text-[10px]">{t("addAttachment")}</span>
               </button>
               <input

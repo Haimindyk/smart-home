@@ -36,18 +36,18 @@ export function AttachmentRow({ attachment }: { attachment: Attachment }) {
   const Icon = KIND_ICON[attachment.kind] ?? FileIcon;
 
   return (
-    <div className="group relative flex w-16 shrink-0 flex-col items-center gap-1">
+    <div className="group relative flex w-24 shrink-0 flex-col items-center gap-1">
       <a
         href={url ?? undefined}
         target="_blank"
         rel="noreferrer"
-        className="flex size-16 items-center justify-center overflow-hidden rounded-xl border bg-muted/50"
+        className="flex size-24 items-center justify-center overflow-hidden rounded-xl border bg-muted/50"
       >
         {attachment.kind === "image" && url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- small inline thumbnail behind a signed URL, not worth next/image here
+          // eslint-disable-next-line @next/next/no-img-element -- inline thumbnail behind a signed URL, not worth next/image here
           <img src={url} alt="" className="size-full object-cover" />
         ) : (
-          <Icon className="size-6 text-muted-foreground" />
+          <Icon className="size-8 text-muted-foreground" />
         )}
       </a>
       <button
@@ -58,7 +58,7 @@ export function AttachmentRow({ attachment }: { attachment: Attachment }) {
       >
         <X className="size-3" />
       </button>
-      <span className="max-w-16 truncate text-[10px] text-muted-foreground" dir="auto">
+      <span className="max-w-24 truncate text-[10px] text-muted-foreground" dir="auto">
         {attachment.file_name}
       </span>
     </div>
