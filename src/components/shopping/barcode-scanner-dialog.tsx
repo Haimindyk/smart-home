@@ -5,6 +5,8 @@ import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser"
 import { useAppStore } from "@/lib/store/app-store";
 import { useT } from "@/lib/i18n/store";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -73,42 +75,79 @@ export function BarcodeScannerDialog({
   // the callback ref actually fires and re-runs at the right time.
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoMounted, setVideoMounted] = useState(false);
-  const [status, setStatus] = useState<"scanning" | "looking-up" | "error">("scanning");
+  const [status, setStatus] = useState<"scanning" | "looking-up" | "naming" | "error">("scanning");
+  const [pendingCode, setPendingCode] = useState<string | null>(null);
+  const [manualName, setManualName] = useState("");
+  // Scan-loop bookkeeping lives in refs (not effect-local `let`s) so the
+  // "naming" form below — rendered outside the effect — can resume
+  // scanning once the person confirms or skips a name.
+  const busyRef = useRef(false);
+  const lastCodeRef = useRef<string | null>(null);
   // Reset to "scanning" each time the dialog opens — adjusting state during
   // render per https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
   const [syncedOpen, setSyncedOpen] = useState(open);
   if (open !== syncedOpen) {
     setSyncedOpen(open);
-    if (open) setStatus("scanning");
+    if (open) {
+      setStatus("scanning");
+      setPendingCode(null);
+      setManualName("");
+    }
+  }
+
+  function resumeScanning() {
+    // Give the same item a moment before it can be re-scanned/re-added.
+    setTimeout(() => {
+      lastCodeRef.current = null;
+      busyRef.current = false;
+    }, 2000);
+  }
+
+  function addItem(code: string, name: string | null) {
+    if (!targetSectionId) return;
+    void createTask({
+      sectionId: targetSectionId,
+      title: name ?? code,
+      createdBy,
+      extra: { notes: `${t("scannedBarcode")}: ${code}` },
+    });
+    toast(`${t("addedFromBarcode")}: ${name ?? code}`);
+    setStatus("scanning");
+    setPendingCode(null);
+    resumeScanning();
+  }
+
+  function confirmManualName() {
+    if (!pendingCode) return;
+    addItem(pendingCode, manualName.trim() || null);
   }
 
   useEffect(() => {
     if (!open || !videoRef.current || !targetSectionId) return;
 
+    // Starting a fresh camera stream means a fresh scanning session.
+    busyRef.current = false;
+    lastCodeRef.current = null;
+
     let cancelled = false;
-    let busy = false;
-    let lastCode: string | null = null;
     let controls: IScannerControls | null = null;
     const reader = new BrowserMultiFormatReader();
 
     async function handleScanned(code: string) {
-      busy = true;
+      busyRef.current = true;
       setStatus("looking-up");
       const name = await lookupProductName(code);
       if (cancelled) return;
-      void createTask({
-        sectionId: targetSectionId!,
-        title: name ?? code,
-        createdBy,
-        extra: { notes: `${t("scannedBarcode")}: ${code}` },
-      });
-      toast(`${t("addedFromBarcode")}: ${name ?? code}`);
-      setStatus("scanning");
-      // Give the same item a moment before it can be re-scanned/re-added.
-      setTimeout(() => {
-        lastCode = null;
-        busy = false;
-      }, 2000);
+      // Open Food Facts has thin coverage for Israeli-local products (729-
+      // prefixed barcodes) — rather than silently filing the raw barcode
+      // number as the item's title, let the person type the real name in.
+      if (!name) {
+        setPendingCode(code);
+        setManualName("");
+        setStatus("naming");
+        return;
+      }
+      addItem(code, name);
     }
 
     const video = videoRef.current;
@@ -125,10 +164,10 @@ export function BarcodeScannerDialog({
         { video: { facingMode: { ideal: "environment" } } },
         video,
         (result) => {
-          if (cancelled || busy || !result) return;
+          if (cancelled || busyRef.current || !result) return;
           const code = result.getText();
-          if (code === lastCode) return;
-          lastCode = code;
+          if (code === lastCodeRef.current) return;
+          lastCodeRef.current = code;
           void handleScanned(code);
         }
       )
@@ -150,9 +189,8 @@ export function BarcodeScannerDialog({
     };
     // `t` from useT() is a brand-new function every render (never
     // memoized) — including it here would tear down and restart the
-    // camera stream on every unrelated re-render. `createTask` is stable
-    // (bound once by zustand) but doesn't need to restart scanning either;
-    // both are read via closure instead.
+    // camera stream on every unrelated re-render. `createTask`/`addItem`
+    // don't need to restart scanning either; all are read via closure.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, videoMounted, targetSectionId, createdBy]);
 
@@ -211,7 +249,34 @@ export function BarcodeScannerDialog({
                 </div>
               )}
             </div>
-            <p className="text-center text-xs text-muted-foreground">{t("scanBarcodeHint")}</p>
+            {status === "naming" ? (
+              <form
+                className="flex flex-col gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  confirmManualName();
+                }}
+              >
+                <p className="text-center text-xs text-muted-foreground">{t("productNotRecognized")}</p>
+                <Input
+                  autoFocus
+                  dir="auto"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  placeholder={t("productNamePlaceholder")}
+                />
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => confirmManualName()}>
+                    {t("addWithoutName")}
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={!manualName.trim()}>
+                    {t("add")}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <p className="text-center text-xs text-muted-foreground">{t("scanBarcodeHint")}</p>
+            )}
           </>
         )}
       </DialogContent>
