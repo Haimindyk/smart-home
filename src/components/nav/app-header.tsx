@@ -48,8 +48,8 @@ export function AppHeader() {
     <div className="sticky top-0 z-40 px-3 pt-3">
       <header className="glass surface-shadow mx-auto flex w-full max-w-3xl items-center gap-3 rounded-full px-4 py-2 ring-1 ring-border/40">
       <Link href="/" className="flex items-center gap-2 text-lg font-bold">
-        <span className="bg-gradient-to-br from-indigo-500 to-violet-600 bg-clip-text text-xl text-transparent">💙</span>
-        <span className="hidden bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent sm:inline">{t("appName")}</span>
+        <span className="text-xl">💙</span>
+        <span className="hidden text-foreground sm:inline">{t("appName")}</span>
       </Link>
 
       <div className="ms-auto flex items-center gap-1">

@@ -71,7 +71,7 @@ export function InstallBanner() {
     <>
       {showBanner && (
         <div className="glass flex items-center gap-3 border-b px-4 py-2.5">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xl">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-xl">
             💙
           </span>
           <div className="min-w-0 flex-1">

@@ -56,7 +56,7 @@ export function CategoryTabs({ sections }: { sections: Section[] }) {
               className={cn(
                 "flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-[background-color,color,transform] duration-150 ease-(--ease-premium)",
                 activeId === section.id
-                  ? "scale-105 bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_4px_14px_-2px_oklch(0.585_0.233_264.376/0.5)]"
+                  ? "scale-105 bg-primary text-primary-foreground shadow-[0_4px_14px_-2px_oklch(0.64_0.15_45/0.5)]"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
               )}
             >

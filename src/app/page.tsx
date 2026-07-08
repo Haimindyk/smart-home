@@ -42,8 +42,7 @@ export default function DashboardPage() {
       <AppHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         <div className="glass surface-shadow relative mb-4 overflow-hidden rounded-3xl p-6 ring-1 ring-border/40 sm:p-8">
-          <div className="pointer-events-none absolute -end-20 -top-20 size-64 rounded-full bg-gradient-to-br from-indigo-400/40 to-violet-500/30 blur-3xl" />
-          <div className="pointer-events-none absolute -start-16 -bottom-24 size-48 rounded-full bg-gradient-to-br from-sky-400/20 to-emerald-400/10 blur-3xl" />
+          <div className="pointer-events-none absolute -end-20 -top-20 size-64 rounded-full bg-primary/25 blur-3xl" />
           <div className="relative flex flex-wrap items-end justify-between gap-4">
             <div>
               <span className="eyebrow mb-2">{t("appName")}</span>
@@ -52,9 +51,7 @@ export default function DashboardPage() {
                 {me ? (
                   <>
                     {", "}
-                    <span className="bg-gradient-to-br from-indigo-500 to-violet-600 bg-clip-text text-transparent">
-                      {me.display_name}
-                    </span>
+                    <span className="text-primary">{me.display_name}</span>
                   </>
                 ) : (
                   ""

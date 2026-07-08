@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AssigneeBadge } from "@/components/tasks/assignee-badge";
 import { ChoreEditorSheet } from "@/components/chores/chore-editor-sheet";
+import { useNow } from "@/lib/hooks/use-now";
 import { cn } from "@/lib/utils";
 import type { Chore } from "@/types/domain";
 
@@ -20,8 +21,9 @@ export function ChoreRow({ chore }: { chore: Chore }) {
   const actingMemberId = useIdentity((s) => s.actingMemberId);
   const t = useT();
   const [editing, setEditing] = useState(false);
+  const now = useNow();
 
-  const isDue = new Date(chore.next_due_at).getTime() <= Date.now();
+  const isDue = new Date(chore.next_due_at).getTime() <= now;
 
   const history = useMemo(
     () =>
@@ -37,7 +39,7 @@ export function ChoreRow({ chore }: { chore: Chore }) {
       <Button
         size="icon"
         variant={isDue ? "default" : "outline"}
-        className={cn("size-9 shrink-0 rounded-full", isDue && "bg-gradient-to-br from-indigo-500 to-violet-600")}
+        className="size-9 shrink-0 rounded-full"
         disabled={!actingMemberId}
         title={actingMemberId ? t("markDone") : t("whoAreYou")}
         onClick={() => actingMemberId && completeChore(chore.id, actingMemberId)}
