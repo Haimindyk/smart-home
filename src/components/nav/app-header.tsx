@@ -16,6 +16,7 @@ import { NotificationSettingsDialog } from "@/components/push/notification-setti
 import { BroadcastMessageDialog, BROADCAST_SENDER_EMAIL } from "@/components/push/broadcast-message-dialog";
 import { BarcodeScannerDialog } from "@/components/shopping/barcode-scanner-dialog";
 import { MemberAvatar } from "@/components/identity/member-avatar";
+import { MembersDialog } from "@/components/identity/members-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +37,7 @@ export function AppHeader() {
   const t = useT();
   const { canInstall, promptInstall } = useInstallPrompt();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
@@ -101,6 +103,9 @@ export function AppHeader() {
                   <Pencil className="size-4" /> {t("editProfile")}
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem onClick={() => setMembersOpen(true)}>
+                <Users className="size-4" /> {t("householdMembers")}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setHistoryOpen(true)}>
                 <History className="size-4" /> {t("history")}
               </DropdownMenuItem>
@@ -130,6 +135,7 @@ export function AppHeader() {
       </header>
 
       <ProfileEditDialog memberId={actingMemberId} open={profileOpen} onOpenChange={setProfileOpen} />
+      <MembersDialog open={membersOpen} onOpenChange={setMembersOpen} />
       <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
       <NotificationSettingsDialog open={notificationsOpen} onOpenChange={setNotificationsOpen} />
       {canBroadcast && (
