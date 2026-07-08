@@ -1,6 +1,22 @@
 import { CHAINS } from "./chains";
-import { matchBasketItem } from "./match";
+import { matchBasketItem, type MatchResult } from "./match";
+import type { BarcodeProduct } from "@/types/domain";
 import type { BasketComparison, BasketInput, BasketItemResult, ChainBasketResult, ItemMatch } from "./types";
+import type { ChainMeta } from "./chains";
+
+/** Picks which candidate row a given chain should price this item from. An
+ * exact barcode match is the literal product — used as-is (null price just
+ * means that chain doesn't carry that exact barcode). A fuzzy match tries
+ * each ranked candidate in order and uses the first one this chain actually
+ * has a price for, since different chains often carry different SKUs of
+ * "the same" product (a generic jar vs. a single-serve snack pack, say). */
+function pickForChain(matched: MatchResult, chain: ChainMeta): BarcodeProduct | null {
+  if (matched.kind === "exact") return matched.product;
+  if (matched.kind === "fuzzy") {
+    return matched.candidates.find((c) => c[chain.priceColumn] != null) ?? null;
+  }
+  return null;
+}
 
 const cache = new Map<string, Promise<BasketComparison>>();
 
@@ -27,21 +43,18 @@ async function computeComparison(items: BasketInput[]): Promise<BasketComparison
     let matchedCount = 0;
 
     const itemResults: BasketItemResult[] = matches.map(({ item, matched }) => {
-      const price = matched ? matched.product[chain.priceColumn] : null;
+      const product = pickForChain(matched, chain);
+      const price = product ? product[chain.priceColumn] : null;
       let match: ItemMatch;
-      if (matched && price != null) {
+      if (product && price != null) {
         total += price;
         matchedCount += 1;
-        match =
-          matched.matchType === "exact"
-            ? { status: "exact", barcode: matched.product.barcode, productName: matched.product.product_name, price }
-            : {
-                status: "similar",
-                barcode: matched.product.barcode,
-                productName: matched.product.product_name,
-                price,
-                similarity: matched.similarity ?? 0,
-              };
+        match = {
+          status: matched.kind === "exact" ? "exact" : "similar",
+          barcode: product.barcode,
+          productName: product.product_name,
+          price,
+        };
       } else {
         match = { status: "not_found" };
       }

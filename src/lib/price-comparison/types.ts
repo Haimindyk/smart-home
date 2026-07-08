@@ -11,7 +11,7 @@ export type BasketInput = {
 
 export type ItemMatch =
   | { status: "exact"; barcode: string; productName: string; price: number }
-  | { status: "similar"; barcode: string; productName: string; price: number; similarity: number }
+  | { status: "similar"; barcode: string; productName: string; price: number }
   | { status: "not_found" };
 
 export type BasketItemResult = {

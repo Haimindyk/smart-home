@@ -13,35 +13,41 @@ function extractBarcode(notes: string | null | undefined): string | null {
   return m ? m[1] : null;
 }
 
-export type MatchedProduct = {
-  product: BarcodeProduct;
-  matchType: "exact" | "similar";
-  /** Only present for fuzzy matches — omitted (not meaningful) for exact ones. */
-  similarity?: number;
-};
+export type MatchResult =
+  | { kind: "exact"; product: BarcodeProduct }
+  /** Ranked best-first — different chains can carry different barcodes for
+   * "the same" product (a generic jar vs. a single-serve snack pack, say),
+   * so each chain picks the best-ranked candidate *it actually has a price
+   * for* rather than being stuck with one globally-best textual match that
+   * might only be sold at one chain. */
+  | { kind: "fuzzy"; candidates: BarcodeProduct[] }
+  | { kind: "none" };
 
 /**
- * Finds the best barcode_products row for one shopping-list item: an exact
+ * Finds barcode_products candidates for one shopping-list item: an exact
  * barcode lookup first (if the item was scanned), then a trigram
  * title-similarity search as a stand-in for "same brand/size/category" —
  * matching on those individually isn't possible without per-item structured
  * attributes, which our imported chain data doesn't carry.
  */
-export async function matchBasketItem(item: BasketInput): Promise<MatchedProduct | null> {
+export async function matchBasketItem(item: BasketInput): Promise<MatchResult> {
   const supabase = createClient();
   const barcode = extractBarcode(item.notes);
 
   if (barcode) {
     const { data } = await supabase.from("barcode_products").select("*").eq("barcode", barcode).maybeSingle();
-    if (data) return { product: data, matchType: "exact" };
+    if (data) return { kind: "exact", product: data };
   }
 
   const { data } = await supabase.rpc("search_barcode_products", {
     p_query: stripShoppingFillerWords(item.title),
-    p_limit: 1,
+    // Deliberately wide — different chains often carry different SKUs of
+    // "the same" product, so a shallow candidate pool can leave a chain
+    // with no price at all even though a fine substitute ranks just a
+    // little further down (verified: a generic Nutella jar priced at every
+    // chain ranked #11 for a bare "נוטלה" query).
+    p_limit: 20,
   });
-  if (data && data.length > 0) {
-    return { product: data[0], matchType: "similar" };
-  }
-  return null;
+  if (data && data.length > 0) return { kind: "fuzzy", candidates: data };
+  return { kind: "none" };
 }
