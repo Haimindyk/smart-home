@@ -286,6 +286,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       emoji: null,
       priority: null,
       due_at: null,
+      due_notified_at: null,
       recurrence: null,
       tags: [],
       detected_links: [],
