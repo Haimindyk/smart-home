@@ -19,11 +19,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
@@ -63,6 +58,7 @@ export function TaskEditorSheet({
   const t = useT();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
 
   const [local, setLocal] = useState<Task | undefined>(task);
   const [tagInput, setTagInput] = useState("");
@@ -73,6 +69,7 @@ export function TaskEditorSheet({
   if (task !== syncedTask) {
     setSyncedTask(task);
     setLocal(task);
+    setDateOpen(false);
   }
 
   if (!task || !local) return null;
@@ -171,43 +168,20 @@ export function TaskEditorSheet({
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label>{t("dueDate")}</Label>
-                  <Popover>
-                    <PopoverTrigger
-                      render={
-                        <Button
-                          variant="outline"
-                          className="justify-start gap-2 font-normal"
-                        />
-                      }
-                    >
-                      <CalendarIcon className="size-4" />
-                      {local.due_at
-                        ? local.due_end_at &&
-                          new Date(local.due_end_at).toDateString() !== new Date(local.due_at).toDateString()
-                          ? `${format(new Date(local.due_at), "d/M")} – ${format(new Date(local.due_end_at), "d/M/yyyy")}`
-                          : format(new Date(local.due_at), "d/M/yyyy")
-                        : "—"}
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={
-                          local.due_at ? new Date(local.due_at) : undefined
-                        }
-                        onSelect={(date) => {
-                          if (!date) {
-                            commit({ due_at: null, due_end_at: null });
-                            return;
-                          }
-                          const patch: Partial<Task> = { due_at: date.toISOString() };
-                          if (local.due_end_at && date > new Date(local.due_end_at)) {
-                            patch.due_end_at = date.toISOString();
-                          }
-                          commit(patch);
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="justify-start gap-2 font-normal"
+                    onClick={() => setDateOpen((v) => !v)}
+                  >
+                    <CalendarIcon className="size-4" />
+                    {local.due_at
+                      ? local.due_end_at &&
+                        new Date(local.due_end_at).toDateString() !== new Date(local.due_at).toDateString()
+                        ? `${format(new Date(local.due_at), "d/M")} – ${format(new Date(local.due_end_at), "d/M/yyyy")}`
+                        : format(new Date(local.due_at), "d/M/yyyy")
+                      : "—"}
+                  </Button>
                 </div>
 
                 <div className="grid gap-2">
@@ -234,40 +208,37 @@ export function TaskEditorSheet({
                 </div>
               </div>
 
-              {local.due_at && (
-                <div className="flex items-center justify-between gap-3 rounded-lg border p-2.5">
-                  <Label className="font-normal">{t("multiDay")}</Label>
-                  <Switch
-                    checked={!!local.due_end_at}
-                    onCheckedChange={(checked) => commit({ due_end_at: checked ? local.due_at : null })}
-                  />
-                </div>
-              )}
-
-              {local.due_at && local.due_end_at && (
-                <div className="grid gap-2">
-                  <Label>{t("eventEndDate")}</Label>
-                  <Popover>
-                    <PopoverTrigger
-                      render={
-                        <Button
-                          variant="outline"
-                          className="justify-start gap-2 font-normal"
-                        />
+              {dateOpen && (
+                // Rendered inline rather than in a Popover: a Popover's portal
+                // stacks against this Sheet's own backdrop, and the backdrop
+                // wins the hit-test — clicking a day was silently closing the
+                // whole sheet instead of picking a date (verified via
+                // elementFromPoint at the click coordinates). Inline has no
+                // competing portal, so it's just reliable.
+                <div className="flex justify-center rounded-lg border p-1">
+                  {/* range mode so a single click just sets a due date, same
+                      as before, and a second click sets an end date — no
+                      separate toggle/second calendar needed. */}
+                  <Calendar
+                    mode="range"
+                    selected={
+                      local.due_at
+                        ? { from: new Date(local.due_at), to: local.due_end_at ? new Date(local.due_end_at) : undefined }
+                        : undefined
+                    }
+                    onSelect={(range) => {
+                      if (!range?.from) {
+                        commit({ due_at: null, due_end_at: null });
+                        return;
                       }
-                    >
-                      <CalendarIcon className="size-4" />
-                      {format(new Date(local.due_end_at), "d/M/yyyy")}
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={new Date(local.due_end_at)}
-                        disabled={{ before: new Date(local.due_at) }}
-                        onSelect={(date) => date && commit({ due_end_at: date.toISOString() })}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                      const sameDay = range.to && range.to.getTime() === range.from.getTime();
+                      const patch: Partial<Task> = {
+                        due_at: range.from.toISOString(),
+                        due_end_at: range.to && !sameDay ? range.to.toISOString() : null,
+                      };
+                      commit(patch);
+                    }}
+                  />
                 </div>
               )}
 

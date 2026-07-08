@@ -18,7 +18,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
@@ -58,10 +57,16 @@ export function EventDialog({
     if (event) return new Date(event.event_date);
     return defaultDate ?? new Date();
   });
-  const [multiDay, setMultiDay] = useState<boolean>(!!event?.end_date);
-  const [endDate, setEndDate] = useState<Date>(() => (event?.end_date ? new Date(event.end_date) : date));
+  const [endDate, setEndDate] = useState<Date | null>(() => (event?.end_date ? new Date(event.end_date) : null));
+  // A new event's `date` defaults to today/defaultDate for convenience before
+  // the user has touched the calendar at all — that default shouldn't count
+  // as a real "first click" for range purposes, or the user's actual first
+  // click gets misread as completing a range against it. Only an event being
+  // edited has a date the user genuinely already chose.
+  const [pickedDate, setPickedDate] = useState(!!event);
   const [recurrence, setRecurrence] = useState<boolean>(event?.recurrence === "yearly");
   const [notes, setNotes] = useState(event?.notes ?? "");
+  const [dateOpen, setDateOpen] = useState(false);
 
   const [syncedEvent, setSyncedEvent] = useState(event);
   if (event !== syncedEvent) {
@@ -69,16 +74,17 @@ export function EventDialog({
     setTitle(event?.title ?? "");
     setKind(event?.kind ?? "other");
     setDate(event ? new Date(event.event_date) : (defaultDate ?? new Date()));
-    setMultiDay(!!event?.end_date);
-    setEndDate(event?.end_date ? new Date(event.end_date) : (event ? new Date(event.event_date) : (defaultDate ?? new Date())));
+    setEndDate(event?.end_date ? new Date(event.end_date) : null);
+    setPickedDate(!!event);
     setRecurrence(event?.recurrence === "yearly");
     setNotes(event?.notes ?? "");
+    setDateOpen(false);
   }
 
   function submit() {
     if (!title.trim()) return;
     const eventDate = format(date, "yyyy-MM-dd");
-    const eventEndDate = multiDay && endDate >= date ? format(endDate, "yyyy-MM-dd") : null;
+    const eventEndDate = endDate ? format(endDate, "yyyy-MM-dd") : null;
     if (event) {
       void updateFamilyEvent(event.id, {
         title: title.trim(),
@@ -135,43 +141,41 @@ export function EventDialog({
 
             <div className="grid gap-2">
               <Label>{t("eventDate")}</Label>
-              <Popover>
-                <PopoverTrigger render={<Button variant="outline" className="justify-start gap-2 font-normal" />}>
-                  <CalendarIcon className="size-4" />
-                  {format(date, "d/M/yyyy")}
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={(d) => {
-                      if (!d) return;
-                      setDate(d);
-                      if (d > endDate) setEndDate(d);
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
+              <Button
+                type="button"
+                variant="outline"
+                className="justify-start gap-2 font-normal"
+                onClick={() => setDateOpen((v) => !v)}
+              >
+                <CalendarIcon className="size-4" />
+                {endDate && endDate.toDateString() !== date.toDateString()
+                  ? `${format(date, "d/M")} – ${format(endDate, "d/M/yyyy")}`
+                  : format(date, "d/M/yyyy")}
+              </Button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-            <Label className="font-normal">{t("multiDay")}</Label>
-            <Switch checked={multiDay} onCheckedChange={setMultiDay} />
-          </div>
-
-          {multiDay && (
-            <div className="grid gap-2">
-              <Label>{t("eventEndDate")}</Label>
-              <Popover>
-                <PopoverTrigger render={<Button variant="outline" className="justify-start gap-2 font-normal" />}>
-                  <CalendarIcon className="size-4" />
-                  {format(endDate, "d/M/yyyy")}
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={endDate} disabled={{ before: date }} onSelect={(d) => d && setEndDate(d)} />
-                </PopoverContent>
-              </Popover>
+          {dateOpen && (
+            // Rendered inline rather than in a Popover: a Popover's portal
+            // stacks against this Dialog's own backdrop, and the backdrop
+            // wins the hit-test — clicking a day was silently closing the
+            // whole dialog instead of picking a date (verified via
+            // elementFromPoint at the click coordinates). Inline has no
+            // competing portal, so it's just reliable.
+            <div className="flex justify-center rounded-lg border p-1">
+              {/* range mode: one click sets the date (same as before), a
+                  second click sets an end date — no separate toggle or
+                  second calendar needed. */}
+              <Calendar
+                mode="range"
+                selected={pickedDate ? { from: date, to: endDate ?? undefined } : undefined}
+                onSelect={(range) => {
+                  if (!range?.from) return;
+                  setPickedDate(true);
+                  setDate(range.from);
+                  setEndDate(range.to && range.to.getTime() !== range.from.getTime() ? range.to : null);
+                }}
+              />
             </div>
           )}
 
