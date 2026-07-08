@@ -2,7 +2,7 @@ import { CHAINS } from "./chains";
 import { matchBasketItem, type MatchResult } from "./match";
 import type { BarcodeProduct } from "@/types/domain";
 import type { BasketComparison, BasketInput, BasketItemResult, ChainBasketResult, ItemMatch } from "./types";
-import type { ChainMeta } from "./chains";
+import type { ChainKey, ChainMeta } from "./chains";
 
 /** Picks which candidate row a given chain should price this item from. An
  * exact barcode match is the literal product — used as-is (null price just
@@ -20,11 +20,12 @@ function pickForChain(matched: MatchResult, chain: ChainMeta): BarcodeProduct | 
 
 const cache = new Map<string, Promise<BasketComparison>>();
 
-function cacheKey(items: BasketInput[]): string {
-  return items
+function cacheKey(items: BasketInput[], excludeChains: ChainKey[]): string {
+  const itemsKey = items
     .map((i) => `${i.id}:${i.title}:${i.notes ?? ""}`)
     .sort()
     .join("|");
+  return `${itemsKey}::${[...excludeChains].sort().join(",")}`;
 }
 
 /** Clears cached comparisons — call after an item is added/edited/removed so
@@ -33,12 +34,14 @@ export function clearBasketComparisonCache() {
   cache.clear();
 }
 
-async function computeComparison(items: BasketInput[]): Promise<BasketComparison> {
+async function computeComparison(items: BasketInput[], excludeChains: ChainKey[]): Promise<BasketComparison> {
   const matches = await Promise.all(
     items.map(async (item) => ({ item, matched: await matchBasketItem(item) }))
   );
 
-  const chainResults: ChainBasketResult[] = CHAINS.map((chain) => {
+  const chains = CHAINS.filter((chain) => !excludeChains.includes(chain.key));
+
+  const chainResults: ChainBasketResult[] = chains.map((chain) => {
     let total = 0;
     let matchedCount = 0;
 
@@ -92,14 +95,15 @@ async function computeComparison(items: BasketInput[]): Promise<BasketComparison
   return { ranked, unavailable, cheapest, mostExpensive, savingsAmount, savingsPercent };
 }
 
-/** Compares a shopping basket across every known chain. Cached per exact
- * basket contents (item id/title/notes) for the life of the session, since
+/** Compares a shopping basket across every known chain (minus any the caller
+ * excludes — see excludedChainsForSection). Cached per exact basket contents
+ * (item id/title/notes) and exclusion set for the life of the session, since
  * recomputing is a handful of network round-trips per open. */
-export function compareBasketPrices(items: BasketInput[]): Promise<BasketComparison> {
-  const key = cacheKey(items);
+export function compareBasketPrices(items: BasketInput[], excludeChains: ChainKey[] = []): Promise<BasketComparison> {
+  const key = cacheKey(items, excludeChains);
   let pending = cache.get(key);
   if (!pending) {
-    pending = computeComparison(items);
+    pending = computeComparison(items, excludeChains);
     cache.set(key, pending);
     pending.catch(() => cache.delete(key));
   }

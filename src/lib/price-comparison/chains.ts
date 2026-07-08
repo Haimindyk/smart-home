@@ -23,3 +23,11 @@ export const CHAINS: ChainMeta[] = [
   { key: "super_pharm", name: "סופר פארם", priceColumn: "price_super_pharm", color: "bg-slate-700", initial: "ס" },
   { key: "osher_ad", name: "אושר עד", priceColumn: "price_osher_ad", color: "bg-emerald-600", initial: "א" },
 ];
+
+/** The general grocery-run list ("קניות בסופר") skips Super-Pharm — it's a
+ * pharmacy/drugstore, not a supermarket, so comparing a grocery basket
+ * against it is mostly noise. A list that's actually Super-Pharm's own
+ * (named after the chain) still compares against everyone as normal. */
+export function excludedChainsForSection(sectionName: string): ChainKey[] {
+  return sectionName.trim() === "קניות בסופר" ? ["super_pharm"] : [];
+}

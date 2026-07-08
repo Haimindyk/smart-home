@@ -5,11 +5,18 @@ import { TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n/store";
 import { PriceComparisonSheet } from "@/components/shopping/price-comparison-sheet";
+import type { ChainKey } from "@/lib/price-comparison/chains";
 import type { BasketInput } from "@/lib/price-comparison/types";
 
 /** Drop into any section header (or anywhere else a basket needs comparing)
  * to open the price-comparison sheet for that list of items. */
-export function PriceComparisonButton({ items }: { items: BasketInput[] }) {
+export function PriceComparisonButton({
+  items,
+  excludeChains,
+}: {
+  items: BasketInput[];
+  excludeChains?: ChainKey[];
+}) {
   const t = useT();
   const [open, setOpen] = useState(false);
 
@@ -24,7 +31,7 @@ export function PriceComparisonButton({ items }: { items: BasketInput[] }) {
         <TrendingDown className="size-4" />
         {t("priceComparison")}
       </Button>
-      <PriceComparisonSheet items={items} open={open} onOpenChange={setOpen} />
+      <PriceComparisonSheet items={items} excludeChains={excludeChains} open={open} onOpenChange={setOpen} />
     </>
   );
 }
