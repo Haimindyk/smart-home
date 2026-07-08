@@ -15,6 +15,13 @@
 // This is a Deno module (Supabase Edge Runtime), not part of the Next.js
 // app's TypeScript project — see tsconfig.json / eslint.config.mjs, both of
 // which exclude supabase/functions/**.
+//
+// Deployed with verify_jwt disabled: chat has no auth by design (same anon
+// reach as the rest of this app), and the insights intent uses its own
+// shared-secret check (verify_assistant_trigger_secret) rather than a
+// Supabase-issued JWT — the pg_cron job's net.http_post sends a random Vault
+// secret as the bearer token, not a JWT, so gateway-level verify_jwt would
+// reject it before this code ever ran.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -23,7 +30,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // runaway loop exhausting the free Gemini tier. Tracked in ai_usage via the
 // increment_ai_usage() RPC (see migration 0022).
 const DAILY_CALL_CAP = 50;
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
