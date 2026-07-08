@@ -87,6 +87,7 @@ type AppState = {
     title: string;
     kind: FamilyEvent["kind"];
     eventDate: string;
+    endDate?: string | null;
     recurrence: FamilyEvent["recurrence"];
     emoji?: string | null;
     notes?: string | null;
@@ -365,6 +366,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       emoji: null,
       priority: null,
       due_at: null,
+      due_end_at: null,
       due_notified_at: null,
       recurrence: null,
       tags: [],
@@ -592,7 +594,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ---------------------------------------------------------------------
   // Family events
   // ---------------------------------------------------------------------
-  createFamilyEvent: async ({ title, kind, eventDate, recurrence, emoji, notes, createdBy }) => {
+  createFamilyEvent: async ({ title, kind, eventDate, endDate, recurrence, emoji, notes, createdBy }) => {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
@@ -602,6 +604,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       kind,
       emoji: emoji ?? null,
       event_date: eventDate,
+      end_date: endDate ?? null,
       recurrence,
       notes: notes ?? null,
       last_notified_on: null,
@@ -617,7 +620,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       {
         table: "family_events",
         op: "insert",
-        payload: { id, title, kind, emoji: optimistic.emoji, event_date: eventDate, recurrence, notes: optimistic.notes, created_by: createdBy },
+        payload: {
+          id,
+          title,
+          kind,
+          emoji: optimistic.emoji,
+          event_date: eventDate,
+          end_date: optimistic.end_date,
+          recurrence,
+          notes: optimistic.notes,
+          created_by: createdBy,
+        },
       },
       () =>
         set((s) => {

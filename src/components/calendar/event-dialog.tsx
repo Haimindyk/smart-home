@@ -58,6 +58,8 @@ export function EventDialog({
     if (event) return new Date(event.event_date);
     return defaultDate ?? new Date();
   });
+  const [multiDay, setMultiDay] = useState<boolean>(!!event?.end_date);
+  const [endDate, setEndDate] = useState<Date>(() => (event?.end_date ? new Date(event.end_date) : date));
   const [recurrence, setRecurrence] = useState<boolean>(event?.recurrence === "yearly");
   const [notes, setNotes] = useState(event?.notes ?? "");
 
@@ -67,6 +69,8 @@ export function EventDialog({
     setTitle(event?.title ?? "");
     setKind(event?.kind ?? "other");
     setDate(event ? new Date(event.event_date) : (defaultDate ?? new Date()));
+    setMultiDay(!!event?.end_date);
+    setEndDate(event?.end_date ? new Date(event.end_date) : (event ? new Date(event.event_date) : (defaultDate ?? new Date())));
     setRecurrence(event?.recurrence === "yearly");
     setNotes(event?.notes ?? "");
   }
@@ -74,11 +78,13 @@ export function EventDialog({
   function submit() {
     if (!title.trim()) return;
     const eventDate = format(date, "yyyy-MM-dd");
+    const eventEndDate = multiDay && endDate >= date ? format(endDate, "yyyy-MM-dd") : null;
     if (event) {
       void updateFamilyEvent(event.id, {
         title: title.trim(),
         kind,
         event_date: eventDate,
+        end_date: eventEndDate,
         recurrence: recurrence ? "yearly" : "none",
         notes: notes.trim() || null,
         emoji: KIND_EMOJI[kind],
@@ -88,6 +94,7 @@ export function EventDialog({
         title: title.trim(),
         kind,
         eventDate,
+        endDate: eventEndDate,
         recurrence: recurrence ? "yearly" : "none",
         notes: notes.trim() || null,
         emoji: KIND_EMOJI[kind],
@@ -134,11 +141,39 @@ export function EventDialog({
                   {format(date, "d/M/yyyy")}
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} />
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(d) => {
+                      if (!d) return;
+                      setDate(d);
+                      if (d > endDate) setEndDate(d);
+                    }}
+                  />
                 </PopoverContent>
               </Popover>
             </div>
           </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+            <Label className="font-normal">{t("multiDay")}</Label>
+            <Switch checked={multiDay} onCheckedChange={setMultiDay} />
+          </div>
+
+          {multiDay && (
+            <div className="grid gap-2">
+              <Label>{t("eventEndDate")}</Label>
+              <Popover>
+                <PopoverTrigger render={<Button variant="outline" className="justify-start gap-2 font-normal" />}>
+                  <CalendarIcon className="size-4" />
+                  {format(endDate, "d/M/yyyy")}
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={endDate} disabled={{ before: date }} onSelect={(d) => d && setEndDate(d)} />
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
 
           <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
             <Label className="font-normal">{t("repeatsYearly")}</Label>

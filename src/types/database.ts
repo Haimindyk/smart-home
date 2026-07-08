@@ -318,6 +318,7 @@ export type Database = {
           created_by: string | null
           deleted_at: string | null
           emoji: string | null
+          end_date: string | null
           event_date: string
           id: string
           kind: string
@@ -333,6 +334,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           emoji?: string | null
+          end_date?: string | null
           event_date: string
           id?: string
           kind?: string
@@ -348,6 +350,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           emoji?: string | null
+          end_date?: string | null
           event_date?: string
           id?: string
           kind?: string
@@ -573,6 +576,7 @@ export type Database = {
           deleted_at: string | null
           detected_links: string[]
           due_at: string | null
+          due_end_at: string | null
           due_notified_at: string | null
           emoji: string | null
           id: string
@@ -606,6 +610,7 @@ export type Database = {
           deleted_at?: string | null
           detected_links?: string[]
           due_at?: string | null
+          due_end_at?: string | null
           due_notified_at?: string | null
           emoji?: string | null
           id?: string
@@ -639,6 +644,7 @@ export type Database = {
           deleted_at?: string | null
           detected_links?: string[]
           due_at?: string | null
+          due_end_at?: string | null
           due_notified_at?: string | null
           emoji?: string | null
           id?: string
@@ -747,6 +753,12 @@ export type Database = {
           price_super_pharm: number | null
           product_name: string
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "barcode_products"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }

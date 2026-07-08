@@ -27,3 +27,14 @@ export function nextOccurrence(eventDate: string, recurrence: EventRecurrence, a
 export function dateKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
+
+/** Whole days between two "yyyy-MM-dd" dates — used to carry a multi-day
+ * event's span forward onto a rolled-forward yearly occurrence. */
+export function spanDays(startDate: string, endDate: string | null): number {
+  if (!endDate) return 0;
+  const [sy, sm, sd] = startDate.split("-").map(Number);
+  const [ey, em, ed] = endDate.split("-").map(Number);
+  const start = new Date(sy, sm - 1, sd);
+  const end = new Date(ey, em - 1, ed);
+  return Math.round((end.getTime() - start.getTime()) / 86_400_000);
+}

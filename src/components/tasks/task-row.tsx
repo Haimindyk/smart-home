@@ -191,6 +191,9 @@ function TaskRowContent({
                 day: "numeric",
                 month: "numeric",
               })}
+              {node.due_end_at &&
+                new Date(node.due_end_at).toDateString() !== new Date(node.due_at).toDateString() &&
+                ` – ${new Date(node.due_end_at).toLocaleDateString("he-IL", { day: "numeric", month: "numeric" })}`}
             </Badge>
           )}
         </button>
