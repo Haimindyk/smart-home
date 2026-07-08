@@ -128,8 +128,11 @@ export type Database = {
           created_at: string
           created_by: string | null
           currency: string
+          price_carrefour: number | null
+          price_osher_ad: number | null
           price_rami_levy: number | null
           price_shufersal: number | null
+          price_super_pharm: number | null
           product_name: string
         }
         Insert: {
@@ -137,8 +140,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          price_carrefour?: number | null
+          price_osher_ad?: number | null
           price_rami_levy?: number | null
           price_shufersal?: number | null
+          price_super_pharm?: number | null
           product_name: string
         }
         Update: {
@@ -146,8 +152,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          price_carrefour?: number | null
+          price_osher_ad?: number | null
           price_rami_levy?: number | null
           price_shufersal?: number | null
+          price_super_pharm?: number | null
           product_name?: string
         }
         Relationships: [
