@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAppStore } from "@/lib/store/app-store";
 import { loadSnapshot, saveSnapshot } from "@/lib/offline/db";
 import { flushMutationQueue } from "@/lib/offline/queue";
-import type { Member, Section, Task, Chore, ChoreCompletion, Attachment, ActivityLog, FamilyEvent } from "@/types/domain";
+import type { Member, Section, Task, Chore, ChoreCompletion, Attachment, ActivityLog, FamilyEvent, AiSuggestion } from "@/types/domain";
 
 /** Delay before rejoining the realtime channel after an error/timeout/close, to avoid retry storms. */
 const REJOIN_DELAY_MS = 2000;
@@ -20,6 +20,7 @@ type Snapshot = {
   attachments: Attachment[];
   activityLog: ActivityLog[];
   familyEvents: FamilyEvent[];
+  aiSuggestions: AiSuggestion[];
 };
 
 const TABLES = [
@@ -31,20 +32,23 @@ const TABLES = [
   "attachments",
   "activity_log",
   "family_events",
+  "ai_suggestions",
 ] as const;
 
 async function fetchAll(): Promise<Snapshot> {
   const supabase = createClient();
-  const [members, sections, tasks, chores, choreCompletions, attachments, activityLog, familyEvents] = await Promise.all([
-    supabase.from("members").select("*"),
-    supabase.from("sections").select("*").order("position"),
-    supabase.from("tasks").select("*").order("position"),
-    supabase.from("chores").select("*").order("position"),
-    supabase.from("chore_completions").select("*"),
-    supabase.from("attachments").select("*"),
-    supabase.from("activity_log").select("*").order("seq", { ascending: false }).limit(200),
-    supabase.from("family_events").select("*").order("event_date"),
-  ]);
+  const [members, sections, tasks, chores, choreCompletions, attachments, activityLog, familyEvents, aiSuggestions] =
+    await Promise.all([
+      supabase.from("members").select("*"),
+      supabase.from("sections").select("*").order("position"),
+      supabase.from("tasks").select("*").order("position"),
+      supabase.from("chores").select("*").order("position"),
+      supabase.from("chore_completions").select("*"),
+      supabase.from("attachments").select("*"),
+      supabase.from("activity_log").select("*").order("seq", { ascending: false }).limit(200),
+      supabase.from("family_events").select("*").order("event_date"),
+      supabase.from("ai_suggestions").select("*").eq("status", "open").order("created_at", { ascending: false }),
+    ]);
   return {
     members: (members.data ?? []) as Member[],
     sections: (sections.data ?? []) as Section[],
@@ -54,6 +58,7 @@ async function fetchAll(): Promise<Snapshot> {
     attachments: (attachments.data ?? []) as Attachment[],
     activityLog: (activityLog.data ?? []) as ActivityLog[],
     familyEvents: (familyEvents.data ?? []) as FamilyEvent[],
+    aiSuggestions: (aiSuggestions.data ?? []) as AiSuggestion[],
   };
 }
 
@@ -169,6 +174,7 @@ export function useRealtimeSync() {
           .sort((a, b) => b.seq - a.seq)
           .slice(0, 200),
         familyEvents: Object.values(state.familyEvents),
+        aiSuggestions: Object.values(state.aiSuggestions),
       });
     });
 

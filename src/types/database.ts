@@ -55,6 +55,48 @@ export type Database = {
           },
         ]
       }
+      ai_suggestions: {
+        Row: {
+          action: Json
+          created_at: string
+          emoji: string | null
+          id: string
+          status: string
+          summary: string
+        }
+        Insert: {
+          action: Json
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          status?: string
+          summary: string
+        }
+        Update: {
+          action?: Json
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          status?: string
+          summary?: string
+        }
+        Relationships: []
+      }
+      ai_usage: {
+        Row: {
+          calls: number
+          day: string
+        }
+        Insert: {
+          calls?: number
+          day?: string
+        }
+        Update: {
+          calls?: number
+          day?: string
+        }
+        Relationships: []
+      }
       attachments: {
         Row: {
           chore_id: string | null
@@ -732,6 +774,7 @@ export type Database = {
           vapid_public_key: string
         }[]
       }
+      increment_ai_usage: { Args: never; Returns: number }
       is_member: { Args: never; Returns: boolean }
       restore_task:
         | { Args: { p_task_id: string }; Returns: undefined }

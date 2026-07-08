@@ -24,6 +24,7 @@ export type ActivityLog = Tables<"activity_log">;
 export type PushSubscriptionRow = Tables<"push_subscriptions">;
 export type NotificationPrefs = Tables<"notification_prefs">;
 export type BarcodeProduct = Tables<"barcode_products">;
+export type AiSuggestion = Tables<"ai_suggestions">;
 
 export type EventKind = "birthday" | "medical" | "other";
 export type EventRecurrence = "none" | "yearly";

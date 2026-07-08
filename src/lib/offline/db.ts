@@ -40,7 +40,8 @@ export type MutableTable =
   | "chore_completions"
   | "attachments"
   | "family_events"
-  | "activity_log";
+  | "activity_log"
+  | "ai_suggestions";
 
 export type QueuedMutation = {
   seq?: number;
