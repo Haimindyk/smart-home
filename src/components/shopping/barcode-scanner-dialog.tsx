@@ -42,7 +42,18 @@ export function BarcodeScannerDialog({
 }) {
   const createTask = useAppStore((s) => s.createTask);
   const t = useT();
-  const videoRef = useRef<HTMLVideoElement>(null);
+  // A plain useRef read inside an effect keyed on `open` is unreliable here:
+  // Base UI's Dialog.Popup (like Radix/MUI dialogs) doesn't mount its
+  // children synchronously the instant `open` flips true — it controls
+  // mount timing to support open/close animations — so the effect could
+  // run before this <video> was actually attached, get `undefined`, and
+  // have zxing scan into its own invisible internal element while ours
+  // sat there empty forever. The ref itself stays a plain mutable handle
+  // (DOM nodes are meant to be mutated directly); `videoMounted` is a
+  // separate signal purely so the effect's dependency array notices once
+  // the callback ref actually fires and re-runs at the right time.
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [videoMounted, setVideoMounted] = useState(false);
   const [status, setStatus] = useState<"scanning" | "looking-up" | "error">("scanning");
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   // Temporary on-screen diagnostics while tracking down the black-preview
@@ -65,7 +76,7 @@ export function BarcodeScannerDialog({
   }
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !videoRef.current) return;
 
     let cancelled = false;
     let busy = false;
@@ -93,17 +104,15 @@ export function BarcodeScannerDialog({
       }, 2000);
     }
 
+    const video = videoRef.current;
     // zxing's internal video setup calls videoElement.setAttribute('muted',
     // 'true') rather than assigning the DOM property — WebKit's autoplay
     // gate reads the live `.muted` property, which setAttribute doesn't
     // reliably update once the element is already mounted. Set it directly
     // ourselves so the stream is genuinely muted before playback starts.
-    if (videoRef.current) {
-      videoRef.current.muted = true;
-      videoRef.current.defaultMuted = true;
-    }
+    video.muted = true;
+    video.defaultMuted = true;
 
-    const video = videoRef.current;
     const addLog = (entry: string) => setLog((prev) => [...prev, entry]);
     const updateDebug = () => {
       if (!video) return;
@@ -125,7 +134,7 @@ export function BarcodeScannerDialog({
     reader
       .decodeFromConstraints(
         { video: { facingMode: { ideal: "environment" } } },
-        videoRef.current ?? undefined,
+        video,
         (result) => {
           if (cancelled || busy || !result) return;
           const code = result.getText();
@@ -176,7 +185,7 @@ export function BarcodeScannerDialog({
     // `createTask` is stable (bound once by zustand) but doesn't need to
     // restart scanning either; both are read via closure instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, sectionId, createdBy]);
+  }, [open, videoMounted, sectionId, createdBy]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -188,10 +197,7 @@ export function BarcodeScannerDialog({
           <video
             ref={(el) => {
               videoRef.current = el;
-              if (el) {
-                el.muted = true;
-                el.defaultMuted = true;
-              }
+              setVideoMounted(!!el);
             }}
             className="aspect-square w-full object-cover"
             autoPlay
