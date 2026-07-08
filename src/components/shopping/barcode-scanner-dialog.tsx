@@ -44,12 +44,19 @@ export function BarcodeScannerDialog({
   const t = useT();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState<"scanning" | "looking-up" | "error">("scanning");
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  // Temporary on-screen diagnostics while tracking down the black-preview
+  // bug — shows real stream/video state instead of guessing blindly.
+  const [debugInfo, setDebugInfo] = useState<string>("");
   // Reset to "scanning" each time the dialog opens — adjusting state during
   // render per https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
   const [syncedOpen, setSyncedOpen] = useState(open);
   if (open !== syncedOpen) {
     setSyncedOpen(open);
-    if (open) setStatus("scanning");
+    if (open) {
+      setStatus("scanning");
+      setErrorDetail(null);
+    }
   }
 
   useEffect(() => {
@@ -91,6 +98,17 @@ export function BarcodeScannerDialog({
       videoRef.current.defaultMuted = true;
     }
 
+    const video = videoRef.current;
+    const updateDebug = () => {
+      if (!video) return;
+      setDebugInfo(
+        `readyState=${video.readyState} size=${video.videoWidth}x${video.videoHeight} paused=${video.paused} muted=${video.muted} networkState=${video.networkState}`
+      );
+    };
+    const events = ["loadedmetadata", "loadeddata", "playing", "play", "pause", "stalled", "suspend", "error", "emptied"] as const;
+    events.forEach((ev) => video?.addEventListener(ev, updateDebug));
+    const debugInterval = setInterval(updateDebug, 500);
+
     reader
       .decodeFromConstraints(
         { video: { facingMode: { ideal: "environment" } } },
@@ -109,6 +127,7 @@ export function BarcodeScannerDialog({
           return;
         }
         controls = c;
+        setDebugInfo((d) => `${d} | decodeFromConstraints resolved`);
         // Belt-and-suspenders: iOS Safari can silently swallow the
         // script-driven play() zxing issues internally if the async
         // getUserMedia permission prompt consumed the tap's user-activation
@@ -116,15 +135,22 @@ export function BarcodeScannerDialog({
         // never actually starts, showing as a black square. The `autoPlay`
         // attribute on the element covers most cases; retrying here is a
         // harmless no-op if it's already playing.
-        void videoRef.current?.play().catch(() => {});
+        video?.play().then(
+          () => setDebugInfo((d) => `${d} | play() resolved`),
+          (err) => setDebugInfo((d) => `${d} | play() rejected: ${err?.name}: ${err?.message}`)
+        );
       })
-      .catch(() => {
-        if (!cancelled) setStatus("error");
+      .catch((err) => {
+        if (cancelled) return;
+        setStatus("error");
+        setErrorDetail(`${err?.name ?? "Error"}: ${err?.message ?? String(err)}`);
       });
 
     return () => {
       cancelled = true;
       controls?.stop();
+      events.forEach((ev) => video?.removeEventListener(ev, updateDebug));
+      clearInterval(debugInterval);
     };
   }, [open, sectionId, createdBy, createTask, t]);
 
@@ -155,12 +181,18 @@ export function BarcodeScannerDialog({
             </div>
           )}
           {status === "error" && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-4 text-center text-sm text-white">
-              {t("cameraUnavailable")}
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/70 p-4 text-center text-sm text-white">
+              <span>{t("cameraUnavailable")}</span>
+              {errorDetail && <span className="text-xs opacity-80" dir="ltr">{errorDetail}</span>}
             </div>
           )}
         </div>
         <p className="text-center text-xs text-muted-foreground">{t("scanBarcodeHint")}</p>
+        {debugInfo && (
+          <p dir="ltr" className="break-all rounded bg-muted p-2 text-center text-[10px] text-muted-foreground">
+            {debugInfo}
+          </p>
+        )}
       </DialogContent>
     </Dialog>
   );
