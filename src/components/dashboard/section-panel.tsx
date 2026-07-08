@@ -20,6 +20,7 @@ import {
 import { TaskList } from "@/components/tasks/task-list";
 import { ChoreQuickAdd } from "@/components/chores/chore-quick-add";
 import { ChoreRow } from "@/components/chores/chore-row";
+import { PriceComparisonButton } from "@/components/shopping/price-comparison-button";
 import { sortByPosition } from "@/lib/ordering/rank";
 import { cn } from "@/lib/utils";
 import type { Section, SectionKind } from "@/types/domain";
@@ -41,6 +42,7 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
     const deleteSection = useAppStore((s) => s.deleteSection);
     const updateSectionNote = useAppStore((s) => s.updateSectionNote);
     const chores = useAppStore((s) => s.chores);
+    const tasks = useAppStore((s) => s.tasks);
     const stats = useSectionStats(section);
     const t = useT();
     const [renaming, setRenaming] = useState(false);
@@ -57,6 +59,13 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
         : [];
     const dueChores = choreItems.filter((c) => new Date(c.next_due_at).getTime() <= now);
     const notDueChores = choreItems.filter((c) => new Date(c.next_due_at).getTime() > now);
+
+    const shoppingItems =
+      section.kind === "shopping"
+        ? Object.values(tasks)
+            .filter((task) => task.section_id === section.id && !task.deleted_at && !task.is_note && !task.is_completed)
+            .map((task) => ({ id: task.id, title: task.title, notes: task.notes }))
+        : [];
 
     return (
       <div
@@ -140,6 +149,12 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {section.kind === "shopping" && (
+          <div className="mb-3">
+            <PriceComparisonButton items={shoppingItems} />
+          </div>
+        )}
 
         {section.kind !== "info" && (
           <Progress
