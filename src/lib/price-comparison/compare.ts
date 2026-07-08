@@ -4,15 +4,37 @@ import type { BarcodeProduct } from "@/types/domain";
 import type { BasketComparison, BasketInput, BasketItemResult, ChainBasketResult, ItemMatch } from "./types";
 import type { ChainKey, ChainMeta } from "./chains";
 
+/** For a fuzzy (unscanned) match, picks the single candidate priced by the
+ * most chains — comparing that one product's price everywhere it's carried
+ * is a fair, apples-to-apples comparison, rather than each chain silently
+ * pricing a different item. Ties go to whichever ranks better (candidates
+ * are already best-match-first). Returns null if no candidate is priced by
+ * more than one chain, in which case there's nothing to share anyway. */
+function pickSharedCandidate(candidates: BarcodeProduct[], chains: ChainMeta[]): BarcodeProduct | null {
+  let best: BarcodeProduct | null = null;
+  let bestCoverage = 1;
+  for (const candidate of candidates) {
+    const coverage = chains.filter((chain) => candidate[chain.priceColumn] != null).length;
+    if (coverage > bestCoverage) {
+      bestCoverage = coverage;
+      best = candidate;
+    }
+  }
+  return best;
+}
+
 /** Picks which candidate row a given chain should price this item from. An
  * exact barcode match is the literal product — used as-is (null price just
- * means that chain doesn't carry that exact barcode). A fuzzy match tries
- * each ranked candidate in order and uses the first one this chain actually
- * has a price for, since different chains often carry different SKUs of
- * "the same" product (a generic jar vs. a single-serve snack pack, say). */
-function pickForChain(matched: MatchResult, chain: ChainMeta): BarcodeProduct | null {
+ * means that chain doesn't carry that exact barcode). A fuzzy match prefers
+ * the basket-wide shared candidate (see pickSharedCandidate) so most chains
+ * compare the exact same product; a chain that doesn't carry it falls back
+ * to its own best-ranked alternative, since different chains often carry
+ * different SKUs of "the same" product (a generic jar vs. a single-serve
+ * snack pack, say). */
+function pickForChain(matched: MatchResult, chain: ChainMeta, sharedCandidate: BarcodeProduct | null): BarcodeProduct | null {
   if (matched.kind === "exact") return matched.product;
   if (matched.kind === "fuzzy") {
+    if (sharedCandidate && sharedCandidate[chain.priceColumn] != null) return sharedCandidate;
     return matched.candidates.find((c) => c[chain.priceColumn] != null) ?? null;
   }
   return null;
@@ -41,12 +63,16 @@ async function computeComparison(items: BasketInput[], excludeChains: ChainKey[]
 
   const chains = CHAINS.filter((chain) => !excludeChains.includes(chain.key));
 
+  const sharedCandidates = matches.map(({ matched }) =>
+    matched.kind === "fuzzy" ? pickSharedCandidate(matched.candidates, chains) : null
+  );
+
   const chainResults: ChainBasketResult[] = chains.map((chain) => {
     let total = 0;
     let matchedCount = 0;
 
-    const itemResults: BasketItemResult[] = matches.map(({ item, matched }) => {
-      const product = pickForChain(matched, chain);
+    const itemResults: BasketItemResult[] = matches.map(({ item, matched }, i) => {
+      const product = pickForChain(matched, chain, sharedCandidates[i]);
       const price = product ? product[chain.priceColumn] : null;
       let match: ItemMatch;
       if (product && price != null) {
