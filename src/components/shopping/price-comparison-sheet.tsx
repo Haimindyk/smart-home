@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Badge } from "@/components/ui/badge";
 import { useT } from "@/lib/i18n/store";
 import { compareBasketPrices } from "@/lib/price-comparison/compare";
+import type { ChainKey } from "@/lib/price-comparison/chains";
 import type { BasketComparison, BasketInput, ChainBasketResult } from "@/lib/price-comparison/types";
 import { cn } from "@/lib/utils";
 
@@ -16,10 +17,13 @@ import { cn } from "@/lib/utils";
  */
 export function PriceComparisonSheet({
   items,
+  excludeChains = [],
   open,
   onOpenChange,
 }: {
   items: BasketInput[];
+  /** Chains to leave out of this comparison — see excludedChainsForSection. */
+  excludeChains?: ChainKey[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -38,16 +42,16 @@ export function PriceComparisonSheet({
   useEffect(() => {
     if (!open || items.length === 0) return;
     let cancelled = false;
-    void compareBasketPrices(items).then((result) => {
+    void compareBasketPrices(items, excludeChains).then((result) => {
       if (!cancelled) setComparison(result);
     });
     return () => {
       cancelled = true;
     };
-    // `items` is an array literal built fresh every render by the caller —
-    // comparing its contents (not identity) is handled inside
-    // compareBasketPrices' own cache key, so re-running on every render
-    // here is unnecessary; only `open` should retrigger a fetch.
+    // `items`/`excludeChains` are array literals built fresh every render by
+    // the caller — comparing contents (not identity) is handled inside
+    // compareBasketPrices' own cache key, so re-running on every render here
+    // is unnecessary; only `open` should retrigger a fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

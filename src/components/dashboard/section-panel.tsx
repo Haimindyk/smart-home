@@ -21,6 +21,7 @@ import { TaskList } from "@/components/tasks/task-list";
 import { ChoreQuickAdd } from "@/components/chores/chore-quick-add";
 import { ChoreRow } from "@/components/chores/chore-row";
 import { PriceComparisonButton } from "@/components/shopping/price-comparison-button";
+import { excludedChainsForSection } from "@/lib/price-comparison/chains";
 import { sortByPosition } from "@/lib/ordering/rank";
 import { cn } from "@/lib/utils";
 import type { Section, SectionKind } from "@/types/domain";
@@ -152,7 +153,7 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
 
         {section.kind === "shopping" && (
           <div className="mb-3">
-            <PriceComparisonButton items={shoppingItems} />
+            <PriceComparisonButton items={shoppingItems} excludeChains={excludedChainsForSection(section.name)} />
           </div>
         )}
 
