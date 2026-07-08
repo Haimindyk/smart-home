@@ -6,6 +6,7 @@ import { AppHeader } from "@/components/nav/app-header";
 import { CategoryTabs } from "@/components/dashboard/category-tabs";
 import { SectionPanels } from "@/components/dashboard/section-panels";
 import { NewSectionDialog } from "@/components/dashboard/new-section-dialog";
+import { InsightCards } from "@/components/assistant/insight-card";
 import { useAppStore } from "@/lib/store/app-store";
 import { useIdentity } from "@/lib/identity";
 import { useLocaleStore, useT } from "@/lib/i18n/store";
@@ -73,6 +74,8 @@ export default function DashboardPage() {
             <NewSectionDialog />
           </div>
         </div>
+
+        <InsightCards />
 
         {!hydrated ? (
           <div className="glass surface-shadow flex flex-col items-center gap-3 rounded-3xl p-12 text-center ring-1 ring-border/40">

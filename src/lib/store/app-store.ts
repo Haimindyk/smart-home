@@ -17,6 +17,7 @@ import type {
   Attachment,
   ActivityLog,
   FamilyEvent,
+  AiSuggestion,
 } from "@/types/domain";
 import { toast } from "sonner";
 
@@ -31,6 +32,7 @@ type AppState = {
   attachments: ById<Attachment>;
   activityLog: ById<ActivityLog>;
   familyEvents: ById<FamilyEvent>;
+  aiSuggestions: ById<AiSuggestion>;
   hydrated: boolean;
 
   hydrate: (data: {
@@ -42,14 +44,26 @@ type AppState = {
     attachments: Attachment[];
     activityLog: ActivityLog[];
     familyEvents?: FamilyEvent[];
+    aiSuggestions?: AiSuggestion[];
   }) => void;
 
   applyRemote: (
-    table: "members" | "sections" | "tasks" | "chores" | "chore_completions" | "attachments" | "activity_log" | "family_events",
+    table:
+      | "members"
+      | "sections"
+      | "tasks"
+      | "chores"
+      | "chore_completions"
+      | "attachments"
+      | "activity_log"
+      | "family_events"
+      | "ai_suggestions",
     eventType: "INSERT" | "UPDATE" | "DELETE",
     row: Record<string, unknown> | null,
     oldRow: Record<string, unknown> | null
   ) => void;
+
+  updateAiSuggestionStatus: (id: string, status: "applied" | "dismissed") => Promise<void>;
 
   updateMember: (id: string, patch: Partial<Pick<Member, "display_name" | "avatar_emoji" | "avatar_photo_url" | "color">>) => Promise<void>;
   addMember: (input: {
@@ -167,6 +181,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   attachments: {},
   activityLog: {},
   familyEvents: {},
+  aiSuggestions: {},
   hydrated: false,
 
   hydrate: (data) =>
@@ -179,6 +194,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       attachments: keyify(data.attachments),
       activityLog: keyify(data.activityLog),
       familyEvents: keyify(data.familyEvents ?? []),
+      aiSuggestions: keyify(data.aiSuggestions ?? []),
       hydrated: true,
     }),
 
@@ -192,6 +208,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       attachments: "attachments",
       activity_log: "activityLog",
       family_events: "familyEvents",
+      ai_suggestions: "aiSuggestions",
     };
     const stateKey = map[table] as
       | "members"
@@ -201,7 +218,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       | "choreCompletions"
       | "attachments"
       | "activityLog"
-      | "familyEvents";
+      | "familyEvents"
+      | "aiSuggestions";
 
     set((state) => {
       const bucket = { ...(state[stateKey] as ById<{ id: string; updated_at?: string }>) };
@@ -677,6 +695,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
       () => {},
       "לא הצלחנו לשלוח את ההודעה"
+    );
+  },
+
+  // ---------------------------------------------------------------------
+  // AI suggestions (see supabase/functions/assistant's "insights" mode) —
+  // a suggestion is only ever marked applied/dismissed here; actually
+  // *applying* one runs through applyProposedAction, same as a chat action.
+  // ---------------------------------------------------------------------
+  updateAiSuggestionStatus: async (id, status) => {
+    const prev = get().aiSuggestions[id];
+    set((s) => ({ aiSuggestions: { ...s.aiSuggestions, [id]: { ...s.aiSuggestions[id], status } } }));
+    await runMutation(
+      { table: "ai_suggestions", op: "update", payload: { status }, match: { id } },
+      () => prev && set((s) => ({ aiSuggestions: { ...s.aiSuggestions, [id]: prev } })),
+      "לא הצלחנו לעדכן את ההצעה"
     );
   },
 
