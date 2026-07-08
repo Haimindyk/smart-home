@@ -42,7 +42,15 @@ export function BarcodeScannerDialog({
 }) {
   const createTask = useAppStore((s) => s.createTask);
   const t = useT();
-  const videoRef = useRef<HTMLVideoElement>(null);
+  // A plain useRef read inside an effect keyed on `open` is unreliable here:
+  // Base UI's Dialog.Popup (like Radix/MUI dialogs) doesn't mount its
+  // children synchronously the instant `open` flips true — it controls
+  // mount timing to support open/close animations — so the effect could
+  // run before this <video> was actually attached. `videoMounted` is a
+  // separate signal purely so the effect's dependency array notices once
+  // the callback ref actually fires and re-runs at the right time.
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [videoMounted, setVideoMounted] = useState(false);
   const [status, setStatus] = useState<"scanning" | "looking-up" | "error">("scanning");
   // Reset to "scanning" each time the dialog opens — adjusting state during
   // render per https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
@@ -53,7 +61,7 @@ export function BarcodeScannerDialog({
   }
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !videoRef.current) return;
 
     let cancelled = false;
     let busy = false;
@@ -81,20 +89,19 @@ export function BarcodeScannerDialog({
       }, 2000);
     }
 
+    const video = videoRef.current;
     // zxing's internal video setup calls videoElement.setAttribute('muted',
     // 'true') rather than assigning the DOM property — WebKit's autoplay
     // gate reads the live `.muted` property, which setAttribute doesn't
     // reliably update once the element is already mounted. Set it directly
     // ourselves so the stream is genuinely muted before playback starts.
-    if (videoRef.current) {
-      videoRef.current.muted = true;
-      videoRef.current.defaultMuted = true;
-    }
+    video.muted = true;
+    video.defaultMuted = true;
 
     reader
       .decodeFromConstraints(
         { video: { facingMode: { ideal: "environment" } } },
-        videoRef.current ?? undefined,
+        video,
         (result) => {
           if (cancelled || busy || !result) return;
           const code = result.getText();
@@ -109,14 +116,7 @@ export function BarcodeScannerDialog({
           return;
         }
         controls = c;
-        // Belt-and-suspenders: iOS Safari can silently swallow the
-        // script-driven play() zxing issues internally if the async
-        // getUserMedia permission prompt consumed the tap's user-activation
-        // window by the time it runs — the stream attaches but the video
-        // never actually starts, showing as a black square. The `autoPlay`
-        // attribute on the element covers most cases; retrying here is a
-        // harmless no-op if it's already playing.
-        void videoRef.current?.play().catch(() => {});
+        void video.play();
       })
       .catch(() => {
         if (!cancelled) setStatus("error");
@@ -126,11 +126,17 @@ export function BarcodeScannerDialog({
       cancelled = true;
       controls?.stop();
     };
-  }, [open, sectionId, createdBy, createTask, t]);
+    // `t` from useT() is a brand-new function every render (never
+    // memoized) — including it here would tear down and restart the
+    // camera stream on every unrelated re-render. `createTask` is stable
+    // (bound once by zustand) but doesn't need to restart scanning either;
+    // both are read via closure instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, videoMounted, sectionId, createdBy]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm" blurOverlay={false}>
         <DialogHeader>
           <DialogTitle>{t("scanBarcode")}</DialogTitle>
         </DialogHeader>
@@ -138,10 +144,7 @@ export function BarcodeScannerDialog({
           <video
             ref={(el) => {
               videoRef.current = el;
-              if (el) {
-                el.muted = true;
-                el.defaultMuted = true;
-              }
+              setVideoMounted(!!el);
             }}
             className="aspect-square w-full object-cover"
             autoPlay
