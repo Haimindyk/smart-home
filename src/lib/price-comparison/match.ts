@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { stripShoppingFillerWords } from "@/lib/nlp/strip-shopping-filler";
 import type { BarcodeProduct } from "@/types/domain";
 import type { BasketInput } from "./types";
 
@@ -35,7 +36,10 @@ export async function matchBasketItem(item: BasketInput): Promise<MatchedProduct
     if (data) return { product: data, matchType: "exact" };
   }
 
-  const { data } = await supabase.rpc("search_barcode_products", { p_query: item.title, p_limit: 1 });
+  const { data } = await supabase.rpc("search_barcode_products", {
+    p_query: stripShoppingFillerWords(item.title),
+    p_limit: 1,
+  });
   if (data && data.length > 0) {
     return { product: data[0], matchType: "similar" };
   }

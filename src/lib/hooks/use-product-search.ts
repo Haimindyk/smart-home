@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { stripShoppingFillerWords } from "@/lib/nlp/strip-shopping-filler";
 import type { BarcodeProduct } from "@/types/domain";
 
 /** Debounced fuzzy search against the barcode_products cache — lets quick-add
@@ -9,7 +10,9 @@ import type { BarcodeProduct } from "@/types/domain";
  * free text. Returns nothing until the query has a couple of characters. */
 export function useProductSearch(query: string, enabled: boolean) {
   const [results, setResults] = useState<BarcodeProduct[]>([]);
-  const trimmed = query.trim();
+  // Quick-add's own placeholder suggests phrasing like "לקנות חלב" — strip
+  // that kind of filler before searching, same as the price-comparison matcher.
+  const trimmed = stripShoppingFillerWords(query);
   const active = enabled && trimmed.length >= 2;
 
   useEffect(() => {
