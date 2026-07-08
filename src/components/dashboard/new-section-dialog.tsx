@@ -69,13 +69,24 @@ export function NewSectionDialog() {
             <Select value={kind} onValueChange={(v) => v && setKind(v as SectionKind)}>
               <SelectTrigger>
                 <SelectValue>
-                  {(v: SectionKind) => t(v === "tasks" ? "section_tasks" : v === "shopping" ? "section_shopping" : "section_chores")}
+                  {(v: SectionKind) =>
+                    t(
+                      v === "tasks"
+                        ? "section_tasks"
+                        : v === "shopping"
+                          ? "section_shopping"
+                          : v === "chores"
+                            ? "section_chores"
+                            : "section_info"
+                    )
+                  }
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="tasks">{t("section_tasks")}</SelectItem>
                 <SelectItem value="shopping">{t("section_shopping")}</SelectItem>
                 <SelectItem value="chores">{t("section_chores")}</SelectItem>
+                <SelectItem value="info">{t("section_info")}</SelectItem>
               </SelectContent>
             </Select>
           </div>

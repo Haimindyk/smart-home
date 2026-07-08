@@ -21,10 +21,11 @@ export function QuickAddInput({
   const t = useT();
   const [value, setValue] = useState("");
   const [asNote, setAsNote] = useState(false);
+  const isInfoSection = sectionKind === "info";
 
   function submit() {
     if (!value.trim()) return;
-    if (asNote) {
+    if (asNote || isInfoSection) {
       void createTask({
         sectionId,
         title: value.trim(),
@@ -52,30 +53,31 @@ export function QuickAddInput({
         submit();
       }}
     >
-      <button
-        type="button"
-        onClick={() => setAsNote((v) => !v)}
-        aria-pressed={asNote}
-        title={t("addAsNote")}
-        className={cn(
-          "flex size-6 shrink-0 items-center justify-center rounded-lg transition-colors",
-          asNote
-            ? "bg-primary text-primary-foreground"
-            : "text-muted-foreground hover:bg-accent",
-        )}
-      >
-        {asNote ? (
-          <StickyNote className="size-4" />
-        ) : (
-          <Plus className="size-4" />
-        )}
-      </button>
+      {isInfoSection ? (
+        <StickyNote className="size-4 shrink-0 text-muted-foreground" />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAsNote((v) => !v)}
+          aria-pressed={asNote}
+          title={t("addAsNote")}
+          className={cn(
+            "flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium transition-colors",
+            asNote
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-accent",
+          )}
+        >
+          {asNote ? <StickyNote className="size-4" /> : <Plus className="size-4" />}
+          <span className="hidden sm:inline">{t("addAsNote")}</span>
+        </button>
+      )}
       <input
         dir="auto"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={
-          asNote
+          isInfoSection || asNote
             ? t("addNotePlaceholder")
             : sectionKind === "chores"
               ? t("addChore")

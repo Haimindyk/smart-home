@@ -43,6 +43,7 @@ type NotificationPrefsRow = {
   on_assigned_me: boolean;
   on_shopping: boolean;
   on_due: boolean;
+  on_broadcast: boolean;
   muted: boolean;
 };
 
@@ -60,6 +61,7 @@ const DEFAULT_PREFS: Omit<NotificationPrefsRow, "member_id"> = {
   on_assigned_me: true,
   on_shopping: true,
   on_due: true,
+  on_broadcast: true,
   muted: false,
 };
 
@@ -207,7 +209,11 @@ Deno.serve(async (req) => {
       //    or vice versa).
       // 3. Everything else falls back to the action-specific pref.
       let notify: boolean;
-      if (action === "due") {
+      if (action === "message") {
+        // A deliberate broadcast from a member — gated purely by on_broadcast,
+        // never by mute-by-assignee/shopping/etc. logic below.
+        notify = prefs.on_broadcast;
+      } else if (action === "due") {
         // Due-date reminders are their own signal, distinct from
         // "assigned to me" — gated purely by on_due. If the task has
         // specific assignees, only they get pinged; unassigned tasks
@@ -233,7 +239,10 @@ Deno.serve(async (req) => {
       const recipient = membersById.get(sub.member_id);
       let title: string;
       let body: string;
-      if (action === "due") {
+      if (action === "message") {
+        title = actorName ? `📣 ${actorName}` : "📣 K&H";
+        body = summary ?? "";
+      } else if (action === "due") {
         title = recipient?.locale === "he" ? "⏰ תזכורת" : "⏰ Reminder";
         body = summary ?? "";
       } else {

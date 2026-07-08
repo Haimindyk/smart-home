@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAppStore } from "@/lib/store/app-store";
 import { loadSnapshot, saveSnapshot } from "@/lib/offline/db";
 import { flushMutationQueue } from "@/lib/offline/queue";
-import type { Member, Section, Task, Chore, ChoreCompletion, Attachment, ActivityLog } from "@/types/domain";
+import type { Member, Section, Task, Chore, ChoreCompletion, Attachment, ActivityLog, FamilyEvent } from "@/types/domain";
 
 /** Delay before rejoining the realtime channel after an error/timeout/close, to avoid retry storms. */
 const REJOIN_DELAY_MS = 2000;
@@ -19,13 +19,23 @@ type Snapshot = {
   choreCompletions: ChoreCompletion[];
   attachments: Attachment[];
   activityLog: ActivityLog[];
+  familyEvents: FamilyEvent[];
 };
 
-const TABLES = ["members", "sections", "tasks", "chores", "chore_completions", "attachments", "activity_log"] as const;
+const TABLES = [
+  "members",
+  "sections",
+  "tasks",
+  "chores",
+  "chore_completions",
+  "attachments",
+  "activity_log",
+  "family_events",
+] as const;
 
 async function fetchAll(): Promise<Snapshot> {
   const supabase = createClient();
-  const [members, sections, tasks, chores, choreCompletions, attachments, activityLog] = await Promise.all([
+  const [members, sections, tasks, chores, choreCompletions, attachments, activityLog, familyEvents] = await Promise.all([
     supabase.from("members").select("*"),
     supabase.from("sections").select("*").order("position"),
     supabase.from("tasks").select("*").order("position"),
@@ -33,6 +43,7 @@ async function fetchAll(): Promise<Snapshot> {
     supabase.from("chore_completions").select("*"),
     supabase.from("attachments").select("*"),
     supabase.from("activity_log").select("*").order("seq", { ascending: false }).limit(200),
+    supabase.from("family_events").select("*").order("event_date"),
   ]);
   return {
     members: (members.data ?? []) as Member[],
@@ -42,6 +53,7 @@ async function fetchAll(): Promise<Snapshot> {
     choreCompletions: (choreCompletions.data ?? []) as ChoreCompletion[],
     attachments: (attachments.data ?? []) as Attachment[],
     activityLog: (activityLog.data ?? []) as ActivityLog[],
+    familyEvents: (familyEvents.data ?? []) as FamilyEvent[],
   };
 }
 
@@ -156,6 +168,7 @@ export function useRealtimeSync() {
         activityLog: Object.values(state.activityLog)
           .sort((a, b) => b.seq - a.seq)
           .slice(0, 200),
+        familyEvents: Object.values(state.familyEvents),
       });
     });
 

@@ -263,6 +263,69 @@ export type Database = {
           },
         ]
       }
+      family_events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          emoji: string | null
+          event_date: string
+          id: string
+          kind: string
+          last_notified_on: string | null
+          notes: string | null
+          recurrence: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          emoji?: string | null
+          event_date: string
+          id?: string
+          kind?: string
+          last_notified_on?: string | null
+          notes?: string | null
+          recurrence?: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          emoji?: string | null
+          event_date?: string
+          id?: string
+          kind?: string
+          last_notified_on?: string | null
+          notes?: string | null
+          recurrence?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_events_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       members: {
         Row: {
           avatar_emoji: string | null
@@ -313,6 +376,7 @@ export type Database = {
           on_assigned_me: boolean
           on_shopping: boolean
           on_due: boolean
+          on_broadcast: boolean
           muted: boolean
           updated_at: string
         }
@@ -323,6 +387,7 @@ export type Database = {
           on_assigned_me?: boolean
           on_shopping?: boolean
           on_due?: boolean
+          on_broadcast?: boolean
           muted?: boolean
           updated_at?: string
         }
@@ -333,6 +398,7 @@ export type Database = {
           on_assigned_me?: boolean
           on_shopping?: boolean
           on_due?: boolean
+          on_broadcast?: boolean
           muted?: boolean
           updated_at?: string
         }

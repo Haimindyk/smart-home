@@ -18,6 +18,7 @@ type PrefsState = {
   on_assigned_me: boolean;
   on_shopping: boolean;
   on_due: boolean;
+  on_broadcast: boolean;
   muted: boolean;
 };
 
@@ -27,6 +28,7 @@ const DEFAULT_PREFS: PrefsState = {
   on_assigned_me: true,
   on_shopping: true,
   on_due: true,
+  on_broadcast: true,
   muted: false,
 };
 
@@ -36,6 +38,7 @@ const CATEGORY_ROWS: { key: keyof Omit<PrefsState, "muted">; label: MessageKey }
   { key: "on_assigned_me", label: "notifyOnAssignedMe" },
   { key: "on_shopping", label: "notifyOnShopping" },
   { key: "on_due", label: "notifyOnDue" },
+  { key: "on_broadcast", label: "notifyOnBroadcast" },
 ];
 
 export function NotificationSettingsDialog({
@@ -66,7 +69,7 @@ export function NotificationSettingsDialog({
     const supabase = createClient();
     supabase
       .from("notification_prefs")
-      .select("on_create, on_complete, on_assigned_me, on_shopping, on_due, muted")
+      .select("on_create, on_complete, on_assigned_me, on_shopping, on_due, on_broadcast, muted")
       .eq("member_id", memberId)
       .maybeSingle()
       .then(({ data }) => {
