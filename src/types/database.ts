@@ -312,6 +312,7 @@ export type Database = {
           on_complete: boolean
           on_assigned_me: boolean
           on_shopping: boolean
+          on_due: boolean
           muted: boolean
           updated_at: string
         }
@@ -321,6 +322,7 @@ export type Database = {
           on_complete?: boolean
           on_assigned_me?: boolean
           on_shopping?: boolean
+          on_due?: boolean
           muted?: boolean
           updated_at?: string
         }
@@ -330,6 +332,7 @@ export type Database = {
           on_complete?: boolean
           on_assigned_me?: boolean
           on_shopping?: boolean
+          on_due?: boolean
           muted?: boolean
           updated_at?: string
         }
@@ -455,6 +458,7 @@ export type Database = {
           deleted_at: string | null
           detected_links: string[]
           due_at: string | null
+          due_notified_at: string | null
           emoji: string | null
           id: string
           image_url: string | null
@@ -487,6 +491,7 @@ export type Database = {
           deleted_at?: string | null
           detected_links?: string[]
           due_at?: string | null
+          due_notified_at?: string | null
           emoji?: string | null
           id?: string
           image_url?: string | null
@@ -519,6 +524,7 @@ export type Database = {
           deleted_at?: string | null
           detected_links?: string[]
           due_at?: string | null
+          due_notified_at?: string | null
           emoji?: string | null
           id?: string
           image_url?: string | null

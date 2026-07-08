@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, StickyNote } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { useT } from "@/lib/i18n/store";
 import { parseQuickAdd } from "@/lib/nlp/quick-add-parse";
+import { cn } from "@/lib/utils";
 import type { SectionKind } from "@/types/domain";
 
 export function QuickAddInput({
@@ -19,17 +20,28 @@ export function QuickAddInput({
   const createTask = useAppStore((s) => s.createTask);
   const t = useT();
   const [value, setValue] = useState("");
+  const [asNote, setAsNote] = useState(false);
 
   function submit() {
     if (!value.trim()) return;
-    const { title, dueAt } = parseQuickAdd(value);
-    void createTask({
-      sectionId,
-      title,
-      createdBy,
-      extra: dueAt ? { due_at: dueAt } : undefined,
-    });
+    if (asNote) {
+      void createTask({
+        sectionId,
+        title: value.trim(),
+        createdBy,
+        extra: { is_note: true },
+      });
+    } else {
+      const { title, dueAt } = parseQuickAdd(value);
+      void createTask({
+        sectionId,
+        title,
+        createdBy,
+        extra: dueAt ? { due_at: dueAt } : undefined,
+      });
+    }
     setValue("");
+    setAsNote(false);
   }
 
   return (
@@ -40,12 +52,35 @@ export function QuickAddInput({
         submit();
       }}
     >
-      <Plus className="size-4 shrink-0 text-muted-foreground" />
+      <button
+        type="button"
+        onClick={() => setAsNote((v) => !v)}
+        aria-pressed={asNote}
+        title={t("addAsNote")}
+        className={cn(
+          "flex size-6 shrink-0 items-center justify-center rounded-lg transition-colors",
+          asNote
+            ? "bg-primary text-primary-foreground"
+            : "text-muted-foreground hover:bg-accent",
+        )}
+      >
+        {asNote ? (
+          <StickyNote className="size-4" />
+        ) : (
+          <Plus className="size-4" />
+        )}
+      </button>
       <input
         dir="auto"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder={sectionKind === "chores" ? t("addChore") : t("quickAddPlaceholder")}
+        placeholder={
+          asNote
+            ? t("addNotePlaceholder")
+            : sectionKind === "chores"
+              ? t("addChore")
+              : t("quickAddPlaceholder")
+        }
         className="w-full bg-transparent text-sm outline-none"
       />
     </form>

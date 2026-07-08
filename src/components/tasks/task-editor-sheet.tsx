@@ -16,7 +16,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
@@ -73,7 +78,10 @@ export function TaskEditorSheet({
 
   return (
     <Sheet open={!!taskId} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="mx-auto max-h-[90vh] max-w-2xl overflow-y-auto rounded-t-2xl">
+      <SheetContent
+        side="bottom"
+        className="mx-auto max-h-[90vh] max-w-2xl overflow-y-auto rounded-t-2xl"
+      >
         <SheetHeader>
           <SheetTitle className="sr-only">{local.title}</SheetTitle>
         </SheetHeader>
@@ -105,96 +113,163 @@ export function TaskEditorSheet({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label>{t("dueDate")}</Label>
-              <Popover>
-                <PopoverTrigger render={<Button variant="outline" className="justify-start gap-2 font-normal" />}>
-                  <CalendarIcon className="size-4" />
-                  {local.due_at ? format(new Date(local.due_at), "d/M/yyyy") : "—"}
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={local.due_at ? new Date(local.due_at) : undefined}
-                    onSelect={(date) => commit({ due_at: date ? date.toISOString() : null })}
+          <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+            <Label className="font-normal">{t("infoOnly")}</Label>
+            <Switch
+              checked={local.is_note}
+              onCheckedChange={(checked) => commit({ is_note: checked })}
+            />
+          </div>
+
+          {!local.is_note && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>{t("dueDate")}</Label>
+                  <Popover>
+                    <PopoverTrigger
+                      render={
+                        <Button
+                          variant="outline"
+                          className="justify-start gap-2 font-normal"
+                        />
+                      }
+                    >
+                      <CalendarIcon className="size-4" />
+                      {local.due_at
+                        ? format(new Date(local.due_at), "d/M/yyyy")
+                        : "—"}
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={
+                          local.due_at ? new Date(local.due_at) : undefined
+                        }
+                        onSelect={(date) =>
+                          commit({ due_at: date ? date.toISOString() : null })
+                        }
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>{t("priority")}</Label>
+                  <Select
+                    value={String(local.priority ?? 0)}
+                    onValueChange={(v) => commit({ priority: Number(v) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue>
+                        {(v: string) =>
+                          PRIORITIES.find((p) => p.value === v)?.labelHe
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRIORITIES.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>
+                          {p.labelHe}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>{t("assignee")}</Label>
+                  <AssigneeMultiSelect
+                    assigneeKind={local.assignee_kind}
+                    assigneeMemberIds={local.assignee_member_ids}
+                    onChange={(next) => commit(next)}
                   />
-                </PopoverContent>
-              </Popover>
-            </div>
+                </div>
 
-            <div className="grid gap-2">
-              <Label>{t("priority")}</Label>
-              <Select value={String(local.priority ?? 0)} onValueChange={(v) => commit({ priority: Number(v) })}>
-                <SelectTrigger>
-                  <SelectValue>{(v: string) => PRIORITIES.find((p) => p.value === v)?.labelHe}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {PRIORITIES.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>
-                      {p.labelHe}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label>{t("assignee")}</Label>
-              <AssigneeMultiSelect
-                assigneeKind={local.assignee_kind}
-                assigneeMemberIds={local.assignee_member_ids}
-                onChange={(next) => commit(next)}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label>{t("doneBy")}</Label>
-              <p className="flex h-8 items-center gap-1.5 text-sm text-muted-foreground">
-                {local.completed_by ? (
-                  <>
-                    <MemberAvatar member={members[local.completed_by]} className="size-5" />
-                    {members[local.completed_by]?.display_name ?? "?"}
-                  </>
-                ) : (
-                  "—"
-                )}
-              </p>
-            </div>
-          </div>
-
-          {sectionKind === "shopping" && (
-            <div className="grid grid-cols-3 gap-3">
-              <div className="grid gap-2">
-                <Label>{t("quantity")}</Label>
-                <Input
-                  value={local.quantity ?? ""}
-                  onChange={(e) => setLocal({ ...local, quantity: e.target.value === "" ? null : Number(e.target.value) })}
-                  onBlur={(e) => commit({ quantity: e.target.value === "" ? null : Number(e.target.value) })}
-                  type="number"
-                />
+                <div className="grid gap-2">
+                  <Label>{t("doneBy")}</Label>
+                  <p className="flex h-8 items-center gap-1.5 text-sm text-muted-foreground">
+                    {local.completed_by ? (
+                      <>
+                        <MemberAvatar
+                          member={members[local.completed_by]}
+                          className="size-5"
+                        />
+                        {members[local.completed_by]?.display_name ?? "?"}
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </p>
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label>{t("price")}</Label>
-                <Input
-                  value={local.price ?? ""}
-                  onChange={(e) => setLocal({ ...local, price: e.target.value === "" ? null : Number(e.target.value) })}
-                  onBlur={(e) => commit({ price: e.target.value === "" ? null : Number(e.target.value) })}
-                  type="number"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>{t("brand")}</Label>
-                <Input
-                  dir="auto"
-                  value={local.brand ?? ""}
-                  onChange={(e) => setLocal({ ...local, brand: e.target.value })}
-                  onBlur={(e) => commit({ brand: e.target.value || null })}
-                />
-              </div>
-            </div>
+
+              {sectionKind === "shopping" && (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="grid gap-2">
+                    <Label>{t("quantity")}</Label>
+                    <Input
+                      value={local.quantity ?? ""}
+                      onChange={(e) =>
+                        setLocal({
+                          ...local,
+                          quantity:
+                            e.target.value === ""
+                              ? null
+                              : Number(e.target.value),
+                        })
+                      }
+                      onBlur={(e) =>
+                        commit({
+                          quantity:
+                            e.target.value === ""
+                              ? null
+                              : Number(e.target.value),
+                        })
+                      }
+                      type="number"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>{t("price")}</Label>
+                    <Input
+                      value={local.price ?? ""}
+                      onChange={(e) =>
+                        setLocal({
+                          ...local,
+                          price:
+                            e.target.value === ""
+                              ? null
+                              : Number(e.target.value),
+                        })
+                      }
+                      onBlur={(e) =>
+                        commit({
+                          price:
+                            e.target.value === ""
+                              ? null
+                              : Number(e.target.value),
+                        })
+                      }
+                      type="number"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>{t("brand")}</Label>
+                    <Input
+                      dir="auto"
+                      value={local.brand ?? ""}
+                      onChange={(e) =>
+                        setLocal({ ...local, brand: e.target.value })
+                      }
+                      onBlur={(e) => commit({ brand: e.target.value || null })}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           <div className="grid gap-2">
@@ -206,7 +281,9 @@ export function TaskEditorSheet({
                   variant="secondary"
                   size="sm"
                   className="h-6 gap-1 rounded-full px-2 text-xs"
-                  onClick={() => commit({ tags: local.tags.filter((tg) => tg !== tag) })}
+                  onClick={() =>
+                    commit({ tags: local.tags.filter((tg) => tg !== tag) })
+                  }
                 >
                   {tag}
                   <X className="size-3" />
@@ -218,7 +295,9 @@ export function TaskEditorSheet({
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && tagInput.trim()) {
-                    commit({ tags: [...new Set([...local.tags, tagInput.trim()])] });
+                    commit({
+                      tags: [...new Set([...local.tags, tagInput.trim()])],
+                    });
                     setTagInput("");
                   }
                 }}
@@ -230,9 +309,16 @@ export function TaskEditorSheet({
 
           <div className="grid gap-2">
             <Label>העברה לקטגוריה</Label>
-            <Select value={local.section_id} onValueChange={(v) => v && commit({ section_id: v })}>
+            <Select
+              value={local.section_id}
+              onValueChange={(v) => v && commit({ section_id: v })}
+            >
               <SelectTrigger>
-                <SelectValue>{(v: string) => (sections[v] ? `${sections[v].emoji} ${sections[v].name}` : v)}</SelectValue>
+                <SelectValue>
+                  {(v: string) =>
+                    sections[v] ? `${sections[v].emoji} ${sections[v].name}` : v
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {Object.values(sections)

@@ -27,12 +27,28 @@ export function TaskRow({
   sectionKind: SectionKind;
   onOpenEditor: (taskId: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: node.id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: node.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   return (
-    <div ref={setNodeRef} style={style} className={cn("rounded-lg", isDragging && "opacity-50")}>
-      <TaskRowContent node={node} sectionKind={sectionKind} onOpenEditor={onOpenEditor} dragHandleProps={{ attributes, listeners }} />
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn("rounded-lg", isDragging && "opacity-50")}
+    >
+      <TaskRowContent
+        node={node}
+        sectionKind={sectionKind}
+        onOpenEditor={onOpenEditor}
+        dragHandleProps={{ attributes, listeners }}
+      />
     </div>
   );
 }
@@ -47,10 +63,19 @@ function TaskChildRow({
   sectionKind: SectionKind;
   onOpenEditor: (taskId: string) => void;
 }) {
-  return <TaskRowContent node={node} sectionKind={sectionKind} onOpenEditor={onOpenEditor} />;
+  return (
+    <TaskRowContent
+      node={node}
+      sectionKind={sectionKind}
+      onOpenEditor={onOpenEditor}
+    />
+  );
 }
 
-type DragHandleProps = Pick<ReturnType<typeof useSortable>, "attributes" | "listeners">;
+type DragHandleProps = Pick<
+  ReturnType<typeof useSortable>,
+  "attributes" | "listeners"
+>;
 
 function TaskRowContent({
   node,
@@ -73,16 +98,26 @@ function TaskRowContent({
 
   if (node.is_note) {
     return (
-      <div className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground">
+      <div className="group flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent/40">
         {dragHandleProps ? (
-          <button {...dragHandleProps.attributes} {...dragHandleProps.listeners} className="cursor-grab touch-none opacity-40 hover:opacity-100" aria-label="Drag">
+          <button
+            {...dragHandleProps.attributes}
+            {...dragHandleProps.listeners}
+            className="cursor-grab touch-none opacity-0 group-hover:opacity-100"
+            aria-label="Drag"
+          >
             <GripVertical className="size-4" />
           </button>
         ) : (
           <span className="w-4" />
         )}
-        {node.emoji && <span>{node.emoji}</span>}
-        <LinkifiedText text={node.title} />
+        <button
+          className="flex flex-1 items-center gap-2 py-0.5 text-start text-sm font-medium text-muted-foreground"
+          onClick={() => onOpenEditor(node.id)}
+        >
+          {node.emoji && <span>{node.emoji}</span>}
+          <LinkifiedText text={node.title} />
+        </button>
       </div>
     );
   }
@@ -104,8 +139,15 @@ function TaskRowContent({
         )}
 
         {node.children.length > 0 ? (
-          <button onClick={() => setExpanded((e) => !e)} className="text-muted-foreground">
-            {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            className="text-muted-foreground"
+          >
+            {expanded ? (
+              <ChevronDown className="size-4" />
+            ) : (
+              <ChevronRight className="size-4" />
+            )}
           </button>
         ) : (
           <span className="w-4" />
@@ -117,12 +159,25 @@ function TaskRowContent({
           className="size-5 rounded-full"
         />
 
-        <button className="flex flex-1 items-center gap-2 py-0.5 text-start" onClick={() => onOpenEditor(node.id)}>
-          {node.priority ? <span className={cn("size-1.5 shrink-0 rounded-full", PRIORITY_COLOR[node.priority])} /> : null}
+        <button
+          className="flex flex-1 items-center gap-2 py-0.5 text-start"
+          onClick={() => onOpenEditor(node.id)}
+        >
+          {node.priority ? (
+            <span
+              className={cn(
+                "size-1.5 shrink-0 rounded-full",
+                PRIORITY_COLOR[node.priority],
+              )}
+            />
+          ) : null}
           {node.emoji && <span>{node.emoji}</span>}
           <LinkifiedText
             text={node.title || "…"}
-            className={cn("text-sm", node.is_completed && "text-muted-foreground line-through")}
+            className={cn(
+              "text-sm",
+              node.is_completed && "text-muted-foreground line-through",
+            )}
           />
           {node.quantity ? (
             <Badge variant="secondary" className="h-5 text-xs">
@@ -132,7 +187,10 @@ function TaskRowContent({
           ) : null}
           {node.due_at && (
             <Badge variant="outline" className="h-5 text-xs">
-              {new Date(node.due_at).toLocaleDateString("he-IL", { day: "numeric", month: "numeric" })}
+              {new Date(node.due_at).toLocaleDateString("he-IL", {
+                day: "numeric",
+                month: "numeric",
+              })}
             </Badge>
           )}
         </button>
@@ -143,7 +201,12 @@ function TaskRowContent({
           assigneeMemberIds={node.assignee_member_ids}
         />
 
-        <Button variant="ghost" size="icon" className="size-6 opacity-0 group-hover:opacity-100" onClick={() => setAddingSubtask((v) => !v)}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6 opacity-0 group-hover:opacity-100"
+          onClick={() => setAddingSubtask((v) => !v)}
+        >
           <Plus className="size-3.5" />
         </Button>
       </div>
@@ -154,7 +217,12 @@ function TaskRowContent({
           onSubmit={(e) => {
             e.preventDefault();
             if (!subtaskTitle.trim()) return;
-            void createTask({ sectionId: node.section_id, parentTaskId: node.id, title: subtaskTitle.trim(), createdBy: actingMemberId });
+            void createTask({
+              sectionId: node.section_id,
+              parentTaskId: node.id,
+              title: subtaskTitle.trim(),
+              createdBy: actingMemberId,
+            });
             setSubtaskTitle("");
             setAddingSubtask(false);
           }}
@@ -174,7 +242,12 @@ function TaskRowContent({
       {expanded && node.children.length > 0 && (
         <div className="ms-6 border-s ps-2">
           {node.children.map((child) => (
-            <TaskChildRow key={child.id} node={child} sectionKind={sectionKind} onOpenEditor={onOpenEditor} />
+            <TaskChildRow
+              key={child.id}
+              node={child}
+              sectionKind={sectionKind}
+              onOpenEditor={onOpenEditor}
+            />
           ))}
         </div>
       )}

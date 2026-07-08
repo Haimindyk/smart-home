@@ -42,6 +42,7 @@ type NotificationPrefsRow = {
   on_complete: boolean;
   on_assigned_me: boolean;
   on_shopping: boolean;
+  on_due: boolean;
   muted: boolean;
 };
 
@@ -58,6 +59,7 @@ const DEFAULT_PREFS: Omit<NotificationPrefsRow, "member_id"> = {
   on_complete: true,
   on_assigned_me: true,
   on_shopping: true,
+  on_due: true,
   muted: false,
 };
 
@@ -73,6 +75,7 @@ const VERBS: Record<string, { he: string; en: string }> = {
   uncompleted: { he: "בוטל סימון בוצע", en: "marked not done" },
   deleted: { he: "נמחק/ה", en: "deleted" },
   restored: { he: "שוחזר/ה", en: "restored" },
+  due: { he: "הגיע מועד היעד", en: "is due" },
 };
 
 function verbFor(action: string, locale: string | null): string {
@@ -204,7 +207,13 @@ Deno.serve(async (req) => {
       //    or vice versa).
       // 3. Everything else falls back to the action-specific pref.
       let notify: boolean;
-      if (isAssignee && prefs.on_assigned_me) {
+      if (action === "due") {
+        // Due-date reminders are their own signal, distinct from
+        // "assigned to me" — gated purely by on_due. If the task has
+        // specific assignees, only they get pinged; unassigned tasks
+        // notify everyone with reminders on.
+        notify = (assigneeIds.length === 0 || isAssignee) && prefs.on_due;
+      } else if (isAssignee && prefs.on_assigned_me) {
         notify = true;
       } else if (isShopping) {
         notify = prefs.on_shopping;
@@ -222,9 +231,16 @@ Deno.serve(async (req) => {
       }
 
       const recipient = membersById.get(sub.member_id);
-      const verb = verbFor(action, recipient?.locale ?? null);
-      const title = actorName ?? "K&H";
-      const body = summary ? `${verb} ${summary}` : verb;
+      let title: string;
+      let body: string;
+      if (action === "due") {
+        title = recipient?.locale === "he" ? "⏰ תזכורת" : "⏰ Reminder";
+        body = summary ?? "";
+      } else {
+        const verb = verbFor(action, recipient?.locale ?? null);
+        title = actorName ?? "K&H";
+        body = summary ? `${verb} ${summary}` : verb;
+      }
 
       const payload = {
         title,
