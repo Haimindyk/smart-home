@@ -81,6 +81,16 @@ export function BarcodeScannerDialog({
       }, 2000);
     }
 
+    // zxing's internal video setup calls videoElement.setAttribute('muted',
+    // 'true') rather than assigning the DOM property — WebKit's autoplay
+    // gate reads the live `.muted` property, which setAttribute doesn't
+    // reliably update once the element is already mounted. Set it directly
+    // ourselves so the stream is genuinely muted before playback starts.
+    if (videoRef.current) {
+      videoRef.current.muted = true;
+      videoRef.current.defaultMuted = true;
+    }
+
     reader
       .decodeFromConstraints(
         { video: { facingMode: { ideal: "environment" } } },
@@ -125,7 +135,19 @@ export function BarcodeScannerDialog({
           <DialogTitle>{t("scanBarcode")}</DialogTitle>
         </DialogHeader>
         <div className="relative overflow-hidden rounded-xl bg-black">
-          <video ref={videoRef} className="aspect-square w-full object-cover" autoPlay muted playsInline />
+          <video
+            ref={(el) => {
+              videoRef.current = el;
+              if (el) {
+                el.muted = true;
+                el.defaultMuted = true;
+              }
+            }}
+            className="aspect-square w-full object-cover"
+            autoPlay
+            muted
+            playsInline
+          />
           <div className="pointer-events-none absolute inset-8 rounded-lg border-2 border-white/70" />
           {status === "looking-up" && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm text-white">
