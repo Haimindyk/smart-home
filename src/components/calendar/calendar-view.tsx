@@ -95,6 +95,19 @@ export function CalendarView() {
 
   const selectedItems = itemsByDate.get(dateKey(selectedDate)) ?? [];
 
+  // Marks each day with an item as the start/middle/end of a contiguous run
+  // (or a standalone single day) purely from day-to-day adjacency, so a
+  // multi-day span reads as one connected bar instead of a separate dot on
+  // every day it covers. A run that crosses a week row just shows its own
+  // partial segment on each row, same as most calendar UIs.
+  const hasItemOn = (date: Date) => itemsByDate.has(dateKey(date));
+  const runModifiers = {
+    itemSingle: (date: Date) => hasItemOn(date) && !hasItemOn(addDays(date, -1)) && !hasItemOn(addDays(date, 1)),
+    itemRunStart: (date: Date) => hasItemOn(date) && !hasItemOn(addDays(date, -1)) && hasItemOn(addDays(date, 1)),
+    itemRunMiddle: (date: Date) => hasItemOn(date) && hasItemOn(addDays(date, -1)) && hasItemOn(addDays(date, 1)),
+    itemRunEnd: (date: Date) => hasItemOn(date) && hasItemOn(addDays(date, -1)) && !hasItemOn(addDays(date, 1)),
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="glass surface-shadow flex flex-col items-center gap-3 rounded-3xl p-4 ring-1 ring-border/40 sm:p-5">
@@ -105,9 +118,13 @@ export function CalendarView() {
           selected={selectedDate}
           onSelect={(d) => d && setSelectedDate(d)}
           locale={locale === "he" ? heLocale : enUS}
-          modifiers={{ hasItem: (date) => itemsByDate.has(dateKey(date)) }}
+          modifiers={runModifiers}
           modifiersClassNames={{
-            hasItem: "after:absolute after:bottom-1 after:start-1/2 after:size-1 after:-translate-x-1/2 after:rounded-full after:bg-primary",
+            itemSingle:
+              "after:absolute after:bottom-1 after:start-1/2 after:size-1 after:-translate-x-1/2 after:rounded-full after:bg-primary",
+            itemRunStart: "after:absolute after:bottom-1 after:start-1/2 after:end-0 after:h-1 after:rounded-s-full after:bg-primary",
+            itemRunMiddle: "after:absolute after:bottom-1 after:inset-x-0 after:h-1 after:bg-primary",
+            itemRunEnd: "after:absolute after:bottom-1 after:start-0 after:end-1/2 after:h-1 after:rounded-e-full after:bg-primary",
           }}
         />
 
