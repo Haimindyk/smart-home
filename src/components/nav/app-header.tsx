@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Moon, Sun, Laptop, Download, Users, Pencil, History, Bell, ChevronDown, CalendarDays, Megaphone } from "lucide-react";
+import { Search, Moon, Sun, Laptop, Download, Users, Pencil, History, Bell, ChevronDown, CalendarDays, Megaphone, ScanBarcode } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useIdentity } from "@/lib/identity";
 import { useAppStore } from "@/lib/store/app-store";
@@ -14,6 +14,7 @@ import { ProfileEditDialog } from "@/components/identity/profile-edit-dialog";
 import { HistoryDialog } from "@/components/history/history-dialog";
 import { NotificationSettingsDialog } from "@/components/push/notification-settings-dialog";
 import { BroadcastMessageDialog, BROADCAST_SENDER_EMAIL } from "@/components/push/broadcast-message-dialog";
+import { BarcodeScannerDialog } from "@/components/shopping/barcode-scanner-dialog";
 import { MemberAvatar } from "@/components/identity/member-avatar";
 import {
   DropdownMenu,
@@ -38,6 +39,7 @@ export function AppHeader() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const me = actingMemberId ? members[actingMemberId] : undefined;
   const canBroadcast = me?.email === BROADCAST_SENDER_EMAIL;
@@ -60,6 +62,9 @@ export function AppHeader() {
         </Button>
         <Button variant="ghost" size="icon" nativeButton={false} render={<Link href="/calendar" />} aria-label={t("calendar")} title={t("calendar")}>
           <CalendarDays className="size-4" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => setScannerOpen(true)} aria-label={t("scanBarcode")} title={t("scanBarcode")}>
+          <ScanBarcode className="size-4" />
         </Button>
         {canBroadcast && (
           <Button
@@ -128,6 +133,7 @@ export function AppHeader() {
       {canBroadcast && (
         <BroadcastMessageDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} actorId={actingMemberId} />
       )}
+      <BarcodeScannerDialog open={scannerOpen} onOpenChange={setScannerOpen} createdBy={actingMemberId} />
     </header>
   );
 }
