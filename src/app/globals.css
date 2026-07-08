@@ -55,18 +55,18 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.585 0.233 264.376);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.97 0.01 264);
+  --primary: oklch(0.64 0.15 45);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.97 0.01 45);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0.008 264);
-  --muted-foreground: oklch(0.53 0.02 264);
-  --accent: oklch(0.94 0.03 264);
-  --accent-foreground: oklch(0.3 0.08 264);
+  --muted: oklch(0.97 0.008 45);
+  --muted-foreground: oklch(0.53 0.02 45);
+  --accent: oklch(0.94 0.03 45);
+  --accent-foreground: oklch(0.32 0.08 45);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.006 264);
-  --input: oklch(0.92 0.006 264);
-  --ring: oklch(0.585 0.233 264.376 / 50%);
+  --border: oklch(0.92 0.006 45);
+  --input: oklch(0.92 0.006 45);
+  --ring: oklch(0.64 0.15 45 / 50%);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -75,46 +75,46 @@
   --radius: 0.9rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.585 0.233 264.376);
+  --sidebar-primary: oklch(0.64 0.15 45);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.585 0.233 264.376 / 50%);
+  --sidebar-ring: oklch(0.64 0.15 45 / 50%);
 }
 
 .dark {
-  --background: oklch(0.16 0.014 264);
-  --foreground: oklch(0.97 0.005 264);
-  --card: oklch(0.21 0.018 264);
-  --card-foreground: oklch(0.97 0.005 264);
-  --popover: oklch(0.21 0.018 264);
-  --popover-foreground: oklch(0.97 0.005 264);
-  --primary: oklch(0.7 0.19 264.376);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.27 0.018 264);
-  --secondary-foreground: oklch(0.97 0.005 264);
-  --muted: oklch(0.27 0.018 264);
-  --muted-foreground: oklch(0.72 0.02 264);
-  --accent: oklch(0.3 0.05 264);
-  --accent-foreground: oklch(0.9 0.04 264);
+  --background: oklch(0.16 0.014 45);
+  --foreground: oklch(0.97 0.005 45);
+  --card: oklch(0.21 0.018 45);
+  --card-foreground: oklch(0.97 0.005 45);
+  --popover: oklch(0.21 0.018 45);
+  --popover-foreground: oklch(0.97 0.005 45);
+  --primary: oklch(0.72 0.14 45);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.27 0.018 45);
+  --secondary-foreground: oklch(0.97 0.005 45);
+  --muted: oklch(0.27 0.018 45);
+  --muted-foreground: oklch(0.72 0.02 45);
+  --accent: oklch(0.3 0.05 45);
+  --accent-foreground: oklch(0.9 0.04 45);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.7 0.19 264.376 / 50%);
+  --ring: oklch(0.72 0.14 45 / 50%);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.21 0.018 264);
-  --sidebar-foreground: oklch(0.97 0.005 264);
-  --sidebar-primary: oklch(0.7 0.19 264.376);
+  --sidebar: oklch(0.21 0.018 45);
+  --sidebar-foreground: oklch(0.97 0.005 45);
+  --sidebar-primary: oklch(0.72 0.14 45);
   --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.27 0.018 264);
-  --sidebar-accent-foreground: oklch(0.97 0.005 264);
+  --sidebar-accent: oklch(0.27 0.018 45);
+  --sidebar-accent-foreground: oklch(0.97 0.005 45);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.7 0.19 264.376 / 50%);
+  --sidebar-ring: oklch(0.72 0.14 45 / 50%);
 }
 
 @layer base {
@@ -123,19 +123,20 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+    /* A single-hue ambient wash plus a fixed grain layer — one considered
+       accent and a bit of texture, instead of a multi-color gradient mesh. */
     background-image:
-      radial-gradient(ellipse 70% 45% at 8% -8%, oklch(0.585 0.233 264.376 / 22%), transparent),
-      radial-gradient(ellipse 60% 45% at 100% 0%, oklch(0.75 0.16 340 / 16%), transparent),
-      radial-gradient(ellipse 55% 40% at 90% 100%, oklch(0.8 0.15 190 / 10%), transparent);
-    background-attachment: fixed;
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
+      radial-gradient(ellipse 65% 45% at 12% -8%, oklch(0.64 0.15 45 / 16%), transparent);
+    background-repeat: repeat, no-repeat;
+    background-attachment: fixed, fixed;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
   .dark body {
     background-image:
-      radial-gradient(ellipse 70% 45% at 8% -8%, oklch(0.7 0.19 264.376 / 26%), transparent),
-      radial-gradient(ellipse 60% 45% at 100% 0%, oklch(0.65 0.18 340 / 18%), transparent),
-      radial-gradient(ellipse 55% 40% at 90% 100%, oklch(0.6 0.15 190 / 12%), transparent);
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E"),
+      radial-gradient(ellipse 65% 45% at 12% -8%, oklch(0.72 0.14 45 / 18%), transparent);
   }
   html {
     @apply font-sans;
@@ -157,21 +158,23 @@
      definition at the pixel edge. */
   .surface-shadow {
     box-shadow:
-      0 1px 2px oklch(0 0 0 / 4%),
-      0 8px 24px -8px oklch(0 0 0 / 10%),
-      0 24px 48px -24px oklch(0 0 0 / 12%);
+      0 1px 2px oklch(0.2 0.02 45 / 5%),
+      0 8px 24px -8px oklch(0.2 0.02 45 / 12%),
+      0 24px 48px -24px oklch(0.2 0.02 45 / 14%);
   }
   .dark .surface-shadow {
     box-shadow:
-      0 1px 2px oklch(0 0 0 / 20%),
-      0 8px 24px -8px oklch(0 0 0 / 40%),
-      0 24px 48px -24px oklch(0 0 0 / 50%);
+      0 1px 2px oklch(0.05 0.01 45 / 25%),
+      0 8px 24px -8px oklch(0.05 0.01 45 / 45%),
+      0 24px 48px -24px oklch(0.05 0.01 45 / 55%);
   }
   .animate-shake {
     animation: shake 0.5s ease-in-out;
   }
+  /* A plain small-caps label, not another pill badge — the app already has
+     enough pill shapes in the floating nav and tabs. */
   .eyebrow {
-    @apply inline-flex w-fit items-center rounded-full bg-primary/10 px-3 py-1 text-[10px] font-semibold tracking-[0.2em] text-primary uppercase;
+    @apply w-fit text-[11px] font-semibold tracking-[0.16em] text-primary uppercase;
   }
 }
 

@@ -23,11 +23,13 @@ import { sortByPosition } from "@/lib/ordering/rank";
 import { cn } from "@/lib/utils";
 import type { Section, SectionKind } from "@/types/domain";
 
-const KIND_GRADIENT: Record<SectionKind, string> = {
-  tasks: "from-indigo-400 to-violet-500",
-  shopping: "from-emerald-400 to-teal-500",
-  chores: "from-amber-400 to-orange-500",
-  info: "from-sky-400 to-blue-500",
+// Flat, solid category colors (no gradients) — distinct hues for wayfinding
+// between section kinds, kept separate from the app's own accent color.
+const KIND_COLOR: Record<SectionKind, string> = {
+  tasks: "bg-indigo-500",
+  shopping: "bg-emerald-500",
+  chores: "bg-rose-500",
+  info: "bg-sky-500",
 };
 
 type DragHandleProps = Partial<Pick<ReturnType<typeof useSortable>, "attributes" | "listeners">>;
@@ -61,9 +63,7 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
         style={style}
         className="glass surface-shadow relative scroll-mt-32 overflow-hidden rounded-3xl p-4 ring-1 ring-border/40 sm:p-5"
       >
-        <div
-          className={cn("absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r", KIND_GRADIENT[section.kind])}
-        />
+        <div className={cn("absolute inset-x-0 top-0 h-1.5", KIND_COLOR[section.kind])} />
         <div className="mb-3 flex items-center gap-2.5">
           {dragHandleProps && (
             <button
@@ -78,8 +78,8 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
           <div className="rounded-2xl bg-black/5 p-1 ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/10">
             <div
               className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-lg shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]",
-                KIND_GRADIENT[section.kind]
+                "flex size-8 shrink-0 items-center justify-center rounded-xl text-lg shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]",
+                KIND_COLOR[section.kind]
               )}
             >
               {section.emoji}
@@ -142,7 +142,7 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
         {section.kind !== "info" && (
           <Progress
             value={progress}
-            className="mb-4 h-1.5 bg-muted/70 [&>div]:bg-gradient-to-r [&>div]:from-indigo-400 [&>div]:to-violet-500"
+            className="mb-4 h-1.5 bg-muted/70 [&>div]:bg-primary"
           />
         )}
 

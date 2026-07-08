@@ -57,8 +57,7 @@ export function IdentityGate({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-background p-6">
-      <div className="pointer-events-none absolute -top-24 start-1/2 size-96 -translate-x-1/2 rounded-full bg-gradient-to-br from-indigo-400/35 to-violet-500/25 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 end-1/4 size-72 rounded-full bg-gradient-to-br from-sky-400/20 to-emerald-400/10 blur-3xl" />
+      <div className="pointer-events-none absolute -top-24 start-1/2 size-96 -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
       <Card className="glass surface-shadow relative w-full max-w-xs gap-5 rounded-3xl p-7 text-center ring-1 ring-border/40">
         <div>
           <div className="mb-3 text-5xl">💙</div>
@@ -72,7 +71,7 @@ export function IdentityGate({ children }: { children: React.ReactNode }) {
               key={i}
               className={cn(
                 "size-3.5 rounded-full border-2 border-primary/40 transition-all",
-                i < pin.length && "scale-110 border-primary bg-gradient-to-br from-indigo-500 to-violet-600"
+                i < pin.length && "scale-110 border-primary bg-primary"
               )}
             />
           ))}

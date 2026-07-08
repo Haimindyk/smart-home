@@ -37,7 +37,7 @@ export function ChoreRow({ chore }: { chore: Chore }) {
       <Button
         size="icon"
         variant={isDue ? "default" : "outline"}
-        className={cn("size-9 shrink-0 rounded-full", isDue && "bg-gradient-to-br from-indigo-500 to-violet-600")}
+        className="size-9 shrink-0 rounded-full"
         disabled={!actingMemberId}
         title={actingMemberId ? t("markDone") : t("whoAreYou")}
         onClick={() => actingMemberId && completeChore(chore.id, actingMemberId)}
