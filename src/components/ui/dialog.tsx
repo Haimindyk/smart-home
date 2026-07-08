@@ -25,13 +25,15 @@ function DialogClose({ ...props }: DialogPrimitive.Close.Props) {
 
 function DialogOverlay({
   className,
+  blur = true,
   ...props
-}: DialogPrimitive.Backdrop.Props) {
+}: DialogPrimitive.Backdrop.Props & { blur?: boolean }) {
   return (
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 isolate z-50 bg-black/10 duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        blur && "supports-backdrop-filter:backdrop-blur-xs",
         className
       )}
       {...props}
@@ -43,13 +45,18 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  blurOverlay = true,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  /** Set false for dialogs showing a live camera feed — `backdrop-filter`
+   * anywhere in the document can make WebKit render a MediaStream `<video>`
+   * as solid black, even though the stream itself is active. */
+  blurOverlay?: boolean
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay blur={blurOverlay} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(

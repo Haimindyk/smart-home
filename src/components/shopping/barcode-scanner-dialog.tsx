@@ -130,7 +130,7 @@ export function BarcodeScannerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm" blurOverlay={false}>
         <DialogHeader>
           <DialogTitle>{t("scanBarcode")}</DialogTitle>
         </DialogHeader>
