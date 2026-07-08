@@ -733,6 +733,23 @@ export type Database = {
             Args: { p_actor_id?: string; p_task_id: string }
             Returns: undefined
           }
+      search_barcode_products: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          barcode: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          price_carrefour: number | null
+          price_osher_ad: number | null
+          price_rami_levy: number | null
+          price_shufersal: number | null
+          price_super_pharm: number | null
+          product_name: string
+        }[]
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       soft_delete_task:
         | { Args: { p_task_id: string }; Returns: undefined }
         | {
