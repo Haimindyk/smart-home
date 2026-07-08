@@ -55,6 +55,7 @@ type AppState = {
 
   createSection: (input: { name: string; emoji?: string; kind: SectionKind; createdBy: string | null }) => Promise<void>;
   renameSection: (id: string, name: string, emoji?: string) => Promise<void>;
+  updateSectionNote: (id: string, description: string | null) => Promise<void>;
   reorderSection: (id: string, beforeId: string | null, afterId: string | null) => Promise<void>;
   deleteSection: (id: string) => Promise<void>;
 
@@ -269,6 +270,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       { table: "sections", op: "update", payload: { name, emoji }, match: { id } },
       () => prev && set((s) => ({ sections: { ...s.sections, [id]: prev } })),
       "לא הצלחנו לשנות את השם"
+    );
+  },
+
+  updateSectionNote: async (id, description) => {
+    const prev = get().sections[id];
+    set((s) => ({ sections: { ...s.sections, [id]: { ...s.sections[id], description } } }));
+    await runMutation(
+      { table: "sections", op: "update", payload: { description }, match: { id } },
+      () => prev && set((s) => ({ sections: { ...s.sections, [id]: prev } })),
+      "לא הצלחנו לעדכן את ההערה"
     );
   },
 
