@@ -122,9 +122,11 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
     background-image: radial-gradient(ellipse 80% 50% at 50% -10%, oklch(0.585 0.233 264.376 / 10%), transparent);
     background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   .dark body {
     background-image: radial-gradient(ellipse 80% 50% at 50% -10%, oklch(0.7 0.19 264.376 / 12%), transparent);
@@ -134,9 +136,30 @@
   }
 }
 
+@theme inline {
+  /* A gentler deceleration than the default eases — used on cards, dialogs,
+     and buttons so state changes feel like they have a little weight. */
+  --ease-premium: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 @layer utilities {
   .glass {
     @apply bg-card/70 backdrop-blur-xl supports-backdrop-filter:bg-card/60;
+  }
+  /* Layered, diffused shadow instead of a single hard drop-shadow — adapts to
+     any background, unlike a flat border. Pair with a hairline ring for
+     definition at the pixel edge. */
+  .surface-shadow {
+    box-shadow:
+      0 1px 2px oklch(0 0 0 / 4%),
+      0 8px 24px -8px oklch(0 0 0 / 10%),
+      0 24px 48px -24px oklch(0 0 0 / 12%);
+  }
+  .dark .surface-shadow {
+    box-shadow:
+      0 1px 2px oklch(0 0 0 / 20%),
+      0 8px 24px -8px oklch(0 0 0 / 40%),
+      0 24px 48px -24px oklch(0 0 0 / 50%);
   }
   .animate-shake {
     animation: shake 0.5s ease-in-out;

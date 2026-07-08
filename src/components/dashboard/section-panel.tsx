@@ -59,7 +59,7 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
         ref={ref}
         id={`section-${section.id}`}
         style={style}
-        className="glass scroll-mt-32 rounded-3xl p-4 ring-1 ring-border/60 sm:p-5"
+        className="glass surface-shadow scroll-mt-32 rounded-3xl p-4 ring-1 ring-border/40 sm:p-5"
       >
         <div className="mb-3 flex items-center gap-2.5">
           {dragHandleProps && (
@@ -72,13 +72,15 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
               <GripVertical className="size-4" />
             </button>
           )}
-          <div
-            className={cn(
-              "flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-lg shadow-inner",
-              KIND_GRADIENT[section.kind]
-            )}
-          >
-            {section.emoji}
+          <div className="rounded-2xl bg-black/5 p-1 ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/10">
+            <div
+              className={cn(
+                "flex size-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-lg shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]",
+                KIND_GRADIENT[section.kind]
+              )}
+            >
+              {section.emoji}
+            </div>
           </div>
 
           {renaming ? (
@@ -101,7 +103,7 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
           )}
 
           {section.kind !== "info" && (
-            <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+            <span className="hidden shrink-0 text-xs tabular-nums text-muted-foreground sm:inline">
               {stats.pending} {t("pending")} · {stats.completed} {t("completed")}
             </span>
           )}

@@ -41,7 +41,7 @@ export default function DashboardPage() {
     <div className="flex min-h-full flex-1 flex-col">
       <AppHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
-        <div className="glass relative mb-4 overflow-hidden rounded-3xl p-6 ring-1 ring-border/60">
+        <div className="glass surface-shadow relative mb-4 overflow-hidden rounded-3xl p-6 ring-1 ring-border/40 sm:p-8">
           <div className="pointer-events-none absolute -end-16 -top-16 size-56 rounded-full bg-gradient-to-br from-indigo-400/30 to-violet-500/20 blur-3xl" />
           <div className="relative flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -60,7 +60,7 @@ export default function DashboardPage() {
             <SectionPanels sections={sections} />
           </>
         ) : (
-          <div className="glass flex flex-col items-center gap-3 rounded-3xl p-12 text-center ring-1 ring-border/60">
+          <div className="glass surface-shadow flex flex-col items-center gap-3 rounded-3xl p-12 text-center ring-1 ring-border/40">
             <span className="text-4xl">💙</span>
             <p className="text-muted-foreground">{t("noTasksYet")}</p>
             <NewSectionDialog />
