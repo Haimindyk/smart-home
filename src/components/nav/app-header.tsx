@@ -77,10 +77,10 @@ export function AppHeader() {
         </Button>
 
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="ghost" className="gap-1 px-2" aria-label={t("settings")} />}>
+          <DropdownMenuTrigger render={<Button variant="ghost" className="h-auto gap-1.5 px-2 py-1" aria-label={t("settings")} />}>
             {me ? (
               <>
-                <MemberAvatar member={me} className="size-5" />
+                <MemberAvatar member={me} className="size-8" />
                 <span className="hidden sm:inline">{me.display_name}</span>
               </>
             ) : (

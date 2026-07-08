@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, StickyNote } from "lucide-react";
+import { Plus, ScanBarcode, StickyNote } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { useT } from "@/lib/i18n/store";
 import { parseQuickAdd } from "@/lib/nlp/quick-add-parse";
+import { BarcodeScannerDialog } from "@/components/shopping/barcode-scanner-dialog";
 import { cn } from "@/lib/utils";
 import type { SectionKind } from "@/types/domain";
 
@@ -21,7 +22,9 @@ export function QuickAddInput({
   const t = useT();
   const [value, setValue] = useState("");
   const [asNote, setAsNote] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const isInfoSection = sectionKind === "info";
+  const isShoppingSection = sectionKind === "shopping";
 
   function submit() {
     if (!value.trim()) return;
@@ -85,6 +88,25 @@ export function QuickAddInput({
         }
         className="w-full bg-transparent text-sm outline-none"
       />
+      {isShoppingSection && (
+        <button
+          type="button"
+          onClick={() => setScannerOpen(true)}
+          title={t("scanBarcode")}
+          aria-label={t("scanBarcode")}
+          className="flex shrink-0 items-center justify-center rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent"
+        >
+          <ScanBarcode className="size-4" />
+        </button>
+      )}
+      {isShoppingSection && (
+        <BarcodeScannerDialog
+          open={scannerOpen}
+          onOpenChange={setScannerOpen}
+          sectionId={sectionId}
+          createdBy={createdBy}
+        />
+      )}
     </form>
   );
 }
