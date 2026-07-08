@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { stripShoppingFillerWords } from "@/lib/nlp/strip-shopping-filler";
+import { expandSynonymQueries } from "@/lib/nlp/product-synonyms";
 import type { BarcodeProduct } from "@/types/domain";
 import type { BasketInput } from "./types";
 
@@ -39,15 +40,39 @@ export async function matchBasketItem(item: BasketInput): Promise<MatchResult> {
     if (data) return { kind: "exact", product: data };
   }
 
-  const { data } = await supabase.rpc("search_barcode_products", {
-    p_query: stripShoppingFillerWords(item.title),
-    // Deliberately wide — different chains often carry different SKUs of
-    // "the same" product, so a shallow candidate pool can leave a chain
-    // with no price at all even though a fine substitute ranks just a
-    // little further down (verified: a generic Nutella jar priced at every
-    // chain ranked #11 for a bare "נוטלה" query).
-    p_limit: 20,
-  });
-  if (data && data.length > 0) return { kind: "fuzzy", candidates: data };
+  // Some product categories are named completely differently from chain to
+  // chain (e.g. Shufersal sells body wash as "תחליב רחצה" while another chain
+  // calls the same category "סבון גוף") — trigram similarity can't bridge
+  // two phrasings sharing no common words, so a known-synonym query also
+  // searches under its alternate phrasings and the results are merged.
+  const queries = expandSynonymQueries(stripShoppingFillerWords(item.title));
+  const results = await Promise.all(
+    queries.map((p_query) =>
+      supabase.rpc("search_barcode_products", {
+        p_query,
+        // Deliberately wide — different chains often carry different SKUs of
+        // "the same" product, so a shallow candidate pool can leave a chain
+        // with no price at all even though a fine substitute ranks much
+        // further down. A generic category query (e.g. "תחליב רחצה") can have
+        // dozens of same-similarity-score variants (scent, size) ahead of the
+        // one a given chain happens to price — verified one such case ranked
+        // #82 among 136 real (non-junk) matches, since the underlying %/<%
+        // filter already excludes anything that isn't a genuine match.
+        p_limit: 150,
+      })
+    )
+  );
+
+  const seenBarcodes = new Set<string>();
+  const candidates: BarcodeProduct[] = [];
+  for (const { data } of results) {
+    for (const product of data ?? []) {
+      if (!seenBarcodes.has(product.barcode)) {
+        seenBarcodes.add(product.barcode);
+        candidates.push(product);
+      }
+    }
+  }
+  if (candidates.length > 0) return { kind: "fuzzy", candidates };
   return { kind: "none" };
 }

@@ -78,11 +78,11 @@ export function PriceComparisonSheet({
             <p className="py-10 text-center text-sm text-muted-foreground">{t("noChainsAvailable")}</p>
           ) : (
             <div className="flex flex-col gap-3">
-              {comparison.ranked.map((chain, i) => (
+              {comparison.ranked.map((chain) => (
                 <ChainCard
                   key={chain.chain}
                   chain={chain}
-                  isCheapest={i === 0}
+                  isCheapest={comparison.cheapest?.chain === chain.chain}
                   mostExpensiveTotal={comparison.mostExpensive?.total ?? null}
                 />
               ))}
@@ -110,7 +110,11 @@ function ChainCard({
 }) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
-  const savings = mostExpensiveTotal != null && chain.total != null ? mostExpensiveTotal - chain.total : null;
+  // A chain missing some items isn't fully comparable to mostExpensiveTotal
+  // (a full-basket figure) — showing "you save ₪X" against it would compare
+  // a partial sum to a complete one, which isn't a real savings number.
+  const fullyMatched = chain.matchedCount === chain.totalCount;
+  const savings = fullyMatched && mostExpensiveTotal != null && chain.total != null ? mostExpensiveTotal - chain.total : null;
   const savingsPercent =
     savings != null && mostExpensiveTotal ? Math.round((savings / mostExpensiveTotal) * 1000) / 10 : null;
 

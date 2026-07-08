@@ -76,11 +76,21 @@ async function computeComparison(items: BasketInput[], excludeChains: ChainKey[]
     };
   });
 
-  const ranked = chainResults.filter((c) => c.total != null).sort((a, b) => a.total! - b.total!);
+  // A chain missing some items only summed the ones it does carry, so its
+  // total isn't comparable to a chain pricing the whole basket — ranking
+  // purely by total let an incomplete chain "win" cheapest just by being
+  // missing (often pricier) items, not by actually costing less. Fully-priced
+  // chains are ranked first (by total), with any partial-coverage chains
+  // listed after — still shown, but never eligible for the cheapest/most
+  // expensive comparison itself.
+  const matchedChains = chainResults.filter((c) => c.total != null);
+  const fullyMatched = matchedChains.filter((c) => c.matchedCount === c.totalCount).sort((a, b) => a.total! - b.total!);
+  const partiallyMatched = matchedChains.filter((c) => c.matchedCount < c.totalCount).sort((a, b) => a.total! - b.total!);
+  const ranked = [...fullyMatched, ...partiallyMatched];
   const unavailable = chainResults.filter((c) => c.total == null);
 
-  const cheapest = ranked[0] ?? null;
-  const mostExpensive = ranked.length > 0 ? ranked[ranked.length - 1] : null;
+  const cheapest = fullyMatched[0] ?? null;
+  const mostExpensive = fullyMatched.length > 0 ? fullyMatched[fullyMatched.length - 1] : null;
   const savingsAmount =
     cheapest && mostExpensive && mostExpensive.total! > cheapest.total!
       ? Math.round((mostExpensive.total! - cheapest.total!) * 100) / 100
