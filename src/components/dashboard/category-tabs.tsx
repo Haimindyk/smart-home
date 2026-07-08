@@ -7,6 +7,17 @@ import type { Section } from "@/types/domain";
 export function CategoryTabs({ sections }: { sections: Section[] }) {
   const [activeId, setActiveId] = useState<string | null>(sections[0]?.id ?? null);
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // Keep the highlighted tab scrolled into view within its own horizontal
+  // strip — otherwise scrolling the page moves the highlight off-screen to
+  // the side with nothing on screen to show which tab is active. `inline`
+  // handles the strip's own scroll; `block: "nearest"` keeps this from also
+  // scrolling the page vertically.
+  useEffect(() => {
+    if (!activeId) return;
+    tabRefs.current[activeId]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [activeId]);
 
   useEffect(() => {
     const elements = sections
@@ -52,6 +63,9 @@ export function CategoryTabs({ sections }: { sections: Section[] }) {
           {sections.map((section) => (
             <button
               key={section.id}
+              ref={(el) => {
+                tabRefs.current[section.id] = el;
+              }}
               onClick={() => jumpTo(section.id)}
               className={cn(
                 "flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-[background-color,color,transform] duration-150 ease-(--ease-premium)",
