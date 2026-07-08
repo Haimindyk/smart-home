@@ -72,7 +72,7 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  --radius: 0.9rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.585 0.233 264.376);
@@ -123,13 +123,19 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    background-image: radial-gradient(ellipse 80% 50% at 50% -10%, oklch(0.585 0.233 264.376 / 10%), transparent);
+    background-image:
+      radial-gradient(ellipse 70% 45% at 8% -8%, oklch(0.585 0.233 264.376 / 22%), transparent),
+      radial-gradient(ellipse 60% 45% at 100% 0%, oklch(0.75 0.16 340 / 16%), transparent),
+      radial-gradient(ellipse 55% 40% at 90% 100%, oklch(0.8 0.15 190 / 10%), transparent);
     background-attachment: fixed;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
   .dark body {
-    background-image: radial-gradient(ellipse 80% 50% at 50% -10%, oklch(0.7 0.19 264.376 / 12%), transparent);
+    background-image:
+      radial-gradient(ellipse 70% 45% at 8% -8%, oklch(0.7 0.19 264.376 / 26%), transparent),
+      radial-gradient(ellipse 60% 45% at 100% 0%, oklch(0.65 0.18 340 / 18%), transparent),
+      radial-gradient(ellipse 55% 40% at 90% 100%, oklch(0.6 0.15 190 / 12%), transparent);
   }
   html {
     @apply font-sans;
@@ -163,6 +169,9 @@
   }
   .animate-shake {
     animation: shake 0.5s ease-in-out;
+  }
+  .eyebrow {
+    @apply inline-flex w-fit items-center rounded-full bg-primary/10 px-3 py-1 text-[10px] font-semibold tracking-[0.2em] text-primary uppercase;
   }
 }
 

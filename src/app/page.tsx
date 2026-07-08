@@ -42,12 +42,24 @@ export default function DashboardPage() {
       <AppHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         <div className="glass surface-shadow relative mb-4 overflow-hidden rounded-3xl p-6 ring-1 ring-border/40 sm:p-8">
-          <div className="pointer-events-none absolute -end-16 -top-16 size-56 rounded-full bg-gradient-to-br from-indigo-400/30 to-violet-500/20 blur-3xl" />
+          <div className="pointer-events-none absolute -end-20 -top-20 size-64 rounded-full bg-gradient-to-br from-indigo-400/40 to-violet-500/30 blur-3xl" />
+          <div className="pointer-events-none absolute -start-16 -bottom-24 size-48 rounded-full bg-gradient-to-br from-sky-400/20 to-emerald-400/10 blur-3xl" />
           <div className="relative flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">
+              <span className="eyebrow mb-2">{t("appName")}</span>
+              <p className="text-2xl font-bold tracking-tight text-balance sm:text-3xl">
                 {greeting}
-                {me ? `, ${me.display_name}` : ""} {me?.avatar_emoji}
+                {me ? (
+                  <>
+                    {", "}
+                    <span className="bg-gradient-to-br from-indigo-500 to-violet-600 bg-clip-text text-transparent">
+                      {me.display_name}
+                    </span>
+                  </>
+                ) : (
+                  ""
+                )}{" "}
+                {me?.avatar_emoji}
               </p>
             </div>
             <NewSectionDialog />

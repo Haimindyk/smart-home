@@ -46,23 +46,25 @@ export function CategoryTabs({ sections }: { sections: Section[] }) {
   if (sections.length === 0) return null;
 
   return (
-    <div className="glass sticky top-[57px] z-30 -mx-4 mb-4 overflow-x-auto px-4 py-2.5 ring-1 ring-border/60">
-      <div className="flex w-max gap-1.5">
-        {sections.map((section) => (
-          <button
-            key={section.id}
-            onClick={() => jumpTo(section.id)}
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-              activeId === section.id
-                ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground"
-            )}
-          >
-            <span>{section.emoji}</span>
-            <span dir="auto">{section.name}</span>
-          </button>
-        ))}
+    <div className="sticky top-[68px] z-30 -mx-4 mb-4 px-4">
+      <div className="glass surface-shadow w-full overflow-x-auto rounded-full px-2 py-2 ring-1 ring-border/40">
+        <div className="flex w-max gap-1.5">
+          {sections.map((section) => (
+            <button
+              key={section.id}
+              onClick={() => jumpTo(section.id)}
+              className={cn(
+                "flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-[background-color,color,transform] duration-150 ease-(--ease-premium)",
+                activeId === section.id
+                  ? "scale-105 bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_4px_14px_-2px_oklch(0.585_0.233_264.376/0.5)]"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              <span>{section.emoji}</span>
+              <span dir="auto">{section.name}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

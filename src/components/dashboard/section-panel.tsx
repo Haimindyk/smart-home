@@ -59,8 +59,11 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
         ref={ref}
         id={`section-${section.id}`}
         style={style}
-        className="glass surface-shadow scroll-mt-32 rounded-3xl p-4 ring-1 ring-border/40 sm:p-5"
+        className="glass surface-shadow relative scroll-mt-32 overflow-hidden rounded-3xl p-4 ring-1 ring-border/40 sm:p-5"
       >
+        <div
+          className={cn("absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r", KIND_GRADIENT[section.kind])}
+        />
         <div className="mb-3 flex items-center gap-2.5">
           {dragHandleProps && (
             <button
@@ -97,7 +100,7 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
               className="h-8 flex-1 text-base font-semibold"
             />
           ) : (
-            <h2 dir="auto" className="flex-1 truncate text-lg font-bold tracking-tight">
+            <h2 dir="auto" className="flex-1 truncate text-xl font-bold tracking-tight">
               {section.name}
             </h2>
           )}
