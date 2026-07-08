@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
 import { useAppStore } from "@/lib/store/app-store";
 import { useT } from "@/lib/i18n/store";
+import { createClient } from "@/lib/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,17 +19,37 @@ import {
 import { sortByPosition } from "@/lib/ordering/rank";
 import { toast } from "sonner";
 
+/** Names the family has already taught the app for a barcode — checked
+ * before any external lookup, so once anyone identifies a product (most
+ * commonly Israeli-local ones Open Food Facts doesn't know), every family
+ * member gets automatic recognition on every future scan of that barcode. */
+async function lookupTaughtProductName(barcode: string): Promise<string | null> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("barcode_products")
+    .select("product_name")
+    .eq("barcode", barcode)
+    .maybeSingle();
+  return data?.product_name ?? null;
+}
+
+async function rememberProductName(barcode: string, productName: string, createdBy: string | null) {
+  const supabase = createClient();
+  await supabase.from("barcode_products").upsert({ barcode, product_name: productName, created_by: createdBy });
+}
+
 /**
- * Open Food Facts is a free, keyless, community-run product database keyed
- * by barcode (EAN/UPC) — good enough coverage for groceries to turn a scan
- * into a real product name instead of a bare number. Best-effort only: any
- * failure (offline, unknown barcode, rate limit) just falls back to the
- * barcode itself as the item title.
+ * Open Food Facts and its sister project Open Products Facts are free,
+ * keyless, community-run product databases keyed by barcode (EAN/UPC) — the
+ * former for groceries, the latter for everything else (household,
+ * cosmetics, electronics...) a shopping list also ends up containing.
+ * Best-effort only: any failure (offline, unknown barcode, rate limit) just
+ * moves on to the next source.
  */
-async function lookupProductName(barcode: string): Promise<string | null> {
+async function lookupFromOpenFactsSite(host: string, barcode: string): Promise<string | null> {
   try {
     const res = await fetch(
-      `https://world.openfoodfacts.org/api/v2/product/${barcode}.json?fields=product_name,product_name_he`,
+      `https://${host}/api/v2/product/${barcode}.json?fields=product_name,product_name_he`,
       { signal: AbortSignal.timeout(5000) }
     );
     if (!res.ok) return null;
@@ -38,6 +59,14 @@ async function lookupProductName(barcode: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+async function lookupProductName(barcode: string): Promise<string | null> {
+  const taught = await lookupTaughtProductName(barcode);
+  if (taught) return taught;
+  const food = await lookupFromOpenFactsSite("world.openfoodfacts.org", barcode);
+  if (food) return food;
+  return lookupFromOpenFactsSite("world.openproductsfacts.org", barcode);
 }
 
 export function BarcodeScannerDialog({
@@ -119,7 +148,9 @@ export function BarcodeScannerDialog({
 
   function confirmManualName() {
     if (!pendingCode) return;
-    addItem(pendingCode, manualName.trim() || null);
+    const name = manualName.trim();
+    if (name) void rememberProductName(pendingCode, name, createdBy);
+    addItem(pendingCode, name || null);
   }
 
   useEffect(() => {
