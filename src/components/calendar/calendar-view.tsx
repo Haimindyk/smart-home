@@ -7,7 +7,8 @@ import { useT, useLocaleStore } from "@/lib/i18n/store";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { EventDialog } from "@/components/calendar/event-dialog";
-import { nextOccurrence, dateKey } from "@/lib/calendar/occurrences";
+import { nextOccurrence, dateKey, spanDays } from "@/lib/calendar/occurrences";
+import { addDays, eachDayOfInterval } from "date-fns";
 import type { FamilyEvent } from "@/types/domain";
 import { he as heLocale, enUS } from "react-day-picker/locale";
 
@@ -40,22 +41,31 @@ export function CalendarView() {
       map.set(key, list);
     };
 
+    const isInMonth = (date: Date) => date.getFullYear() === month.getFullYear() && date.getMonth() === month.getMonth();
+
     for (const event of Object.values(familyEvents)) {
       if (event.deleted_at) continue;
-      const occurrence = nextOccurrence(event.event_date, event.recurrence, new Date(month.getFullYear(), month.getMonth(), 1));
-      // Only place the occurrence if it actually falls in the displayed month —
-      // a yearly event whose anchor month differs from the one shown has no
-      // occurrence in this month at all.
-      if (occurrence.getFullYear() === month.getFullYear() && occurrence.getMonth() === month.getMonth()) {
-        add({ id: event.id, date: occurrence, title: event.title, emoji: event.emoji, kind: "event", event });
+      const start = nextOccurrence(event.event_date, event.recurrence, new Date(month.getFullYear(), month.getMonth(), 1));
+      const end = addDays(start, spanDays(event.event_date, event.end_date));
+      // Only place days that actually fall in the displayed month — a
+      // yearly event whose anchor month differs from the one shown (or a
+      // multi-day event that only partly overlaps it) has no occurrence
+      // days in this month at all, or just some of them.
+      for (const day of eachDayOfInterval({ start, end })) {
+        if (isInMonth(day)) {
+          add({ id: event.id, date: day, title: event.title, emoji: event.emoji, kind: "event", event });
+        }
       }
     }
 
     for (const task of Object.values(tasks)) {
       if (task.deleted_at || task.is_note || !task.due_at) continue;
-      const due = new Date(task.due_at);
-      if (due.getFullYear() === month.getFullYear() && due.getMonth() === month.getMonth()) {
-        add({ id: task.id, date: due, title: task.title, emoji: task.emoji, kind: "task" });
+      const start = new Date(task.due_at);
+      const end = task.due_end_at ? new Date(task.due_end_at) : start;
+      for (const day of eachDayOfInterval({ start, end })) {
+        if (isInMonth(day)) {
+          add({ id: task.id, date: day, title: task.title, emoji: task.emoji, kind: "task" });
+        }
       }
     }
 

@@ -182,7 +182,10 @@ export function TaskEditorSheet({
                     >
                       <CalendarIcon className="size-4" />
                       {local.due_at
-                        ? format(new Date(local.due_at), "d/M/yyyy")
+                        ? local.due_end_at &&
+                          new Date(local.due_end_at).toDateString() !== new Date(local.due_at).toDateString()
+                          ? `${format(new Date(local.due_at), "d/M")} – ${format(new Date(local.due_end_at), "d/M/yyyy")}`
+                          : format(new Date(local.due_at), "d/M/yyyy")
                         : "—"}
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
@@ -191,9 +194,17 @@ export function TaskEditorSheet({
                         selected={
                           local.due_at ? new Date(local.due_at) : undefined
                         }
-                        onSelect={(date) =>
-                          commit({ due_at: date ? date.toISOString() : null })
-                        }
+                        onSelect={(date) => {
+                          if (!date) {
+                            commit({ due_at: null, due_end_at: null });
+                            return;
+                          }
+                          const patch: Partial<Task> = { due_at: date.toISOString() };
+                          if (local.due_end_at && date > new Date(local.due_end_at)) {
+                            patch.due_end_at = date.toISOString();
+                          }
+                          commit(patch);
+                        }}
                       />
                     </PopoverContent>
                   </Popover>
@@ -222,6 +233,43 @@ export function TaskEditorSheet({
                   </Select>
                 </div>
               </div>
+
+              {local.due_at && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border p-2.5">
+                  <Label className="font-normal">{t("multiDay")}</Label>
+                  <Switch
+                    checked={!!local.due_end_at}
+                    onCheckedChange={(checked) => commit({ due_end_at: checked ? local.due_at : null })}
+                  />
+                </div>
+              )}
+
+              {local.due_at && local.due_end_at && (
+                <div className="grid gap-2">
+                  <Label>{t("eventEndDate")}</Label>
+                  <Popover>
+                    <PopoverTrigger
+                      render={
+                        <Button
+                          variant="outline"
+                          className="justify-start gap-2 font-normal"
+                        />
+                      }
+                    >
+                      <CalendarIcon className="size-4" />
+                      {format(new Date(local.due_end_at), "d/M/yyyy")}
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={new Date(local.due_end_at)}
+                        disabled={{ before: new Date(local.due_at) }}
+                        onSelect={(date) => date && commit({ due_end_at: date.toISOString() })}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
