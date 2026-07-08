@@ -41,9 +41,18 @@ export default function DashboardPage() {
     <div className="flex min-h-full flex-1 flex-col">
       <AppHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
-        <div className="glass surface-shadow relative mb-4 overflow-hidden rounded-3xl p-6 ring-1 ring-border/40 sm:p-8">
-          <div className="pointer-events-none absolute -end-20 -top-20 size-64 rounded-full bg-primary/25 blur-3xl" />
-          <div className="relative flex flex-wrap items-end justify-between gap-4">
+        <div
+          className="glass surface-shadow relative mb-4 overflow-hidden rounded-3xl p-6 ring-1 ring-border/40 sm:p-8"
+          style={{
+            // A plain background-image instead of a separate blurred, absolutely-
+            // positioned child — combining `backdrop-blur` (the `.glass` class)
+            // with a sibling `blur-*` filter inside an `overflow-hidden` box
+            // renders as a hard-edged rectangle on WebKit instead of a soft glow.
+            backgroundImage:
+              "radial-gradient(140% 100% at 100% -10%, color-mix(in oklch, var(--primary) 18%, transparent), transparent 60%)",
+          }}
+        >
+          <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <span className="eyebrow mb-2">{t("appName")}</span>
               <p className="text-2xl font-bold tracking-tight text-balance sm:text-3xl">
