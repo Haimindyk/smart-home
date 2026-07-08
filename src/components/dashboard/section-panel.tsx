@@ -2,12 +2,13 @@
 
 import { forwardRef, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
-import { GripVertical, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { GripVertical, MoreVertical, NotebookPen, Pencil, Trash2 } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { useT } from "@/lib/i18n/store";
 import { useSectionStats } from "@/lib/hooks/use-section-stats";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenu,
@@ -35,11 +36,14 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
   function SectionPanel({ section, dragHandleProps, style }, ref) {
     const renameSection = useAppStore((s) => s.renameSection);
     const deleteSection = useAppStore((s) => s.deleteSection);
+    const updateSectionNote = useAppStore((s) => s.updateSectionNote);
     const chores = useAppStore((s) => s.chores);
     const stats = useSectionStats(section);
     const t = useT();
     const [renaming, setRenaming] = useState(false);
     const [name, setName] = useState(section.name);
+    const [editingNote, setEditingNote] = useState(false);
+    const [note, setNote] = useState(section.description ?? "");
 
     const progress = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
 
@@ -115,6 +119,14 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
               >
                 <Pencil className="size-4" /> {t("rename")}
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setNote(section.description ?? "");
+                  setEditingNote(true);
+                }}
+              >
+                <NotebookPen className="size-4" /> {t("editNote")}
+              </DropdownMenuItem>
               <DropdownMenuItem variant="destructive" onClick={() => void deleteSection(section.id)}>
                 <Trash2 className="size-4" /> {t("delete")}
               </DropdownMenuItem>
@@ -129,10 +141,33 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
           />
         )}
 
-        {section.description && (
-          <p dir="auto" className="mb-3 rounded-xl bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
-            {section.description}
-          </p>
+        {editingNote ? (
+          <Textarea
+            autoFocus
+            dir="auto"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            onBlur={() => {
+              void updateSectionNote(section.id, note.trim() || null);
+              setEditingNote(false);
+            }}
+            placeholder={t("sectionNotePlaceholder")}
+            rows={2}
+            className="mb-3 text-sm"
+          />
+        ) : (
+          section.description && (
+            <button
+              dir="auto"
+              onClick={() => {
+                setNote(section.description ?? "");
+                setEditingNote(true);
+              }}
+              className="mb-3 w-full rounded-xl bg-muted/60 px-3 py-2 text-start text-sm text-muted-foreground transition-colors hover:bg-muted"
+            >
+              {section.description}
+            </button>
+          )
         )}
 
         {section.kind === "chores" ? (
