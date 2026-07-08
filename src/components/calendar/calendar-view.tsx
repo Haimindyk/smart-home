@@ -73,7 +73,7 @@ export function CalendarView() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="glass flex flex-col items-center gap-3 rounded-3xl p-4 ring-1 ring-border/60 sm:p-5">
+      <div className="glass surface-shadow flex flex-col items-center gap-3 rounded-3xl p-4 ring-1 ring-border/40 sm:p-5">
         <Calendar
           mode="single"
           month={month}
@@ -122,8 +122,8 @@ export function CalendarView() {
         </Button>
       </div>
 
-      <div className="glass flex flex-col gap-2 rounded-3xl p-4 ring-1 ring-border/60 sm:p-5">
-        <h2 className="text-sm font-bold tracking-tight">{t("upcomingEvents")}</h2>
+      <div className="glass surface-shadow flex flex-col gap-2 rounded-3xl p-4 ring-1 ring-border/40 sm:p-5">
+        <h2 className="eyebrow mb-1">{t("upcomingEvents")}</h2>
         {upcoming.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground">{t("noEventsYet")}</p>
         ) : (

@@ -57,11 +57,12 @@ export function IdentityGate({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-background p-6">
-      <div className="pointer-events-none absolute -top-24 start-1/2 size-96 -translate-x-1/2 rounded-full bg-gradient-to-br from-indigo-400/25 to-violet-500/20 blur-3xl" />
-      <Card className="glass relative w-full max-w-xs gap-5 rounded-3xl p-7 text-center shadow-2xl ring-1 ring-border/60">
+      <div className="pointer-events-none absolute -top-24 start-1/2 size-96 -translate-x-1/2 rounded-full bg-gradient-to-br from-indigo-400/35 to-violet-500/25 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 end-1/4 size-72 rounded-full bg-gradient-to-br from-sky-400/20 to-emerald-400/10 blur-3xl" />
+      <Card className="glass surface-shadow relative w-full max-w-xs gap-5 rounded-3xl p-7 text-center ring-1 ring-border/40">
         <div>
           <div className="mb-3 text-5xl">💙</div>
-          <h1 className="text-xl font-semibold tracking-tight">{t("whoAreYou")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("whoAreYou")}</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">{t("enterYourCode")}</p>
         </div>
 
@@ -86,7 +87,7 @@ export function IdentityGate({ children }: { children: React.ReactNode }) {
                 key={i}
                 type="button"
                 onClick={() => press(key)}
-                className="flex h-12 items-center justify-center rounded-2xl bg-accent/50 text-lg font-medium transition-colors hover:bg-accent active:scale-95"
+                className="flex h-12 items-center justify-center rounded-2xl bg-accent/50 text-lg font-medium transition-[background-color,transform] duration-150 ease-(--ease-premium) hover:bg-accent active:scale-90"
               >
                 {key === "back" ? <Delete className="size-5" /> : key}
               </button>

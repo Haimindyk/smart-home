@@ -33,7 +33,7 @@ export function ChoreRow({ chore }: { chore: Chore }) {
   );
 
   return (
-    <div className="glass flex items-center gap-2.5 rounded-2xl px-3.5 py-3 ring-1 ring-border/60 transition-shadow hover:shadow-md">
+    <div className="glass flex items-center gap-2.5 rounded-2xl px-3.5 py-3 ring-1 ring-border/40 transition-shadow duration-150 ease-(--ease-premium) hover:shadow-md">
       <Button
         size="icon"
         variant={isDue ? "default" : "outline"}

@@ -45,10 +45,11 @@ export function AppHeader() {
   const canBroadcast = me?.email === BROADCAST_SENDER_EMAIL;
 
   return (
-    <header className="glass sticky top-0 z-40 flex items-center gap-3 px-4 py-3 shadow-xs supports-backdrop-filter:shadow-none">
+    <div className="sticky top-0 z-40 px-3 pt-3">
+      <header className="glass surface-shadow mx-auto flex w-full max-w-3xl items-center gap-3 rounded-full px-4 py-2 ring-1 ring-border/40">
       <Link href="/" className="flex items-center gap-2 text-lg font-bold">
         <span className="bg-gradient-to-br from-indigo-500 to-violet-600 bg-clip-text text-xl text-transparent">💙</span>
-        <span className="bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">{t("appName")}</span>
+        <span className="hidden bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent sm:inline">{t("appName")}</span>
       </Link>
 
       <div className="ms-auto flex items-center gap-1">
@@ -126,6 +127,7 @@ export function AppHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      </header>
 
       <ProfileEditDialog memberId={actingMemberId} open={profileOpen} onOpenChange={setProfileOpen} />
       <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
@@ -134,6 +136,6 @@ export function AppHeader() {
         <BroadcastMessageDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} actorId={actingMemberId} />
       )}
       <BarcodeScannerDialog open={scannerOpen} onOpenChange={setScannerOpen} createdBy={actingMemberId} />
-    </header>
+    </div>
   );
 }
