@@ -167,7 +167,16 @@ export function BarcodeScannerDialog({
       events.forEach((ev) => video?.removeEventListener(ev, updateDebug));
       clearInterval(debugInterval);
     };
-  }, [open, sectionId, createdBy, createTask, t]);
+    // `t` from useT() is a brand-new function every render (never
+    // memoized) — including it here caused the effect to tear down and
+    // restart the camera stream on every single state update this effect
+    // itself made (an infinite loop: state update -> re-render -> new `t`
+    // -> effect re-runs -> more state updates -> ...), which is exactly
+    // why the stream never stabilized long enough to render a frame.
+    // `createTask` is stable (bound once by zustand) but doesn't need to
+    // restart scanning either; both are read via closure instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, sectionId, createdBy]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
