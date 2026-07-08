@@ -127,18 +127,27 @@ export type Database = {
           barcode: string
           created_at: string
           created_by: string | null
+          currency: string
+          price_rami_levy: number | null
+          price_shufersal: number | null
           product_name: string
         }
         Insert: {
           barcode: string
           created_at?: string
           created_by?: string | null
+          currency?: string
+          price_rami_levy?: number | null
+          price_shufersal?: number | null
           product_name: string
         }
         Update: {
           barcode?: string
           created_at?: string
           created_by?: string | null
+          currency?: string
+          price_rami_levy?: number | null
+          price_shufersal?: number | null
           product_name?: string
         }
         Relationships: [
