@@ -160,41 +160,52 @@ function TaskRowContent({
         />
 
         <button
-          className="flex flex-1 items-center gap-2 py-0.5 text-start"
+          className="flex flex-1 flex-col items-start gap-1 py-0.5 text-start"
           onClick={() => onOpenEditor(node.id)}
         >
-          {node.priority ? (
-            <span
+          {/* Title on its own line so a short title never has to share width
+              (and shrink into a wrap) with the badges below it — that fight
+              for space was both causing short titles to wrap unnecessarily
+              and making the badges' vertical position shift depending on how
+              many lines the title happened to wrap to. */}
+          <span className="flex w-full items-center gap-2">
+            {node.priority ? (
+              <span
+                className={cn(
+                  "size-1.5 shrink-0 rounded-full",
+                  PRIORITY_COLOR[node.priority],
+                )}
+              />
+            ) : null}
+            {node.emoji && <span>{node.emoji}</span>}
+            <LinkifiedText
+              text={node.title || "…"}
               className={cn(
-                "size-1.5 shrink-0 rounded-full",
-                PRIORITY_COLOR[node.priority],
+                "text-sm",
+                node.is_completed && "text-muted-foreground line-through",
               )}
             />
-          ) : null}
-          {node.emoji && <span>{node.emoji}</span>}
-          <LinkifiedText
-            text={node.title || "…"}
-            className={cn(
-              "text-sm",
-              node.is_completed && "text-muted-foreground line-through",
-            )}
-          />
-          {node.quantity ? (
-            <Badge variant="secondary" className="h-5 text-xs">
-              ×{node.quantity}
-              {node.unit ?? ""}
-            </Badge>
-          ) : null}
-          {node.due_at && (
-            <Badge variant="outline" className="h-5 text-xs">
-              {new Date(node.due_at).toLocaleDateString("he-IL", {
-                day: "numeric",
-                month: "numeric",
-              })}
-              {node.due_end_at &&
-                new Date(node.due_end_at).toDateString() !== new Date(node.due_at).toDateString() &&
-                ` – ${new Date(node.due_end_at).toLocaleDateString("he-IL", { day: "numeric", month: "numeric" })}`}
-            </Badge>
+          </span>
+          {(node.quantity || node.due_at) && (
+            <span className="flex flex-wrap items-center gap-1.5">
+              {node.quantity ? (
+                <Badge variant="secondary" className="h-5 text-xs">
+                  ×{node.quantity}
+                  {node.unit ?? ""}
+                </Badge>
+              ) : null}
+              {node.due_at && (
+                <Badge variant="outline" className="h-5 text-xs">
+                  {new Date(node.due_at).toLocaleDateString("he-IL", {
+                    day: "numeric",
+                    month: "numeric",
+                  })}
+                  {node.due_end_at &&
+                    new Date(node.due_end_at).toDateString() !== new Date(node.due_at).toDateString() &&
+                    ` – ${new Date(node.due_end_at).toLocaleDateString("he-IL", { day: "numeric", month: "numeric" })}`}
+                </Badge>
+              )}
+            </span>
           )}
         </button>
 
