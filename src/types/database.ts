@@ -128,6 +128,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           currency: string
+          price_carrefour: number | null
           price_rami_levy: number | null
           price_shufersal: number | null
           product_name: string
@@ -137,6 +138,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          price_carrefour?: number | null
           price_rami_levy?: number | null
           price_shufersal?: number | null
           product_name: string
@@ -146,6 +148,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          price_carrefour?: number | null
           price_rami_levy?: number | null
           price_shufersal?: number | null
           product_name?: string
