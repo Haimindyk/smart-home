@@ -129,6 +129,7 @@ export type Database = {
           created_by: string | null
           currency: string
           price_carrefour: number | null
+          price_osher_ad: number | null
           price_rami_levy: number | null
           price_shufersal: number | null
           price_super_pharm: number | null
@@ -140,6 +141,7 @@ export type Database = {
           created_by?: string | null
           currency?: string
           price_carrefour?: number | null
+          price_osher_ad?: number | null
           price_rami_levy?: number | null
           price_shufersal?: number | null
           price_super_pharm?: number | null
@@ -151,6 +153,7 @@ export type Database = {
           created_by?: string | null
           currency?: string
           price_carrefour?: number | null
+          price_osher_ad?: number | null
           price_rami_levy?: number | null
           price_shufersal?: number | null
           price_super_pharm?: number | null
