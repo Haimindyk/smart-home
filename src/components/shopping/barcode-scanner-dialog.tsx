@@ -99,6 +99,14 @@ export function BarcodeScannerDialog({
           return;
         }
         controls = c;
+        // Belt-and-suspenders: iOS Safari can silently swallow the
+        // script-driven play() zxing issues internally if the async
+        // getUserMedia permission prompt consumed the tap's user-activation
+        // window by the time it runs — the stream attaches but the video
+        // never actually starts, showing as a black square. The `autoPlay`
+        // attribute on the element covers most cases; retrying here is a
+        // harmless no-op if it's already playing.
+        void videoRef.current?.play().catch(() => {});
       })
       .catch(() => {
         if (!cancelled) setStatus("error");
@@ -117,7 +125,7 @@ export function BarcodeScannerDialog({
           <DialogTitle>{t("scanBarcode")}</DialogTitle>
         </DialogHeader>
         <div className="relative overflow-hidden rounded-xl bg-black">
-          <video ref={videoRef} className="aspect-square w-full object-cover" muted playsInline />
+          <video ref={videoRef} className="aspect-square w-full object-cover" autoPlay muted playsInline />
           <div className="pointer-events-none absolute inset-8 rounded-lg border-2 border-white/70" />
           {status === "looking-up" && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm text-white">
