@@ -6,6 +6,7 @@ import { GripVertical, MoreVertical, NotebookPen, Pencil, Trash2 } from "lucide-
 import { useAppStore } from "@/lib/store/app-store";
 import { useT } from "@/lib/i18n/store";
 import { useSectionStats } from "@/lib/hooks/use-section-stats";
+import { useNow } from "@/lib/hooks/use-now";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,6 +47,7 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
     const [name, setName] = useState(section.name);
     const [editingNote, setEditingNote] = useState(false);
     const [note, setNote] = useState(section.description ?? "");
+    const now = useNow();
 
     const progress = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
 
@@ -53,8 +55,8 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
       section.kind === "chores"
         ? sortByPosition(Object.values(chores).filter((c) => c.section_id === section.id && !c.deleted_at))
         : [];
-    const dueChores = choreItems.filter((c) => new Date(c.next_due_at).getTime() <= Date.now());
-    const notDueChores = choreItems.filter((c) => new Date(c.next_due_at).getTime() > Date.now());
+    const dueChores = choreItems.filter((c) => new Date(c.next_due_at).getTime() <= now);
+    const notDueChores = choreItems.filter((c) => new Date(c.next_due_at).getTime() > now);
 
     return (
       <div
