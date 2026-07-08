@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Moon, Sun, Laptop, Download, Users, Pencil, History, Bell, ChevronDown } from "lucide-react";
+import { Search, Moon, Sun, Laptop, Download, Users, Pencil, History, Bell, ChevronDown, CalendarDays, Megaphone } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useIdentity } from "@/lib/identity";
 import { useAppStore } from "@/lib/store/app-store";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ProfileEditDialog } from "@/components/identity/profile-edit-dialog";
 import { HistoryDialog } from "@/components/history/history-dialog";
 import { NotificationSettingsDialog } from "@/components/push/notification-settings-dialog";
+import { BroadcastMessageDialog, BROADCAST_SENDER_EMAIL } from "@/components/push/broadcast-message-dialog";
 import { MemberAvatar } from "@/components/identity/member-avatar";
 import {
   DropdownMenu,
@@ -36,8 +37,10 @@ export function AppHeader() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
 
   const me = actingMemberId ? members[actingMemberId] : undefined;
+  const canBroadcast = me?.email === BROADCAST_SENDER_EMAIL;
 
   return (
     <header className="glass sticky top-0 z-40 flex items-center gap-3 px-4 py-3 shadow-xs supports-backdrop-filter:shadow-none">
@@ -55,6 +58,20 @@ export function AppHeader() {
         <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)} aria-label={t("search")}>
           <Search className="size-4" />
         </Button>
+        <Button variant="ghost" size="icon" nativeButton={false} render={<Link href="/calendar" />} aria-label={t("calendar")} title={t("calendar")}>
+          <CalendarDays className="size-4" />
+        </Button>
+        {canBroadcast && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setBroadcastOpen(true)}
+            aria-label={t("sendMessage")}
+            title={t("sendMessage")}
+          >
+            <Megaphone className="size-4" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" onClick={() => setNotificationsOpen(true)} aria-label={t("notifications")} title={t("notifications")}>
           <Bell className="size-4" />
         </Button>
@@ -108,6 +125,9 @@ export function AppHeader() {
       <ProfileEditDialog memberId={actingMemberId} open={profileOpen} onOpenChange={setProfileOpen} />
       <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
       <NotificationSettingsDialog open={notificationsOpen} onOpenChange={setNotificationsOpen} />
+      {canBroadcast && (
+        <BroadcastMessageDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} actorId={actingMemberId} />
+      )}
     </header>
   );
 }

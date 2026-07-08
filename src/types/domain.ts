@@ -2,7 +2,7 @@ import type { Tables } from "./database";
 
 export type Member = Tables<"members">;
 
-export type SectionKind = "tasks" | "shopping" | "chores";
+export type SectionKind = "tasks" | "shopping" | "chores" | "info";
 export type Section = Omit<Tables<"sections">, "kind"> & { kind: SectionKind };
 
 export type AssigneeKind = "unassigned" | "member" | "anyone" | "louis";
@@ -23,6 +23,13 @@ export type Attachment = Tables<"attachments">;
 export type ActivityLog = Tables<"activity_log">;
 export type PushSubscriptionRow = Tables<"push_subscriptions">;
 export type NotificationPrefs = Tables<"notification_prefs">;
+
+export type EventKind = "birthday" | "medical" | "other";
+export type EventRecurrence = "none" | "yearly";
+export type FamilyEvent = Omit<Tables<"family_events">, "kind" | "recurrence"> & {
+  kind: EventKind;
+  recurrence: EventRecurrence;
+};
 
 /** A task with its children materialized into a tree (client-side only). */
 export type TaskNode = Task & { children: TaskNode[] };

@@ -32,7 +32,15 @@ export async function loadSnapshot<T>(): Promise<T | undefined> {
   return db.get(SNAPSHOT_STORE, "all");
 }
 
-export type MutableTable = "members" | "sections" | "tasks" | "chores" | "chore_completions" | "attachments";
+export type MutableTable =
+  | "members"
+  | "sections"
+  | "tasks"
+  | "chores"
+  | "chore_completions"
+  | "attachments"
+  | "family_events"
+  | "activity_log";
 
 export type QueuedMutation = {
   seq?: number;

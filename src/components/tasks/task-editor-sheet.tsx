@@ -113,13 +113,15 @@ export function TaskEditorSheet({
             />
           </div>
 
-          <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-            <Label className="font-normal">{t("infoOnly")}</Label>
-            <Switch
-              checked={local.is_note}
-              onCheckedChange={(checked) => commit({ is_note: checked })}
-            />
-          </div>
+          {sectionKind !== "info" && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <Label className="font-normal">{t("infoOnly")}</Label>
+              <Switch
+                checked={local.is_note}
+                onCheckedChange={(checked) => commit({ is_note: checked })}
+              />
+            </div>
+          )}
 
           {!local.is_note && (
             <>

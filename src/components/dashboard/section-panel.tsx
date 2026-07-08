@@ -26,6 +26,7 @@ const KIND_GRADIENT: Record<SectionKind, string> = {
   tasks: "from-indigo-400 to-violet-500",
   shopping: "from-emerald-400 to-teal-500",
   chores: "from-amber-400 to-orange-500",
+  info: "from-sky-400 to-blue-500",
 };
 
 type DragHandleProps = Partial<Pick<ReturnType<typeof useSortable>, "attributes" | "listeners">>;
@@ -95,9 +96,11 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
             </h2>
           )}
 
-          <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
-            {stats.pending} {t("pending")} · {stats.completed} {t("completed")}
-          </span>
+          {section.kind !== "info" && (
+            <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+              {stats.pending} {t("pending")} · {stats.completed} {t("completed")}
+            </span>
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="size-7 shrink-0" />}>
@@ -119,10 +122,12 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
           </DropdownMenu>
         </div>
 
-        <Progress
-          value={progress}
-          className="mb-4 h-1.5 bg-muted/70 [&>div]:bg-gradient-to-r [&>div]:from-indigo-400 [&>div]:to-violet-500"
-        />
+        {section.kind !== "info" && (
+          <Progress
+            value={progress}
+            className="mb-4 h-1.5 bg-muted/70 [&>div]:bg-gradient-to-r [&>div]:from-indigo-400 [&>div]:to-violet-500"
+          />
+        )}
 
         {section.description && (
           <p dir="auto" className="mb-3 rounded-xl bg-muted/60 px-3 py-2 text-sm text-muted-foreground">

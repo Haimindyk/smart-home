@@ -16,6 +16,7 @@ import type {
   ChoreCompletion,
   Attachment,
   ActivityLog,
+  FamilyEvent,
 } from "@/types/domain";
 import { toast } from "sonner";
 
@@ -29,6 +30,7 @@ type AppState = {
   choreCompletions: ById<ChoreCompletion>;
   attachments: ById<Attachment>;
   activityLog: ById<ActivityLog>;
+  familyEvents: ById<FamilyEvent>;
   hydrated: boolean;
 
   hydrate: (data: {
@@ -39,10 +41,11 @@ type AppState = {
     choreCompletions: ChoreCompletion[];
     attachments: Attachment[];
     activityLog: ActivityLog[];
+    familyEvents?: FamilyEvent[];
   }) => void;
 
   applyRemote: (
-    table: "members" | "sections" | "tasks" | "chores" | "chore_completions" | "attachments" | "activity_log",
+    table: "members" | "sections" | "tasks" | "chores" | "chore_completions" | "attachments" | "activity_log" | "family_events",
     eventType: "INSERT" | "UPDATE" | "DELETE",
     row: Record<string, unknown> | null,
     oldRow: Record<string, unknown> | null
@@ -72,6 +75,20 @@ type AppState = {
   updateChore: (id: string, patch: Partial<Chore>) => Promise<void>;
   completeChore: (id: string, completedBy: string) => Promise<void>;
   deleteChore: (id: string) => Promise<void>;
+
+  createFamilyEvent: (input: {
+    title: string;
+    kind: FamilyEvent["kind"];
+    eventDate: string;
+    recurrence: FamilyEvent["recurrence"];
+    emoji?: string | null;
+    notes?: string | null;
+    createdBy: string | null;
+  }) => Promise<void>;
+  updateFamilyEvent: (id: string, patch: Partial<FamilyEvent>) => Promise<void>;
+  deleteFamilyEvent: (id: string) => Promise<void>;
+
+  sendBroadcastMessage: (message: string, actorId: string | null) => Promise<void>;
 };
 
 function keyify<T extends { id: string }>(rows: T[]): ById<T> {
@@ -138,6 +155,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   choreCompletions: {},
   attachments: {},
   activityLog: {},
+  familyEvents: {},
   hydrated: false,
 
   hydrate: (data) =>
@@ -149,6 +167,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       choreCompletions: keyify(data.choreCompletions),
       attachments: keyify(data.attachments),
       activityLog: keyify(data.activityLog),
+      familyEvents: keyify(data.familyEvents ?? []),
       hydrated: true,
     }),
 
@@ -161,8 +180,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       chore_completions: "choreCompletions",
       attachments: "attachments",
       activity_log: "activityLog",
+      family_events: "familyEvents",
     };
-    const stateKey = map[table] as "members" | "sections" | "tasks" | "chores" | "choreCompletions" | "attachments" | "activityLog";
+    const stateKey = map[table] as
+      | "members"
+      | "sections"
+      | "tasks"
+      | "chores"
+      | "choreCompletions"
+      | "attachments"
+      | "activityLog"
+      | "familyEvents";
 
     set((state) => {
       const bucket = { ...(state[stateKey] as ById<{ id: string; updated_at?: string }>) };
@@ -507,6 +535,84 @@ export const useAppStore = create<AppState>((set, get) => ({
       { table: "chores", op: "update", payload: { deleted_at: now }, match: { id } },
       () => prev && set((s) => ({ chores: { ...s.chores, [id]: prev } })),
       "לא הצלחנו למחוק את המטלה"
+    );
+  },
+
+  // ---------------------------------------------------------------------
+  // Family events
+  // ---------------------------------------------------------------------
+  createFamilyEvent: async ({ title, kind, eventDate, recurrence, emoji, notes, createdBy }) => {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    const optimistic: FamilyEvent = {
+      id,
+      title,
+      kind,
+      emoji: emoji ?? null,
+      event_date: eventDate,
+      recurrence,
+      notes: notes ?? null,
+      last_notified_on: null,
+      deleted_at: null,
+      created_by: createdBy,
+      updated_by: createdBy,
+      created_at: now,
+      updated_at: now,
+    };
+    set((s) => ({ familyEvents: { ...s.familyEvents, [id]: optimistic } }));
+
+    await runMutation(
+      {
+        table: "family_events",
+        op: "insert",
+        payload: { id, title, kind, emoji: optimistic.emoji, event_date: eventDate, recurrence, notes: optimistic.notes, created_by: createdBy },
+      },
+      () =>
+        set((s) => {
+          const next = { ...s.familyEvents };
+          delete next[id];
+          return { familyEvents: next };
+        }),
+      "לא הצלחנו ליצור את האירוע"
+    );
+  },
+
+  updateFamilyEvent: async (id, patch) => {
+    const prev = get().familyEvents[id];
+    set((s) => ({ familyEvents: { ...s.familyEvents, [id]: { ...s.familyEvents[id], ...patch } } }));
+    await runMutation(
+      { table: "family_events", op: "update", payload: patch, match: { id } },
+      () => prev && set((s) => ({ familyEvents: { ...s.familyEvents, [id]: prev } })),
+      "לא הצלחנו לעדכן את האירוע"
+    );
+  },
+
+  deleteFamilyEvent: async (id) => {
+    const now = new Date().toISOString();
+    const prev = get().familyEvents[id];
+    set((s) => ({ familyEvents: { ...s.familyEvents, [id]: { ...s.familyEvents[id], deleted_at: now } } }));
+    await runMutation(
+      { table: "family_events", op: "update", payload: { deleted_at: now }, match: { id } },
+      () => prev && set((s) => ({ familyEvents: { ...s.familyEvents, [id]: prev } })),
+      "לא הצלחנו למחוק את האירוע"
+    );
+  },
+
+  // ---------------------------------------------------------------------
+  // Broadcast messages — a one-off activity_log row with no backing entity,
+  // fanned out to every device through the same trigger/edge-function path
+  // as every other activity_log insert (see supabase/functions/send-push).
+  // ---------------------------------------------------------------------
+  sendBroadcastMessage: async (message, actorId) => {
+    await runMutation(
+      {
+        table: "activity_log",
+        op: "insert",
+        payload: { entity_type: "broadcast", entity_id: crypto.randomUUID(), action: "message", actor_id: actorId, summary: message },
+      },
+      () => {},
+      "לא הצלחנו לשלוח את ההודעה"
     );
   },
 }));
