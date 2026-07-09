@@ -83,15 +83,16 @@ const TOOLS = [
   },
   {
     name: "propose_create_section",
-    description: "Create a new section when none of the existing ones fit (rare).",
+    description:
+      "Create a new section when none of the existing ones fit. Always pick one emoji that clearly fits the section's theme (e.g. ✈️ for a Trips section, 🎂 for birthdays) — never leave it out or use a generic placeholder.",
     parameters: {
       type: "OBJECT",
       properties: {
         name: { type: "STRING" },
         kind: { type: "STRING", enum: ["tasks", "shopping", "chores", "info"] },
-        emoji: { type: "STRING" },
+        emoji: { type: "STRING", description: "one emoji that fits the section's theme — required" },
       },
-      required: ["name", "kind"],
+      required: ["name", "kind", "emoji"],
     },
   },
   {
@@ -101,6 +102,23 @@ const TOOLS = [
       type: "OBJECT",
       properties: { taskId: { type: "STRING" } },
       required: ["taskId"],
+    },
+  },
+  {
+    name: "propose_move_task",
+    description:
+      "Move an existing task or shopping item into a different section — use this when the user asks to reorganize/regroup items, e.g. 'create a Trips section and move all the trip-related tasks there'. Call this once per item being moved. taskId must be an existing task id from context.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        taskId: { type: "STRING", description: "id of an existing task/item from context" },
+        sectionId: {
+          type: "STRING",
+          description:
+            "id of an existing section from context, OR the literal string \"NEW_SECTION\" if moving into a section you're also creating with propose_create_section in this same response",
+        },
+      },
+      required: ["taskId", "sectionId"],
     },
   },
   {
@@ -175,6 +193,7 @@ const TOOL_TO_ACTION: Record<string, string> = {
   propose_create_task: "create_task",
   propose_create_section: "create_section",
   propose_toggle_task_completed: "toggle_task_completed",
+  propose_move_task: "move_task",
   propose_create_chore: "create_chore",
   propose_complete_chore: "complete_chore",
   propose_create_family_event: "create_family_event",
@@ -448,6 +467,7 @@ Deno.serve(async (req) => {
     "You are 'העוזר' (the assistant), a helpful household AI embedded in the K&H family organizer app.",
     "You can read the household's current sections, open tasks, and chores (given below) and propose concrete actions using the tools available — you never apply anything yourself, a human always confirms.",
     "When resolving a vague request (e.g. 'get something for dinner') or a pasted recipe or a photographed receipt, propose one propose_create_task call per concrete item, using the most fitting existing section (usually a 'shopping' kind section).",
+    "When the user asks you to reorganize existing items — e.g. 'create a Trips section and move all the trip-related tasks there' — look through the open tasks/items list below for every item that matches what they described, call propose_create_section once, then call propose_move_task once per matching item using sectionId \"NEW_SECTION\" to mean the section you just created. Don't stop at just creating the section — actually move every matching item, and don't ask the user to confirm which items match, use your best judgment.",
     "Always include a short natural-language reply summarizing what you're proposing, in addition to any tool calls.",
     "If you notice a new, durable fact about the family — a relationship, a preference, a recurring pattern — that isn't already listed in the family notes below, call remember_family_fact to save it silently, without mentioning that you did.",
     LANGUAGE_INSTRUCTION,

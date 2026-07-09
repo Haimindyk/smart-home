@@ -1,4 +1,5 @@
 import { useAppStore } from "@/lib/store/app-store";
+import { rankAtEnd } from "@/lib/ordering/rank";
 import type { ProposedAction } from "./types";
 
 /** Seeded in migration 0022 — a dedicated member row so History reads
@@ -17,14 +18,19 @@ function assistantMemberId(): string | null {
  * chat assistant or a proactive insight card's action actually writes
  * anything, so optimistic UI, the offline queue, and realtime sync all
  * behave identically to a human doing it themselves.
+ *
+ * Returns the new row's id for create_task/create_section, so a caller
+ * applying several actions in sequence (see assistant-dialog.tsx) can
+ * resolve a move_task's "NEW_SECTION" sentinel to the section that was
+ * just created earlier in the same batch.
  */
-export async function applyProposedAction(action: ProposedAction): Promise<void> {
+export async function applyProposedAction(action: ProposedAction): Promise<string | undefined> {
   const store = useAppStore.getState();
   const actorId = assistantMemberId();
 
   switch (action.type) {
     case "create_task":
-      await store.createTask({
+      return await store.createTask({
         sectionId: action.sectionId,
         title: action.title,
         createdBy: actorId,
@@ -34,18 +40,28 @@ export async function applyProposedAction(action: ProposedAction): Promise<void>
           notes: action.notes ?? null,
         },
       });
-      return;
     case "create_section":
-      await store.createSection({
+      return await store.createSection({
         name: action.name,
         kind: action.kind,
         emoji: action.emoji ?? undefined,
         createdBy: actorId,
       });
-      return;
     case "toggle_task_completed":
       await store.toggleTaskCompleted(action.taskId, actorId);
       return;
+    case "move_task": {
+      const siblings = Object.values(store.tasks).filter(
+        (t) => t.section_id === action.sectionId && t.parent_task_id === null && !t.deleted_at
+      );
+      const lastPosition = siblings.sort((a, b) => (a.position > b.position ? -1 : 1))[0]?.position;
+      await store.updateTask(action.taskId, {
+        section_id: action.sectionId,
+        parent_task_id: null,
+        position: rankAtEnd(lastPosition),
+      });
+      return;
+    }
     case "create_chore":
       // createChore attributes to the currently-acting human device identity
       // rather than an explicit createdBy param (an existing asymmetry with

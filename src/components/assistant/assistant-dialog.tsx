@@ -27,14 +27,19 @@ type ChatMessage = {
 };
 
 function describeAction(action: ProposedAction): string {
-  const { tasks, chores } = useAppStore.getState();
+  const { tasks, chores, sections } = useAppStore.getState();
   switch (action.type) {
     case "create_task":
       return `➕ ${action.title}`;
     case "create_section":
-      return `📁 ${action.name}`;
+      return `${action.emoji ?? "📁"} ${action.name}`;
     case "toggle_task_completed":
       return `✅ ${tasks[action.taskId]?.title ?? action.taskId}`;
+    case "move_task": {
+      const title = tasks[action.taskId]?.title ?? action.taskId;
+      const sectionName = sections[action.sectionId]?.name ?? "הקטגוריה החדשה";
+      return `🔀 ${title} אל ${sectionName}`;
+    }
     case "create_chore":
       return `🔁 ${action.title}`;
     case "complete_chore":
@@ -115,9 +120,23 @@ export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenC
     // assistant to add milk" actually means. Each action still runs through
     // applyProposedAction, so it gets the same attribution/offline-queue/
     // realtime behavior as a human doing it directly.
+    //
+    // Applied strictly in order so a "create a Trips section and move these
+    // tasks there" request works in one turn: the model emits a
+    // create_section call followed by one move_task per item, each with
+    // sectionId "NEW_SECTION" — a sentinel meaning "the section created
+    // earlier in this same batch", since Gemini can't know that section's
+    // real id before it's actually created.
+    let newSectionId: string | null = null;
     for (let i = 0; i < result.proposedActions.length; i++) {
+      const original = result.proposedActions[i];
+      const action: ProposedAction =
+        original.type === "move_task" && original.sectionId === "NEW_SECTION" && newSectionId
+          ? { ...original, sectionId: newSectionId }
+          : original;
       try {
-        await applyProposedAction(result.proposedActions[i]);
+        const createdId = await applyProposedAction(action);
+        if (action.type === "create_section" && createdId) newSectionId = createdId;
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMessageId

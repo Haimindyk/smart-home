@@ -73,7 +73,7 @@ type AppState = {
     color: string;
   }) => Promise<{ member: Member } | { error: "pin_taken" | "unknown" }>;
 
-  createSection: (input: { name: string; emoji?: string; kind: SectionKind; createdBy: string | null }) => Promise<void>;
+  createSection: (input: { name: string; emoji?: string; kind: SectionKind; createdBy: string | null }) => Promise<string>;
   renameSection: (id: string, name: string, emoji?: string) => Promise<void>;
   updateSectionNote: (id: string, description: string | null) => Promise<void>;
   reorderSection: (id: string, beforeId: string | null, afterId: string | null) => Promise<void>;
@@ -317,6 +317,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }),
       "לא הצלחנו ליצור את הקטגוריה"
     );
+    return id;
   },
 
   renameSection: async (id, name, emoji) => {
