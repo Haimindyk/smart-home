@@ -92,7 +92,7 @@ type AppState = {
   softDeleteTask: (id: string) => Promise<void>;
   restoreTask: (id: string) => Promise<void>;
 
-  createChore: (input: Partial<Chore> & { sectionId: string; title: string; freq: Chore["freq"] }) => Promise<void>;
+  createChore: (input: Partial<Chore> & { sectionId: string; title: string; freq: Chore["freq"] }) => Promise<string>;
   updateChore: (id: string, patch: Partial<Chore>) => Promise<void>;
   completeChore: (id: string, completedBy: string) => Promise<void>;
   deleteChore: (id: string) => Promise<void>;
@@ -106,7 +106,7 @@ type AppState = {
     emoji?: string | null;
     notes?: string | null;
     createdBy: string | null;
-  }) => Promise<void>;
+  }) => Promise<string>;
   updateFamilyEvent: (id: string, patch: Partial<FamilyEvent>) => Promise<void>;
   deleteFamilyEvent: (id: string) => Promise<void>;
 
@@ -570,6 +570,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }),
       "לא הצלחנו ליצור את המטלה"
     );
+    return id;
   },
 
   updateChore: async (id, patch) => {
@@ -659,6 +660,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }),
       "לא הצלחנו ליצור את האירוע"
     );
+    return id;
   },
 
   updateFamilyEvent: async (id, patch) => {

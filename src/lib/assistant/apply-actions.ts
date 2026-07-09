@@ -12,25 +12,33 @@ function assistantMemberId(): string | null {
   return Object.values(members).find((m) => m.email === ASSISTANT_EMAIL)?.id ?? null;
 }
 
+export type ApplyResult = {
+  /** The new row's id, for create_task/create_section/create_chore/create_family_event —
+   * lets a caller applying several actions in sequence (see assistant-dialog.tsx)
+   * resolve a move_task's "NEW_SECTION" sentinel to the section just created
+   * earlier in the same batch. */
+  createdId?: string;
+  /** Reverses this action, if it's safely reversible. Missing for
+   * complete_chore (no clean way to un-record a completion without new
+   * plumbing) and send_broadcast (a push notification can't be recalled
+   * once sent). */
+  undo?: () => Promise<void>;
+};
+
 /**
  * Applies one confirmed proposed action through the same useAppStore
  * mutations a human action would use — this is the only place either the
  * chat assistant or a proactive insight card's action actually writes
  * anything, so optimistic UI, the offline queue, and realtime sync all
  * behave identically to a human doing it themselves.
- *
- * Returns the new row's id for create_task/create_section, so a caller
- * applying several actions in sequence (see assistant-dialog.tsx) can
- * resolve a move_task's "NEW_SECTION" sentinel to the section that was
- * just created earlier in the same batch.
  */
-export async function applyProposedAction(action: ProposedAction): Promise<string | undefined> {
+export async function applyProposedAction(action: ProposedAction): Promise<ApplyResult> {
   const store = useAppStore.getState();
   const actorId = assistantMemberId();
 
   switch (action.type) {
-    case "create_task":
-      return await store.createTask({
+    case "create_task": {
+      const id = await store.createTask({
         sectionId: action.sectionId,
         title: action.title,
         createdBy: actorId,
@@ -40,17 +48,28 @@ export async function applyProposedAction(action: ProposedAction): Promise<strin
           notes: action.notes ?? null,
         },
       });
-    case "create_section":
-      return await store.createSection({
+      return { createdId: id, undo: () => store.softDeleteTask(id) };
+    }
+    case "create_section": {
+      const id = await store.createSection({
         name: action.name,
         kind: action.kind,
         emoji: action.emoji ?? undefined,
         createdBy: actorId,
       });
+      return { createdId: id, undo: () => store.deleteSection(id) };
+    }
     case "toggle_task_completed":
       await store.toggleTaskCompleted(action.taskId, actorId);
-      return;
+      // Toggling again flips it right back — safe as long as nothing else
+      // touched completion state in between.
+      return { undo: () => store.toggleTaskCompleted(action.taskId, actorId) };
     case "move_task": {
+      const task = store.tasks[action.taskId];
+      const prevSectionId = task?.section_id;
+      const prevParentTaskId = task?.parent_task_id ?? null;
+      const prevPosition = task?.position;
+
       const siblings = Object.values(store.tasks).filter(
         (t) => t.section_id === action.sectionId && t.parent_task_id === null && !t.deleted_at
       );
@@ -60,21 +79,33 @@ export async function applyProposedAction(action: ProposedAction): Promise<strin
         parent_task_id: null,
         position: rankAtEnd(lastPosition),
       });
-      return;
+
+      return {
+        undo:
+          prevSectionId && prevPosition
+            ? () =>
+                store.updateTask(action.taskId, {
+                  section_id: prevSectionId,
+                  parent_task_id: prevParentTaskId,
+                  position: prevPosition,
+                })
+            : undefined,
+      };
     }
-    case "create_chore":
+    case "create_chore": {
       // createChore attributes to the currently-acting human device identity
       // rather than an explicit createdBy param (an existing asymmetry with
       // createTask/createSection/createFamilyEvent) — not something this
       // feature reworks.
-      await store.createChore({ sectionId: action.sectionId, title: action.title, freq: action.freq });
-      return;
+      const id = await store.createChore({ sectionId: action.sectionId, title: action.title, freq: action.freq });
+      return { createdId: id, undo: () => store.deleteChore(id) };
+    }
     case "complete_chore":
-      if (!actorId) return;
+      if (!actorId) return {};
       await store.completeChore(action.choreId, actorId);
-      return;
-    case "create_family_event":
-      await store.createFamilyEvent({
+      return {};
+    case "create_family_event": {
+      const id = await store.createFamilyEvent({
         title: action.title,
         kind: action.kind,
         eventDate: action.eventDate,
@@ -82,9 +113,10 @@ export async function applyProposedAction(action: ProposedAction): Promise<strin
         recurrence: "none",
         createdBy: actorId,
       });
-      return;
+      return { createdId: id, undo: () => store.deleteFamilyEvent(id) };
+    }
     case "send_broadcast":
       await store.sendBroadcastMessage(action.message, actorId);
-      return;
+      return {};
   }
 }

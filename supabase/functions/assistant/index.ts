@@ -39,11 +39,19 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 // This endpoint has no auth (matches the rest of the app — anyone with the
-// link can use it), so a modest daily cap is a cheap safety net against a
-// runaway loop exhausting the free Gemini tier. Tracked in ai_usage via the
-// increment_ai_usage() RPC (see migration 0022).
-const DAILY_CALL_CAP = 50;
-const GEMINI_MODEL = "gemini-2.5-flash";
+// link can use it), so a daily cap is a cheap safety net against a runaway
+// loop exhausting the free Gemini tier. Tracked in ai_usage via the
+// increment_ai_usage() RPC (see migration 0022). This is *our own*
+// self-imposed ceiling, not Gemini's actual free-tier quota (which is far
+// higher) — it only exists to bound a worst-case bug/abuse loop, so it can
+// safely be generous for a small household.
+const DAILY_CALL_CAP = 300;
+
+// Tried in order. gemini-2.0-flash (this app's original choice) had its
+// free-tier quota reduced to zero at some point after it shipped — Google
+// occasionally does this to older models — so a real 429 quota error now
+// falls through to the next model instead of failing the whole request.
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-flash-lite-latest"];
 
 const LANGUAGE_INSTRUCTION =
   "Always respond in Hebrew, naturally and briefly. Never respond in English or any other language, regardless of what language the user writes in.";
@@ -229,31 +237,52 @@ function parseGeminiResponse(data: GeminiResponse): { reply: string; proposedAct
   return { reply: textParts.join("\n").trim(), proposedActions, memoryFacts };
 }
 
+async function callGeminiModel(
+  model: string,
+  apiKey: string,
+  systemInstruction: string,
+  userParts: GeminiPart[]
+): Promise<GeminiResponse> {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemInstruction }] },
+      contents: [{ role: "user", parts: userParts }],
+      tools: [{ functionDeclarations: TOOLS }],
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    const err = new Error(`Gemini API error ${res.status} (${model}): ${body.slice(0, 500)}`);
+    (err as { status?: number }).status = res.status;
+    throw err;
+  }
+
+  return (await res.json()) as GeminiResponse;
+}
+
+/** Tries each model in GEMINI_MODELS in order, falling through to the next
+ * one only on a 429 (quota exhausted) — any other error fails immediately
+ * rather than masking a real bug behind a slow retry chain. */
 async function callGemini(
   apiKey: string,
   systemInstruction: string,
   userParts: GeminiPart[]
 ): Promise<{ reply: string; proposedActions: ProposedAction[]; memoryFacts: string[] }> {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemInstruction }] },
-        contents: [{ role: "user", parts: userParts }],
-        tools: [{ functionDeclarations: TOOLS }],
-      }),
+  let lastErr: unknown;
+  for (const model of GEMINI_MODELS) {
+    try {
+      const data = await callGeminiModel(model, apiKey, systemInstruction, userParts);
+      return parseGeminiResponse(data);
+    } catch (err) {
+      lastErr = err;
+      if ((err as { status?: number }).status !== 429) throw err;
+      console.error(`assistant: ${model} quota exhausted, falling back`, err);
     }
-  );
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${body.slice(0, 500)}`);
   }
-
-  const data = (await res.json()) as GeminiResponse;
-  return parseGeminiResponse(data);
+  throw lastErr;
 }
 
 function buildContextBlock(
@@ -306,10 +335,24 @@ function getBearerToken(req: Request): string | null {
   return token.length > 0 ? token : null;
 }
 
+function normalizeFact(fact: string): string {
+  return fact.trim().toLowerCase();
+}
+
 // deno-lint-ignore no-explicit-any
-async function saveFamilyFacts(supabase: any, facts: string[]): Promise<void> {
+async function saveFamilyFacts(supabase: any, facts: string[], existing: { fact: string }[]): Promise<void> {
   if (facts.length === 0) return;
-  await supabase.from("family_facts").insert(facts.map((fact) => ({ fact })));
+  const existingNormalized = new Set(existing.map((f) => normalizeFact(f.fact)));
+  const seen = new Set(existingNormalized);
+  const toInsert: { fact: string }[] = [];
+  for (const fact of facts) {
+    const normalized = normalizeFact(fact);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    toInsert.push({ fact });
+  }
+  if (toInsert.length === 0) return;
+  await supabase.from("family_facts").insert(toInsert);
 }
 
 Deno.serve(async (req) => {
@@ -404,7 +447,7 @@ Deno.serve(async (req) => {
     const { reply, memoryFacts } = await callGemini(geminiKey, systemInstruction, [
       { text: "תן לי בדיחה חמה ומצחיקה למשפחה." },
     ]);
-    await saveFamilyFacts(supabase, memoryFacts);
+    await saveFamilyFacts(supabase, memoryFacts, (familyFacts ?? []) as { fact: string }[]);
 
     const jokeText = reply.trim();
     if (!jokeText) return json({ sent: false, reason: "empty" });
@@ -448,7 +491,7 @@ Deno.serve(async (req) => {
     const { reply, proposedActions, memoryFacts } = await callGemini(geminiKey, systemInstruction, [
       { text: "Look at the household's recent activity and suggest at most one useful action, if any." },
     ]);
-    await saveFamilyFacts(supabase, memoryFacts);
+    await saveFamilyFacts(supabase, memoryFacts, (familyFacts ?? []) as { fact: string }[]);
 
     if (proposedActions.length > 0 && reply) {
       const action = proposedActions[0];
@@ -489,7 +532,7 @@ Deno.serve(async (req) => {
 
   try {
     const { reply, proposedActions, memoryFacts } = await callGemini(geminiKey, systemInstruction, userParts);
-    await saveFamilyFacts(supabase, memoryFacts);
+    await saveFamilyFacts(supabase, memoryFacts, (familyFacts ?? []) as { fact: string }[]);
     return json({ reply, proposedActions });
   } catch (err) {
     console.error("assistant: Gemini call failed", err);
