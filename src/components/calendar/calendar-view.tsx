@@ -1,16 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { CalendarPlus, Plus } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { useT, useLocaleStore } from "@/lib/i18n/store";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { EventDialog } from "@/components/calendar/event-dialog";
 import { nextOccurrence, dateKey, spanDays } from "@/lib/calendar/occurrences";
+import { calendarFeedUrl } from "@/lib/calendar/feed-url";
 import { addDays, eachDayOfInterval } from "date-fns";
 import type { FamilyEvent } from "@/types/domain";
 import { he as heLocale, enUS } from "react-day-picker/locale";
+import { toast } from "sonner";
 
 type CalendarItem = {
   id: string;
@@ -151,16 +153,29 @@ export function CalendarView() {
           )}
         </div>
 
-        <Button
-          className="gap-2"
-          onClick={() => {
-            setEditingEvent(null);
-            setDialogOpen(true);
-          }}
-        >
-          <Plus className="size-4" />
-          {t("addEvent")}
-        </Button>
+        <div className="flex w-full gap-2">
+          <Button
+            className="flex-1 gap-2"
+            onClick={() => {
+              setEditingEvent(null);
+              setDialogOpen(true);
+            }}
+          >
+            <Plus className="size-4" />
+            {t("addEvent")}
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={async () => {
+              await navigator.clipboard.writeText(calendarFeedUrl());
+              toast.success(t("calendarLinkCopied"));
+            }}
+          >
+            <CalendarPlus className="size-4" />
+            {t("subscribeCalendar")}
+          </Button>
+        </div>
       </div>
 
       <div className="glass surface-shadow flex flex-col gap-2 rounded-3xl p-4 ring-1 ring-border/40 sm:p-5">

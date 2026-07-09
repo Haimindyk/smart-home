@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Bot, ImagePlus, Loader2, Send, X } from "lucide-react";
+import { Bot, ImagePlus, Loader2, Send, Undo2, X } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { useT } from "@/lib/i18n/store";
 import { askAssistant } from "@/lib/assistant/client";
@@ -18,12 +18,18 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+type ChatAction = ProposedAction & {
+  applied?: boolean;
+  undone?: boolean;
+  undo?: () => Promise<void>;
+};
+
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
   imagePreview?: string;
-  proposedActions?: (ProposedAction & { applied?: boolean })[];
+  proposedActions?: ChatAction[];
 };
 
 function describeAction(action: ProposedAction): string {
@@ -135,18 +141,36 @@ export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenC
           ? { ...original, sectionId: newSectionId }
           : original;
       try {
-        const createdId = await applyProposedAction(action);
+        const { createdId, undo } = await applyProposedAction(action);
         if (action.type === "create_section" && createdId) newSectionId = createdId;
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMessageId
-              ? { ...m, proposedActions: m.proposedActions?.map((a, idx) => (idx === i ? { ...a, applied: true } : a)) }
+              ? { ...m, proposedActions: m.proposedActions?.map((a, idx) => (idx === i ? { ...a, applied: true, undo } : a)) }
               : m
           )
         );
       } catch {
         toast.error(t("assistantActionFailed"));
       }
+    }
+  }
+
+  async function undoAction(messageId: string, index: number) {
+    const msg = messages.find((m) => m.id === messageId);
+    const action = msg?.proposedActions?.[index];
+    if (!action?.undo) return;
+    try {
+      await action.undo();
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, proposedActions: m.proposedActions?.map((a, idx) => (idx === index ? { ...a, undone: true } : a)) }
+            : m
+        )
+      );
+    } catch {
+      toast.error(t("assistantActionFailed"));
     }
   }
 
@@ -185,14 +209,27 @@ export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenC
                       key={i}
                       dir="auto"
                       className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-medium",
-                        action.applied
-                          ? "border-emerald-600/40 bg-emerald-600/10 text-emerald-700 dark:text-emerald-400"
-                          : "border-primary/30 bg-primary/10 text-primary"
+                        "flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium",
+                        action.undone
+                          ? "border-border bg-muted text-muted-foreground line-through"
+                          : action.applied
+                            ? "border-emerald-600/40 bg-emerald-600/10 text-emerald-700 dark:text-emerald-400"
+                            : "border-primary/30 bg-primary/10 text-primary"
                       )}
                     >
-                      {action.applied ? "✓ " : ""}
+                      {action.applied && !action.undone ? "✓ " : ""}
                       {describeAction(action)}
+                      {action.applied && !action.undone && action.undo && (
+                        <button
+                          type="button"
+                          onClick={() => void undoAction(msg.id, i)}
+                          aria-label={t("undo")}
+                          title={t("undo")}
+                          className="ms-0.5 -me-1 rounded-full p-0.5 hover:bg-emerald-600/20"
+                        >
+                          <Undo2 className="size-3" />
+                        </button>
+                      )}
                     </span>
                   ))}
                 </div>
