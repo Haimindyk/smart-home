@@ -7,21 +7,34 @@
 // src/lib/assistant/apply-actions.ts, the one place on the client that
 // actually applies a confirmed action, through the same useAppStore
 // mutations a human action would use, so attribution, the offline queue,
-// and realtime sync all behave identically. The one exception is "insights"
-// mode, which inserts rows straight into ai_suggestions — those are already
-// just a proposal sitting in an inbox, applied the same way as a chat action
-// once a human taps it.
+// and realtime sync all behave identically. Three exceptions, all
+// low-stakes/reversible rather than household-data mutations a human needs
+// to confirm:
+//   - "insights" mode inserts rows straight into ai_suggestions — those are
+//     already just a proposal sitting in an inbox, applied the same way as
+//     a chat action once a human taps it. It also now fires a push
+//     notification (see migration 0024) so a new suggestion isn't silent.
+//   - "joke" mode writes a broadcast message straight to activity_log once a
+//     day — a pure FYI with nothing to "apply", riding the existing
+//     broadcast -> push pipeline.
+//   - remember_family_fact (a tool available in every intent) lets the model
+//     grow its own free-text memory of family relationships/preferences
+//     directly, since it's the assistant's own background knowledge, not
+//     household state a human manages.
 //
 // This is a Deno module (Supabase Edge Runtime), not part of the Next.js
 // app's TypeScript project — see tsconfig.json / eslint.config.mjs, both of
 // which exclude supabase/functions/**.
 //
 // Deployed with verify_jwt disabled: chat has no auth by design (same anon
-// reach as the rest of this app), and the insights intent uses its own
-// shared-secret check (verify_assistant_trigger_secret) rather than a
-// Supabase-issued JWT — the pg_cron job's net.http_post sends a random Vault
-// secret as the bearer token, not a JWT, so gateway-level verify_jwt would
-// reject it before this code ever ran.
+// reach as the rest of this app), and the insights/joke intents use their
+// own shared-secret check (verify_assistant_trigger_secret) rather than a
+// Supabase-issued JWT — the pg_cron jobs' net.http_post calls send a random
+// Vault secret as the bearer token, not a JWT, so gateway-level verify_jwt
+// would reject them before this code ever ran.
+//
+// Everything this assistant writes (chat replies, insight notes, jokes) is
+// Hebrew-only by design — this household's whole app is Hebrew-first.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -31,6 +44,9 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // increment_ai_usage() RPC (see migration 0022).
 const DAILY_CALL_CAP = 50;
 const GEMINI_MODEL = "gemini-2.5-flash";
+
+const LANGUAGE_INSTRUCTION =
+  "Always respond in Hebrew, naturally and briefly. Never respond in English or any other language, regardless of what language the user writes in.";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -132,6 +148,16 @@ const TOOLS = [
       required: ["message"],
     },
   },
+  {
+    name: "remember_family_fact",
+    description:
+      "Silently save one short, durable fact about the family — a relationship (who's married to whom, who's whose parent, a beloved pet), a preference, a recurring pattern — that you picked up on in this conversation and that isn't already listed in the family notes below. Only for things genuinely worth remembering long-term, not routine chit-chat. Never use this to record a task/chore/event; those go through the other tools.",
+    parameters: {
+      type: "OBJECT",
+      properties: { fact: { type: "STRING", description: "one short sentence, in Hebrew" } },
+      required: ["fact"],
+    },
+  },
 ];
 
 type ProposedAction = { type: string; [key: string]: unknown };
@@ -155,16 +181,25 @@ const TOOL_TO_ACTION: Record<string, string> = {
   propose_send_broadcast: "send_broadcast",
 };
 
-/** Turns a Gemini response's parts into (reply text, proposed actions). */
-function parseGeminiResponse(data: GeminiResponse): { reply: string; proposedActions: ProposedAction[] } {
+/** Turns a Gemini response's parts into (reply text, proposed actions, new
+ * family facts to remember). remember_family_fact calls are pulled out
+ * separately from proposedActions since they're auto-saved, not something a
+ * human taps to confirm. */
+function parseGeminiResponse(data: GeminiResponse): { reply: string; proposedActions: ProposedAction[]; memoryFacts: string[] } {
   const parts = data.candidates?.[0]?.content?.parts ?? [];
   const textParts: string[] = [];
   const proposedActions: ProposedAction[] = [];
+  const memoryFacts: string[] = [];
 
   for (const part of parts) {
     if ("text" in part && part.text) {
       textParts.push(part.text);
     } else if ("functionCall" in part) {
+      if (part.functionCall.name === "remember_family_fact") {
+        const fact = String(part.functionCall.args.fact ?? "").trim();
+        if (fact) memoryFacts.push(fact);
+        continue;
+      }
       const actionType = TOOL_TO_ACTION[part.functionCall.name];
       if (actionType) {
         proposedActions.push({ type: actionType, ...part.functionCall.args });
@@ -172,14 +207,14 @@ function parseGeminiResponse(data: GeminiResponse): { reply: string; proposedAct
     }
   }
 
-  return { reply: textParts.join("\n").trim(), proposedActions };
+  return { reply: textParts.join("\n").trim(), proposedActions, memoryFacts };
 }
 
 async function callGemini(
   apiKey: string,
   systemInstruction: string,
   userParts: GeminiPart[]
-): Promise<{ reply: string; proposedActions: ProposedAction[] }> {
+): Promise<{ reply: string; proposedActions: ProposedAction[]; memoryFacts: string[] }> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
     {
@@ -230,6 +265,14 @@ function buildContextBlock(
   ].join("\n");
 }
 
+/** Free-text notes the assistant has taught itself about the family (see
+ * migration 0024 / remember_family_fact above) — included as context on
+ * every call so it gets more "aware" over time on its own. */
+function buildFamilyFactsBlock(facts: { fact: string }[]): string {
+  if (facts.length === 0) return "(nothing learned yet)";
+  return facts.map((f) => `- ${f.fact}`).join("\n");
+}
+
 function buildActivitySummary(rows: { action: string; summary: string | null; created_at: string }[]): string {
   return rows
     .slice(0, 60)
@@ -244,6 +287,12 @@ function getBearerToken(req: Request): string | null {
   return token.length > 0 ? token : null;
 }
 
+// deno-lint-ignore no-explicit-any
+async function saveFamilyFacts(supabase: any, facts: string[]): Promise<void> {
+  if (facts.length === 0) return;
+  await supabase.from("family_facts").insert(facts.map((fact) => ({ fact })));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
@@ -253,11 +302,10 @@ Deno.serve(async (req) => {
   }
 
   let body: {
-    intent?: "chat" | "insights";
+    intent?: "chat" | "insights" | "joke";
     message?: string;
     imageBase64?: string;
     imageMimeType?: string;
-    locale?: "he" | "en";
   };
   try {
     body = await req.json();
@@ -269,11 +317,12 @@ Deno.serve(async (req) => {
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-  // The insights sweep writes straight into everyone's dashboard (unlike
-  // chat, which only a human can act on) — gate it with a shared secret so
-  // an open endpoint can't be used to spam the household with junk cards.
-  // Chat stays open to anyone with the link, same as the rest of the app.
-  if (body.intent === "insights") {
+  // The insights sweep and the daily joke both write straight into
+  // everyone's dashboard/feed (unlike chat, which only a human can act on)
+  // — gate them with a shared secret so an open endpoint can't be used to
+  // spam the household. Chat stays open to anyone with the link, same as
+  // the rest of the app.
+  if (body.intent === "insights" || body.intent === "joke") {
     const secret = getBearerToken(req);
     const { data: valid } = secret
       ? await supabase.rpc("verify_assistant_trigger_secret", { p_secret: secret })
@@ -290,17 +339,67 @@ Deno.serve(async (req) => {
     return json({ error: "rate_limited" }, 429);
   }
 
-  const locale = body.locale === "en" ? "en" : "he";
-  const languageInstruction =
-    locale === "he" ? "Respond in Hebrew, naturally and briefly." : "Respond in English, naturally and briefly.";
-
-  const [{ data: sections }, { data: tasks }, { data: chores }] = await Promise.all([
+  const [{ data: sections }, { data: tasks }, { data: chores }, { data: familyFacts }] = await Promise.all([
     supabase.from("sections").select("id, name, kind").is("deleted_at", null),
     supabase.from("tasks").select("id, title, section_id, is_completed").is("deleted_at", null).eq("is_note", false),
     supabase.from("chores").select("id, title, section_id").is("deleted_at", null),
+    supabase.from("family_facts").select("fact").order("created_at", { ascending: true }).limit(200),
   ]);
 
   const contextBlock = buildContextBlock(sections ?? [], tasks ?? [], chores ?? []);
+  const familyFactsBlock = buildFamilyFactsBlock((familyFacts ?? []) as { fact: string }[]);
+
+  if (body.intent === "joke") {
+    const { data: assistantMember } = await supabase
+      .from("members")
+      .select("id")
+      .eq("email", "assistant@kh.family")
+      .maybeSingle();
+    const assistantId = (assistantMember as { id: string } | null)?.id ?? null;
+
+    if (assistantId) {
+      const startOfDay = new Date();
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const { data: existing } = await supabase
+        .from("activity_log")
+        .select("id")
+        .eq("actor_id", assistantId)
+        .eq("entity_type", "broadcast")
+        .gte("created_at", startOfDay.toISOString())
+        .limit(1);
+      if (existing && existing.length > 0) {
+        return json({ sent: false, reason: "already_sent_today" });
+      }
+    }
+
+    const systemInstruction = [
+      "You are 'העוזר', the household AI embedded in the K&H family organizer app.",
+      "Write exactly one short, warm, funny family-friendly joke for the household. You may (but don't have to) reference the family notes below — e.g. Louis the dog.",
+      "Do not call any tools. Reply with just the joke text — no preamble, no quotation marks.",
+      LANGUAGE_INSTRUCTION,
+      "",
+      "## Family notes",
+      familyFactsBlock,
+    ].join("\n");
+
+    const { reply, memoryFacts } = await callGemini(geminiKey, systemInstruction, [
+      { text: "תן לי בדיחה חמה ומצחיקה למשפחה." },
+    ]);
+    await saveFamilyFacts(supabase, memoryFacts);
+
+    const jokeText = reply.trim();
+    if (!jokeText) return json({ sent: false, reason: "empty" });
+
+    await supabase.from("activity_log").insert({
+      entity_type: "broadcast",
+      entity_id: crypto.randomUUID(),
+      action: "message",
+      actor_id: assistantId,
+      summary: `😄 ${jokeText}`,
+    });
+
+    return json({ sent: true });
+  }
 
   if (body.intent === "insights") {
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -315,17 +414,22 @@ Deno.serve(async (req) => {
       "You are the K&H family household assistant. Look at the recent activity log and the current open tasks/chores below, and see if there's a genuinely useful, gentle observation worth surfacing as a dashboard suggestion — e.g. a chore nobody's done in a while, or a shopping item that keeps coming back.",
       "Propose AT MOST ONE suggestion. If nothing is clearly worth surfacing, propose nothing and just reply with an empty string.",
       "Never nag about something already handled. Keep the tone warm, not naggy.",
-      languageInstruction,
+      "If you notice a new, durable fact about the family that isn't already listed in the family notes below, call remember_family_fact to save it.",
+      LANGUAGE_INSTRUCTION,
       "",
       contextBlock,
+      "",
+      "## Family notes",
+      familyFactsBlock,
       "",
       "## Activity in the last 7 days",
       buildActivitySummary(activity ?? []),
     ].join("\n");
 
-    const { reply, proposedActions } = await callGemini(geminiKey, systemInstruction, [
+    const { reply, proposedActions, memoryFacts } = await callGemini(geminiKey, systemInstruction, [
       { text: "Look at the household's recent activity and suggest at most one useful action, if any." },
     ]);
+    await saveFamilyFacts(supabase, memoryFacts);
 
     if (proposedActions.length > 0 && reply) {
       const action = proposedActions[0];
@@ -345,9 +449,13 @@ Deno.serve(async (req) => {
     "You can read the household's current sections, open tasks, and chores (given below) and propose concrete actions using the tools available — you never apply anything yourself, a human always confirms.",
     "When resolving a vague request (e.g. 'get something for dinner') or a pasted recipe or a photographed receipt, propose one propose_create_task call per concrete item, using the most fitting existing section (usually a 'shopping' kind section).",
     "Always include a short natural-language reply summarizing what you're proposing, in addition to any tool calls.",
-    languageInstruction,
+    "If you notice a new, durable fact about the family — a relationship, a preference, a recurring pattern — that isn't already listed in the family notes below, call remember_family_fact to save it silently, without mentioning that you did.",
+    LANGUAGE_INSTRUCTION,
     "",
     contextBlock,
+    "",
+    "## Family notes",
+    familyFactsBlock,
   ].join("\n");
 
   const userParts: GeminiPart[] = [];
@@ -360,7 +468,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { reply, proposedActions } = await callGemini(geminiKey, systemInstruction, userParts);
+    const { reply, proposedActions, memoryFacts } = await callGemini(geminiKey, systemInstruction, userParts);
+    await saveFamilyFacts(supabase, memoryFacts);
     return json({ reply, proposedActions });
   } catch (err) {
     console.error("assistant: Gemini call failed", err);

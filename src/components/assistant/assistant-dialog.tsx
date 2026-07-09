@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Bot, ImagePlus, Loader2, Send, X } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
-import { useT, useLocaleStore } from "@/lib/i18n/store";
+import { useT } from "@/lib/i18n/store";
 import { askAssistant } from "@/lib/assistant/client";
 import { applyProposedAction } from "@/lib/assistant/apply-actions";
 import type { ProposedAction } from "@/lib/assistant/types";
@@ -57,7 +57,6 @@ function fileToBase64(file: File): Promise<string> {
 
 export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useT();
-  const locale = useLocaleStore((s) => s.locale);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -86,7 +85,6 @@ export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenC
       message: text || undefined,
       imageBase64,
       imageMimeType: image?.file.type,
-      locale,
     });
     setSending(false);
 
@@ -101,31 +99,36 @@ export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenC
       return;
     }
 
+    const assistantMessageId = crypto.randomUUID();
     setMessages((prev) => [
       ...prev,
       {
-        id: crypto.randomUUID(),
+        id: assistantMessageId,
         role: "assistant",
         text: result.reply || t("assistantNoReply"),
         proposedActions: result.proposedActions,
       },
     ]);
-  }
 
-  async function acceptAction(messageId: string, index: number) {
-    setMessages((prev) => {
-      const msg = prev.find((m) => m.id === messageId);
-      const action = msg?.proposedActions?.[index];
-      if (action) void applyProposedAction(action).catch(() => toast.error(t("assistantActionFailed")));
-      return prev.map((m) =>
-        m.id === messageId
-          ? {
-              ...m,
-              proposedActions: m.proposedActions?.map((a, i) => (i === index ? { ...a, applied: true } : a)),
-            }
-          : m
-      );
-    });
+    // The user already asked for this in chat — applying it immediately
+    // (rather than making them tap a second confirm button) is what "ask the
+    // assistant to add milk" actually means. Each action still runs through
+    // applyProposedAction, so it gets the same attribution/offline-queue/
+    // realtime behavior as a human doing it directly.
+    for (let i = 0; i < result.proposedActions.length; i++) {
+      try {
+        await applyProposedAction(result.proposedActions[i]);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMessageId
+              ? { ...m, proposedActions: m.proposedActions?.map((a, idx) => (idx === i ? { ...a, applied: true } : a)) }
+              : m
+          )
+        );
+      } catch {
+        toast.error(t("assistantActionFailed"));
+      }
+    }
   }
 
   return (
@@ -159,22 +162,19 @@ export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenC
               {msg.proposedActions && msg.proposedActions.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {msg.proposedActions.map((action, i) => (
-                    <button
+                    <span
                       key={i}
-                      type="button"
-                      disabled={action.applied}
-                      onClick={() => void acceptAction(msg.id, i)}
                       dir="auto"
                       className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                        "rounded-full border px-3 py-1.5 text-xs font-medium",
                         action.applied
                           ? "border-emerald-600/40 bg-emerald-600/10 text-emerald-700 dark:text-emerald-400"
-                          : "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
+                          : "border-primary/30 bg-primary/10 text-primary"
                       )}
                     >
                       {action.applied ? "✓ " : ""}
                       {describeAction(action)}
-                    </button>
+                    </span>
                   ))}
                 </div>
               )}

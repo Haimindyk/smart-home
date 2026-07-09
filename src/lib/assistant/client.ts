@@ -8,7 +8,6 @@ export async function askAssistant(input: {
   message?: string;
   imageBase64?: string;
   imageMimeType?: string;
-  locale?: "he" | "en";
 }): Promise<AssistantResponse | { error: string }> {
   const supabase = createClient();
   const { data, error } = await supabase.functions.invoke("assistant", {
