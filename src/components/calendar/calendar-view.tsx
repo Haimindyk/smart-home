@@ -9,6 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { EventDialog } from "@/components/calendar/event-dialog";
 import { SubscribeCalendarDialog } from "@/components/calendar/subscribe-calendar-dialog";
 import { nextOccurrence, dateKey, spanDays } from "@/lib/calendar/occurrences";
+import { downloadEventIcs } from "@/lib/calendar/ics-event";
 import { addDays, eachDayOfInterval } from "date-fns";
 import type { FamilyEvent } from "@/types/domain";
 import { he as heLocale, enUS } from "react-day-picker/locale";
@@ -179,23 +180,43 @@ export function CalendarView() {
           upcoming.map(({ item, start, end }) => {
             const fmt = (d: Date) => d.toLocaleDateString(locale === "he" ? "he-IL" : "en-US", { day: "numeric", month: "short" });
             return (
-              <button
-                key={`${item.kind}-${item.id}`}
-                disabled={item.kind === "task"}
-                onClick={() => {
-                  if (item.kind === "event" && item.event) {
-                    setEditingEvent(item.event);
-                    setDialogOpen(true);
+              <div key={`${item.kind}-${item.id}`} className="flex items-center gap-1 rounded-xl hover:bg-accent/40">
+                <button
+                  type="button"
+                  disabled={item.kind === "task"}
+                  onClick={() => {
+                    if (item.kind === "event" && item.event) {
+                      setEditingEvent(item.event);
+                      setDialogOpen(true);
+                    }
+                  }}
+                  className="flex flex-1 items-center gap-2.5 px-2.5 py-2 text-start text-sm disabled:cursor-default"
+                >
+                  <span>{item.emoji ?? (item.kind === "task" ? "✅" : "📌")}</span>
+                  <span dir="auto" className="flex-1">{item.title}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {dateKey(start) === dateKey(end) ? fmt(start) : `${fmt(start)} – ${fmt(end)}`}
+                  </span>
+                </button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="me-1.5 shrink-0"
+                  onClick={() =>
+                    downloadEventIcs({
+                      title: item.title,
+                      emoji: item.emoji,
+                      start,
+                      end,
+                      notes: item.event?.notes ?? null,
+                    })
                   }
-                }}
-                className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-start text-sm hover:bg-accent/40 disabled:cursor-default disabled:hover:bg-transparent"
-              >
-                <span>{item.emoji ?? (item.kind === "task" ? "✅" : "📌")}</span>
-                <span dir="auto" className="flex-1">{item.title}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {dateKey(start) === dateKey(end) ? fmt(start) : `${fmt(start)} – ${fmt(end)}`}
-                </span>
-              </button>
+                  aria-label={t("addEventToCalendar")}
+                  title={t("addEventToCalendar")}
+                >
+                  <CalendarPlus className="size-3.5" />
+                </Button>
+              </div>
             );
           })
         )}
