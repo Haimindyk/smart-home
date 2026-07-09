@@ -7,12 +7,11 @@ import { useT, useLocaleStore } from "@/lib/i18n/store";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { EventDialog } from "@/components/calendar/event-dialog";
+import { SubscribeCalendarDialog } from "@/components/calendar/subscribe-calendar-dialog";
 import { nextOccurrence, dateKey, spanDays } from "@/lib/calendar/occurrences";
-import { calendarFeedUrl } from "@/lib/calendar/feed-url";
 import { addDays, eachDayOfInterval } from "date-fns";
 import type { FamilyEvent } from "@/types/domain";
 import { he as heLocale, enUS } from "react-day-picker/locale";
-import { toast } from "sonner";
 
 type CalendarItem = {
   id: string;
@@ -33,6 +32,7 @@ export function CalendarView() {
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<FamilyEvent | null>(null);
+  const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
 
   const itemsByDate = useMemo(() => {
     const map = new Map<string, CalendarItem[]>();
@@ -164,14 +164,7 @@ export function CalendarView() {
             <Plus className="size-4" />
             {t("addEvent")}
           </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={async () => {
-              await navigator.clipboard.writeText(calendarFeedUrl());
-              toast.success(t("calendarLinkCopied"));
-            }}
-          >
+          <Button variant="outline" className="gap-2" onClick={() => setSubscribeDialogOpen(true)}>
             <CalendarPlus className="size-4" />
             {t("subscribeCalendar")}
           </Button>
@@ -209,6 +202,7 @@ export function CalendarView() {
       </div>
 
       <EventDialog open={dialogOpen} onOpenChange={setDialogOpen} event={editingEvent} defaultDate={selectedDate} />
+      <SubscribeCalendarDialog open={subscribeDialogOpen} onOpenChange={setSubscribeDialogOpen} />
     </div>
   );
 }
