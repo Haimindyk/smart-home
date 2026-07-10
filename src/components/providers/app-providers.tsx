@@ -7,7 +7,6 @@ import { Toaster } from "@/components/ui/sonner";
 import { useLocaleStore, dirFor } from "@/lib/i18n/store";
 import { useRealtimeSync } from "@/lib/realtime/use-realtime-sync";
 import { IdentityGate } from "@/components/identity/identity-gate";
-import { OfflineBanner } from "@/components/common/offline-banner";
 import { InstallBanner } from "@/components/pwa/install-banner";
 import { GlobalSearch } from "@/components/search/global-search";
 
@@ -32,7 +31,6 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         <DirSync />
         <DataBoot>
           <IdentityGate>
-            <OfflineBanner />
             <InstallBanner />
             {children}
             <GlobalSearch />

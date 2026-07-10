@@ -3,6 +3,8 @@
 import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
 import { useIdentity } from "@/lib/identity";
+import { useLocaleStore } from "@/lib/i18n/store";
+import { messages } from "@/lib/i18n/messages";
 import { enqueueMutation, type QueuedMutation } from "@/lib/offline/db";
 import { execGenericWrite } from "@/lib/supabase/generic-write";
 import { rankAtEnd, rankBetween } from "@/lib/ordering/rank";
@@ -83,6 +85,7 @@ type AppState = {
   updateSectionNote: (id: string, description: string | null) => Promise<void>;
   reorderSection: (id: string, beforeId: string | null, afterId: string | null) => Promise<void>;
   deleteSection: (id: string) => Promise<void>;
+  restoreSection: (id: string) => Promise<void>;
 
   createTask: (input: {
     sectionId: string;
@@ -101,6 +104,7 @@ type AppState = {
   updateChore: (id: string, patch: Partial<Chore>) => Promise<void>;
   completeChore: (id: string, completedBy: string) => Promise<void>;
   deleteChore: (id: string) => Promise<void>;
+  restoreChore: (id: string) => Promise<void>;
 
   createFamilyEvent: (input: {
     title: string;
@@ -136,6 +140,13 @@ function shouldApply(existing: { updated_at?: string } | undefined, incoming: { 
 /** Who's acting on this device right now — read directly so callers don't have to thread it through every action. */
 function currentActorId(): string | null {
   return useIdentity.getState().actingMemberId;
+}
+
+/** Localizes a store-triggered toast against whatever locale is active right
+ * now — read directly (like currentActorId) since store actions run outside
+ * React and can't call useT(). */
+function t(key: keyof (typeof messages)["he"]): string {
+  return messages[useLocaleStore.getState().locale][key];
 }
 
 /** Tables with an `updated_by` column (fed into the activity_log trigger) — see runMutation. */
@@ -370,6 +381,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       () => prev && set((s) => ({ sections: { ...s.sections, [id]: prev } })),
       "לא הצלחנו למחוק את הקטגוריה"
     );
+    toast(t("sectionDeleted"), {
+      action: { label: t("undo"), onClick: () => void get().restoreSection(id) },
+    });
+  },
+
+  restoreSection: async (id) => {
+    const prev = get().sections[id];
+    set((s) => ({ sections: { ...s.sections, [id]: { ...s.sections[id], deleted_at: null } } }));
+    await runMutation(
+      { table: "sections", op: "update", payload: { deleted_at: null }, match: { id } },
+      () => prev && set((s) => ({ sections: { ...s.sections, [id]: prev } })),
+      "לא הצלחנו לשחזר את הקטגוריה"
+    );
   },
 
   // ---------------------------------------------------------------------
@@ -492,8 +516,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         }),
       "לא הצלחנו למחוק את המשימה"
     );
-    toast("המשימה נמחקה", {
-      action: { label: "בטל", onClick: () => get().restoreTask(id) },
+    toast(t("taskDeleted"), {
+      action: { label: t("undo"), onClick: () => get().restoreTask(id) },
     });
   },
 
@@ -617,6 +641,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       { table: "chores", op: "update", payload: { deleted_at: now }, match: { id } },
       () => prev && set((s) => ({ chores: { ...s.chores, [id]: prev } })),
       "לא הצלחנו למחוק את המטלה"
+    );
+    toast(t("choreDeleted"), {
+      action: { label: t("undo"), onClick: () => void get().restoreChore(id) },
+    });
+  },
+
+  restoreChore: async (id) => {
+    const prev = get().chores[id];
+    set((s) => ({ chores: { ...s.chores, [id]: { ...s.chores[id], deleted_at: null } } }));
+    await runMutation(
+      { table: "chores", op: "update", payload: { deleted_at: null }, match: { id } },
+      () => prev && set((s) => ({ chores: { ...s.chores, [id]: prev } })),
+      "לא הצלחנו לשחזר את המטלה"
     );
   },
 

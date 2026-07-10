@@ -118,9 +118,14 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
           )}
 
           {section.kind !== "info" && (
-            <span className="hidden shrink-0 text-xs tabular-nums text-muted-foreground sm:inline">
-              {stats.pending} {t("pending")} · {stats.completed} {t("completed")}
-            </span>
+            <>
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground sm:hidden">
+                {stats.completed}/{stats.total}
+              </span>
+              <span className="hidden shrink-0 text-xs tabular-nums text-muted-foreground sm:inline">
+                {stats.pending} {t("pending")} · {stats.completed} {t("completed")}
+              </span>
+            </>
           )}
 
           <DropdownMenu>
@@ -196,6 +201,9 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
         {section.kind === "chores" ? (
           <div className="flex flex-col gap-2">
             <ChoreQuickAdd sectionId={section.id} />
+            {choreItems.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">{t("noTasksYet")}</p>
+            )}
             {dueChores.map((chore) => (
               <ChoreRow key={chore.id} chore={chore} />
             ))}

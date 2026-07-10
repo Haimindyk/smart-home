@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { CalendarIcon, Paperclip, Trash2, X } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { useIdentity } from "@/lib/identity";
-import { useT } from "@/lib/i18n/store";
+import { useLocaleStore, useT } from "@/lib/i18n/store";
 import { AttachmentRow } from "@/components/attachments/attachment-row";
 import {
   Sheet,
@@ -56,6 +56,7 @@ export function TaskEditorSheet({
   const addAttachment = useAppStore((s) => s.addAttachment);
   const actingMemberId = useIdentity((s) => s.actingMemberId);
   const t = useT();
+  const locale = useLocaleStore((s) => s.locale);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
@@ -193,14 +194,14 @@ export function TaskEditorSheet({
                     <SelectTrigger>
                       <SelectValue>
                         {(v: string) =>
-                          PRIORITIES.find((p) => p.value === v)?.labelHe
+                          PRIORITIES.find((p) => p.value === v)?.[locale === "he" ? "labelHe" : "labelEn"]
                         }
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {PRIORITIES.map((p) => (
                         <SelectItem key={p.value} value={p.value}>
-                          {p.labelHe}
+                          {p[locale === "he" ? "labelHe" : "labelEn"]}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -238,6 +239,8 @@ export function TaskEditorSheet({
                       };
                       commit(patch);
                     }}
+                    className="w-full [--cell-size:--spacing(9)]"
+                    classNames={{ root: "w-full", month: "w-full" }}
                   />
                 </div>
               )}
@@ -372,7 +375,7 @@ export function TaskEditorSheet({
           </div>
 
           <div className="grid gap-2">
-            <Label>העברה לקטגוריה</Label>
+            <Label>{t("moveToSection")}</Label>
             <Select
               value={local.section_id}
               onValueChange={(v) => v && commit({ section_id: v })}

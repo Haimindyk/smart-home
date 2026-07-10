@@ -175,6 +175,8 @@ export function EventDialog({
                   setDate(range.from);
                   setEndDate(range.to && range.to.getTime() !== range.from.getTime() ? range.to : null);
                 }}
+                className="w-full [--cell-size:--spacing(9)]"
+                classNames={{ root: "w-full", month: "w-full" }}
               />
             </div>
           )}

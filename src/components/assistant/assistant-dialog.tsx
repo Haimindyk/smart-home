@@ -5,6 +5,7 @@ import { Bot, ImagePlus, Loader2, Send, Undo2, X } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { useIdentity } from "@/lib/identity";
 import { useT } from "@/lib/i18n/store";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { askAssistant } from "@/lib/assistant/client";
 import { applyProposedAction } from "@/lib/assistant/apply-actions";
 import type { ProposedAction } from "@/lib/assistant/types";
@@ -33,7 +34,7 @@ type ChatMessage = {
   proposedActions?: ChatAction[];
 };
 
-function describeAction(action: ProposedAction): string {
+function describeAction(action: ProposedAction, t: (key: MessageKey) => string): string {
   const { tasks, chores, sections } = useAppStore.getState();
   switch (action.type) {
     case "create_task":
@@ -44,8 +45,8 @@ function describeAction(action: ProposedAction): string {
       return `✅ ${tasks[action.taskId]?.title ?? action.taskId}`;
     case "move_task": {
       const title = tasks[action.taskId]?.title ?? action.taskId;
-      const sectionName = sections[action.sectionId]?.name ?? "הקטגוריה החדשה";
-      return `🔀 ${title} אל ${sectionName}`;
+      const sectionName = sections[action.sectionId]?.name ?? t("theNewSection");
+      return `🔀 ${title} ${t("moveToConnector")} ${sectionName}`;
     }
     case "create_chore":
       return `🔁 ${action.title}`;
@@ -74,11 +75,17 @@ export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenC
   const markPrivateMessageRead = useAppStore((s) => s.markPrivateMessageRead);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const seededPrivateMessageIds = useRef<Set<string>>(new Set());
+  const endRef = useRef<HTMLDivElement>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
   const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [open, messages, sending]);
 
   // A private check-in from Mika (see personal-note-card.tsx) previously had
   // nowhere to actually reply — this drops any not-yet-shown one straight
@@ -208,7 +215,10 @@ export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenC
 
         <div className="flex flex-1 flex-col gap-3 overflow-y-auto py-2">
           {messages.length === 0 && (
-            <p className="py-8 text-center text-sm text-muted-foreground">{t("assistantEmptyState")}</p>
+            <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
+              <Bot className="size-8 opacity-50" />
+              <p>{t("assistantEmptyState")}</p>
+            </div>
           )}
           {messages.map((msg) => (
             <div key={msg.id} className={cn("flex flex-col gap-1.5", msg.role === "user" ? "items-end" : "items-start")}>
@@ -226,35 +236,40 @@ export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenC
                 {msg.text}
               </div>
               {msg.proposedActions && msg.proposedActions.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {msg.proposedActions.map((action, i) => (
-                    <span
-                      key={i}
-                      dir="auto"
-                      className={cn(
-                        "flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium",
-                        action.undone
-                          ? "border-border bg-muted text-muted-foreground line-through"
-                          : action.applied
-                            ? "border-emerald-600/40 bg-emerald-600/10 text-emerald-700 dark:text-emerald-400"
-                            : "border-primary/30 bg-primary/10 text-primary"
-                      )}
-                    >
-                      {action.applied && !action.undone ? "✓ " : ""}
-                      {describeAction(action)}
-                      {action.applied && !action.undone && action.undo && (
-                        <button
-                          type="button"
-                          onClick={() => void undoAction(msg.id, i)}
-                          aria-label={t("undo")}
-                          title={t("undo")}
-                          className="ms-0.5 -me-1 rounded-full p-0.5 hover:bg-emerald-600/20"
-                        >
-                          <Undo2 className="size-3" />
-                        </button>
-                      )}
-                    </span>
-                  ))}
+                <div className="flex flex-col gap-1">
+                  {msg.proposedActions.some((a) => a.applied && !a.undone) && (
+                    <p className="text-[11px] text-muted-foreground">{t("assistantActionsApplied")}</p>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {msg.proposedActions.map((action, i) => (
+                      <span
+                        key={i}
+                        dir="auto"
+                        className={cn(
+                          "flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium",
+                          action.undone
+                            ? "border-border bg-muted text-muted-foreground line-through"
+                            : action.applied
+                              ? "border-emerald-600/40 bg-emerald-600/10 text-emerald-700 dark:text-emerald-400"
+                              : "border-primary/30 bg-primary/10 text-primary"
+                        )}
+                      >
+                        {action.applied && !action.undone ? "✓ " : ""}
+                        {describeAction(action, t)}
+                        {action.applied && !action.undone && action.undo && (
+                          <button
+                            type="button"
+                            onClick={() => void undoAction(msg.id, i)}
+                            aria-label={t("undo")}
+                            title={t("undo")}
+                            className="ms-0.5 -me-1 rounded-full p-1 hover:bg-emerald-600/20"
+                          >
+                            <Undo2 className="size-3.5" />
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -264,6 +279,7 @@ export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenC
               <Loader2 className="size-3.5 animate-spin" /> {t("assistantThinking")}
             </div>
           )}
+          <div ref={endRef} />
         </div>
 
         <div className="flex flex-col gap-2 border-t pt-3">

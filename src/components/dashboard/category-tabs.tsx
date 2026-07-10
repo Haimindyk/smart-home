@@ -57,7 +57,11 @@ export function CategoryTabs({ sections }: { sections: Section[] }) {
   if (sections.length === 0) return null;
 
   return (
-    <div className="sticky top-[68px] z-30 -mx-4 mb-4 px-4">
+    // Offset must track the header's own height (padding + row + border),
+    // including its safe-area inset — a fixed pixel value here tucks the
+    // strip under the header on notched phones, where the header grows
+    // taller than on a regular screen.
+    <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-30 -mx-4 mb-4 px-4">
       <div className="glass surface-shadow w-full overflow-x-auto rounded-full px-2 py-2 ring-1 ring-border/40">
         <div className="flex w-max gap-1.5">
           {sections.map((section) => (
