@@ -41,7 +41,8 @@ export type MutableTable =
   | "attachments"
   | "family_events"
   | "activity_log"
-  | "ai_suggestions";
+  | "ai_suggestions"
+  | "ai_private_messages";
 
 export type QueuedMutation = {
   seq?: number;

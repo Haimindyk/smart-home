@@ -55,6 +55,38 @@ export type Database = {
           },
         ]
       }
+      ai_private_messages: {
+        Row: {
+          created_at: string
+          id: string
+          member_id: string
+          read_at: string | null
+          summary: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          member_id: string
+          read_at?: string | null
+          summary: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          member_id?: string
+          read_at?: string | null
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_private_messages_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_suggestions: {
         Row: {
           action: Json
@@ -420,6 +452,24 @@ export type Database = {
           },
         ]
       }
+      family_facts: {
+        Row: {
+          created_at: string
+          fact: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          fact: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          fact?: string
+          id?: string
+        }
+        Relationships: []
+      }
       members: {
         Row: {
           avatar_emoji: string | null
@@ -429,6 +479,8 @@ export type Database = {
           display_name: string
           email: string
           id: string
+          is_ai_companion_target: boolean
+          last_chat_at: string | null
           locale: string
           pin: string | null
           updated_at: string
@@ -442,6 +494,8 @@ export type Database = {
           display_name: string
           email: string
           id?: string
+          is_ai_companion_target?: boolean
+          last_chat_at?: string | null
           locale?: string
           pin?: string | null
           updated_at?: string
@@ -455,6 +509,8 @@ export type Database = {
           display_name?: string
           email?: string
           id?: string
+          is_ai_companion_target?: boolean
+          last_chat_at?: string | null
           locale?: string
           pin?: string | null
           updated_at?: string
@@ -466,6 +522,7 @@ export type Database = {
         Row: {
           member_id: string
           muted: boolean
+          on_ai_personal: boolean
           on_assigned_me: boolean
           on_broadcast: boolean
           on_complete: boolean
@@ -477,6 +534,7 @@ export type Database = {
         Insert: {
           member_id: string
           muted?: boolean
+          on_ai_personal?: boolean
           on_assigned_me?: boolean
           on_broadcast?: boolean
           on_complete?: boolean
@@ -488,6 +546,7 @@ export type Database = {
         Update: {
           member_id?: string
           muted?: boolean
+          on_ai_personal?: boolean
           on_assigned_me?: boolean
           on_broadcast?: boolean
           on_complete?: boolean
@@ -757,6 +816,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_ai_daily_joke: { Args: never; Returns: undefined }
+      check_ai_insights: { Args: never; Returns: undefined }
+      check_ai_personal_checkin: { Args: never; Returns: undefined }
+      check_ai_weekly_digest: { Args: never; Returns: undefined }
       check_due_tasks: { Args: never; Returns: undefined }
       check_family_events: { Args: never; Returns: undefined }
       complete_chore: {
@@ -811,6 +874,10 @@ export type Database = {
             Args: { p_actor_id?: string; p_task_id: string }
             Returns: undefined
           }
+      verify_assistant_trigger_secret: {
+        Args: { p_secret: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

@@ -18,6 +18,7 @@ import type {
   ActivityLog,
   FamilyEvent,
   AiSuggestion,
+  AiPrivateMessage,
 } from "@/types/domain";
 import { toast } from "sonner";
 
@@ -33,6 +34,7 @@ type AppState = {
   activityLog: ById<ActivityLog>;
   familyEvents: ById<FamilyEvent>;
   aiSuggestions: ById<AiSuggestion>;
+  aiPrivateMessages: ById<AiPrivateMessage>;
   hydrated: boolean;
 
   hydrate: (data: {
@@ -45,6 +47,7 @@ type AppState = {
     activityLog: ActivityLog[];
     familyEvents?: FamilyEvent[];
     aiSuggestions?: AiSuggestion[];
+    aiPrivateMessages?: AiPrivateMessage[];
   }) => void;
 
   applyRemote: (
@@ -57,13 +60,15 @@ type AppState = {
       | "attachments"
       | "activity_log"
       | "family_events"
-      | "ai_suggestions",
+      | "ai_suggestions"
+      | "ai_private_messages",
     eventType: "INSERT" | "UPDATE" | "DELETE",
     row: Record<string, unknown> | null,
     oldRow: Record<string, unknown> | null
   ) => void;
 
   updateAiSuggestionStatus: (id: string, status: "applied" | "dismissed") => Promise<void>;
+  markPrivateMessageRead: (id: string) => Promise<void>;
 
   updateMember: (id: string, patch: Partial<Pick<Member, "display_name" | "avatar_emoji" | "avatar_photo_url" | "color">>) => Promise<void>;
   addMember: (input: {
@@ -182,6 +187,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activityLog: {},
   familyEvents: {},
   aiSuggestions: {},
+  aiPrivateMessages: {},
   hydrated: false,
 
   hydrate: (data) =>
@@ -195,6 +201,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       activityLog: keyify(data.activityLog),
       familyEvents: keyify(data.familyEvents ?? []),
       aiSuggestions: keyify(data.aiSuggestions ?? []),
+      aiPrivateMessages: keyify(data.aiPrivateMessages ?? []),
       hydrated: true,
     }),
 
@@ -209,6 +216,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       activity_log: "activityLog",
       family_events: "familyEvents",
       ai_suggestions: "aiSuggestions",
+      ai_private_messages: "aiPrivateMessages",
     };
     const stateKey = map[table] as
       | "members"
@@ -219,7 +227,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       | "attachments"
       | "activityLog"
       | "familyEvents"
-      | "aiSuggestions";
+      | "aiSuggestions"
+      | "aiPrivateMessages";
 
     set((state) => {
       const bucket = { ...(state[stateKey] as ById<{ id: string; updated_at?: string }>) };
@@ -713,6 +722,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       { table: "ai_suggestions", op: "update", payload: { status }, match: { id } },
       () => prev && set((s) => ({ aiSuggestions: { ...s.aiSuggestions, [id]: prev } })),
       "לא הצלחנו לעדכן את ההצעה"
+    );
+  },
+
+  // ---------------------------------------------------------------------
+  // Mika's personal one-on-one notes (see supabase/functions/assistant's
+  // "personal_checkin" mode + migration 0026's ai_private_messages table) —
+  // dismissing one just marks it read; there's nothing to "apply".
+  // ---------------------------------------------------------------------
+  markPrivateMessageRead: async (id) => {
+    const prev = get().aiPrivateMessages[id];
+    const now = new Date().toISOString();
+    set((s) => ({ aiPrivateMessages: { ...s.aiPrivateMessages, [id]: { ...s.aiPrivateMessages[id], read_at: now } } }));
+    await runMutation(
+      { table: "ai_private_messages", op: "update", payload: { read_at: now }, match: { id } },
+      () => prev && set((s) => ({ aiPrivateMessages: { ...s.aiPrivateMessages, [id]: prev } })),
+      "לא הצלחנו לסמן את ההודעה כנקראה"
     );
   },
 

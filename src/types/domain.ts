@@ -25,6 +25,7 @@ export type PushSubscriptionRow = Tables<"push_subscriptions">;
 export type NotificationPrefs = Tables<"notification_prefs">;
 export type BarcodeProduct = Tables<"barcode_products">;
 export type AiSuggestion = Tables<"ai_suggestions">;
+export type AiPrivateMessage = Tables<"ai_private_messages">;
 
 export type EventKind = "birthday" | "medical" | "other";
 export type EventRecurrence = "none" | "yearly";

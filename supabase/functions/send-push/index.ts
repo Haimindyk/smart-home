@@ -26,6 +26,10 @@ type ActivityLogRow = {
   summary: string | null;
   created_at: string;
   seq?: number;
+  // Only set for action === "personal" (Mika's one-on-one notes, see
+  // migration 0026) — targets exactly this one member instead of the usual
+  // "everyone but the actor" household fan-out.
+  target_member_id?: string;
 };
 
 type PushSubscriptionRow = {
@@ -44,6 +48,7 @@ type NotificationPrefsRow = {
   on_shopping: boolean;
   on_due: boolean;
   on_broadcast: boolean;
+  on_ai_personal: boolean;
   muted: boolean;
 };
 
@@ -62,6 +67,7 @@ const DEFAULT_PREFS: Omit<NotificationPrefsRow, "member_id"> = {
   on_shopping: true,
   on_due: true,
   on_broadcast: true,
+  on_ai_personal: true,
   muted: false,
 };
 
@@ -84,6 +90,23 @@ function verbFor(action: string, locale: string | null): string {
   const entry = VERBS[action];
   if (!entry) return action;
   return locale === "he" ? entry.he : entry.en;
+}
+
+// Web push bodies get visually truncated by the OS/browser notification UI
+// somewhere around 3-4 lines with no ellipsis of its own — a mid-word cutoff
+// reads as broken. This is a defensive cap applied uniformly to every
+// notification body (regardless of source: a human broadcast, the AI's daily
+// joke/weekly digest, an insight card, a due reminder), truncating at the
+// last word boundary and adding our own "…" so a long body still reads as a
+// complete-looking sentence instead of getting chopped by the platform.
+const MAX_PUSH_BODY_LENGTH = 200;
+
+function truncateForPush(text: string, maxLen = MAX_PUSH_BODY_LENGTH): string {
+  if (text.length <= maxLen) return text;
+  const slice = text.slice(0, maxLen);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cut = lastSpace > maxLen * 0.6 ? slice.slice(0, lastSpace) : slice;
+  return `${cut.trimEnd()}…`;
 }
 
 function getBearerToken(req: Request): string | null {
@@ -127,7 +150,47 @@ Deno.serve(async (req) => {
     return json({ error: "invalid body" }, 400);
   }
 
-  const { entity_type: entityType, entity_id: entityId, action, actor_id: actorId, summary } = activity;
+  const { entity_type: entityType, entity_id: entityId, action, actor_id: actorId, summary, target_member_id: targetMemberId } = activity;
+
+  // Mika's one-on-one notes (see migration 0026) — targets ONLY that one
+  // member's own subscriptions, never the household-wide "everyone but the
+  // actor" fan-out the rest of this function uses. Handled as an entirely
+  // separate path since its targeting/gating/title logic doesn't overlap
+  // with the generic case at all.
+  if (action === "personal" && targetMemberId) {
+    const [{ data: personalSubs }, { data: personalPrefsRows }] = await Promise.all([
+      supabase.from("push_subscriptions").select("id, member_id, endpoint, p256dh, auth").eq("member_id", targetMemberId),
+      supabase.from("notification_prefs").select("*").eq("member_id", targetMemberId).maybeSingle(),
+    ]);
+
+    const prefs = (personalPrefsRows as NotificationPrefsRow | null) ?? { member_id: targetMemberId, ...DEFAULT_PREFS };
+    if (prefs.muted || !prefs.on_ai_personal) {
+      return json({ sent: 0, skipped: (personalSubs ?? []).length });
+    }
+
+    let sent = 0;
+    let skipped = 0;
+    const payload = { title: "💜 מיקה", body: truncateForPush(summary ?? ""), url: "/", tag: `${entityType}-${entityId}` };
+
+    await Promise.all(
+      ((personalSubs ?? []) as PushSubscriptionRow[]).map(async (sub) => {
+        try {
+          await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, JSON.stringify(payload));
+          sent++;
+        } catch (err) {
+          const statusCode = (err as { statusCode?: number; status?: number })?.statusCode ??
+            (err as { statusCode?: number; status?: number })?.status;
+          if (statusCode === 410 || statusCode === 404) {
+            await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+          }
+          console.error(`send-push: personal notification failed for subscription ${sub.id}`, statusCode, err);
+          skipped++;
+        }
+      })
+    );
+
+    return json({ sent, skipped });
+  }
 
   // Assignee targeting only applies to tasks/chores — sections have no
   // assignees. A new/renamed section still gets a (generic, non-targeted)
@@ -253,7 +316,7 @@ Deno.serve(async (req) => {
 
       const payload = {
         title,
-        body,
+        body: truncateForPush(body),
         url: "/",
         tag: `${entityType}-${entityId}`,
         icon: actor?.avatar_photo_url ?? undefined,
