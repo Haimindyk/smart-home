@@ -301,29 +301,60 @@ async function callGemini(
 
 function buildContextBlock(
   sections: { id: string; name: string; kind: string }[],
-  tasks: { id: string; title: string; section_id: string; is_completed: boolean }[],
-  chores: { id: string; title: string; section_id: string }[]
+  tasks: { id: string; title: string; section_id: string; is_completed: boolean; is_note: boolean; notes: string | null }[],
+  chores: { id: string; title: string; section_id: string }[],
+  members: { id: string; display_name: string }[],
+  events: { title: string; emoji: string | null; event_date: string; recurrence: string }[]
 ): string {
   const sectionLines = sections.map((s) => `- ${s.id} | ${s.name} (${s.kind})`).join("\n");
   const openTaskLines = tasks
-    .filter((t) => !t.is_completed)
+    .filter((t) => !t.is_note && !t.is_completed)
     .slice(0, 80)
     .map((t) => `- ${t.id} | ${t.title} | section=${t.section_id}`)
+    .join("\n");
+  const completedTaskLines = tasks
+    .filter((t) => !t.is_note && t.is_completed)
+    .slice(0, 40)
+    .map((t) => `- ${t.id} | ${t.title} | section=${t.section_id}`)
+    .join("\n");
+  // "Notes" are free-text items (is_note=true) living in an 'info'-kind
+  // section — recipes, reference info, anything that isn't a checklist item.
+  const noteLines = tasks
+    .filter((t) => t.is_note)
+    .slice(0, 40)
+    .map((t) => `- ${t.id} | ${t.title}${t.notes ? `: ${t.notes}` : ""} | section=${t.section_id}`)
     .join("\n");
   const choreLines = chores
     .slice(0, 40)
     .map((c) => `- ${c.id} | ${c.title} | section=${c.section_id}`)
     .join("\n");
+  const memberLines = members.map((m) => `- ${m.id} | ${m.display_name}`).join("\n");
+  const eventLines = events
+    .slice(0, 60)
+    .map((e) => `- ${e.event_date}: ${e.emoji ? e.emoji + " " : ""}${e.title} (${e.recurrence})`)
+    .join("\n");
 
   return [
+    "## Household members (id | name)",
+    memberLines || "(none)",
+    "",
     "## Sections (id | name (kind))",
     sectionLines || "(none)",
     "",
     "## Open tasks/shopping items (id | title | section)",
     openTaskLines || "(none)",
     "",
+    "## Recently completed tasks/shopping items (id | title | section)",
+    completedTaskLines || "(none)",
+    "",
+    "## Notes (id | title: body | section)",
+    noteLines || "(none)",
+    "",
     "## Chores (id | title | section)",
     choreLines || "(none)",
+    "",
+    "## Calendar events (date: title (recurrence))",
+    eventLines || "(none)",
   ].join("\n");
 }
 
@@ -474,15 +505,25 @@ Deno.serve(async (req) => {
     return json({ error: "rate_limited" }, 429);
   }
 
-  const [{ data: sections }, { data: tasks }, { data: chores }, { data: familyFacts }] = await Promise.all([
-    supabase.from("sections").select("id, name, kind").is("deleted_at", null),
-    supabase.from("tasks").select("id, title, section_id, is_completed").is("deleted_at", null).eq("is_note", false),
-    supabase.from("chores").select("id, title, section_id").is("deleted_at", null),
-    supabase.from("family_facts").select("fact").order("created_at", { ascending: true }).limit(200),
-  ]);
+  // Full household context, shared by chat and insights (the two "general
+  // knowledge" intents) — Mika should know everything a human already sees
+  // in the app, not a narrowed-down subset. joke/digest/personal_checkin
+  // each pull their own narrower, purpose-specific data instead of this.
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const [{ data: sections }, { data: tasks }, { data: chores }, { data: familyFacts }, { data: members }, { data: events }, { data: activity }] =
+    await Promise.all([
+      supabase.from("sections").select("id, name, kind").is("deleted_at", null),
+      supabase.from("tasks").select("id, title, section_id, is_completed, is_note, notes").is("deleted_at", null),
+      supabase.from("chores").select("id, title, section_id").is("deleted_at", null),
+      supabase.from("family_facts").select("fact").order("created_at", { ascending: true }).limit(200),
+      supabase.from("members").select("id, display_name").order("created_at", { ascending: true }),
+      supabase.from("family_events").select("title, emoji, event_date, recurrence").is("deleted_at", null).order("event_date"),
+      supabase.from("activity_log").select("action, summary, created_at").gte("created_at", sevenDaysAgo).order("seq", { ascending: false }).limit(200),
+    ]);
 
-  const contextBlock = buildContextBlock(sections ?? [], tasks ?? [], chores ?? []);
+  const contextBlock = buildContextBlock(sections ?? [], tasks ?? [], chores ?? [], members ?? [], events ?? []);
   const familyFactsBlock = buildFamilyFactsBlock((familyFacts ?? []) as { fact: string }[]);
+  const activitySummary = buildActivitySummary(activity ?? []);
 
   if (body.intent === "joke") {
     const { data: assistantMember } = await supabase
@@ -719,14 +760,6 @@ Deno.serve(async (req) => {
   }
 
   if (body.intent === "insights") {
-    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: activity } = await supabase
-      .from("activity_log")
-      .select("action, summary, created_at")
-      .gte("created_at", since)
-      .order("seq", { ascending: false })
-      .limit(200);
-
     const systemInstruction = [
       MIKA_PERSONA,
       "Look at the recent activity log and the current open tasks/chores below, and see if there's a genuinely useful, gentle observation worth surfacing as a dashboard suggestion — e.g. a chore nobody's done in a while, or a shopping item that keeps coming back.",
@@ -742,7 +775,7 @@ Deno.serve(async (req) => {
       familyFactsBlock,
       "",
       "## Activity in the last 7 days",
-      buildActivitySummary(activity ?? []),
+      activitySummary,
     ].join("\n");
 
     const { reply, proposedActions, memoryFacts } = await callGemini(geminiKey, systemInstruction, [
@@ -765,7 +798,7 @@ Deno.serve(async (req) => {
   // Default: chat mode.
   const systemInstruction = [
     MIKA_PERSONA,
-    "You can read the household's current sections, open tasks, and chores (given below) and propose concrete actions using the tools available — you never apply anything yourself, a human always confirms.",
+    "You can read the household's full current data below — members, sections, open and completed tasks, notes, chores, calendar events, family notes, and recent activity — and propose concrete actions using the tools available. You never apply anything yourself, a human always confirms.",
     "When resolving a vague request (e.g. 'get something for dinner') or a pasted recipe or a photographed receipt, propose one propose_create_task call per concrete item, using the most fitting existing section (usually a 'shopping' kind section).",
     "When the user asks you to reorganize existing items — e.g. 'create a Trips section and move all the trip-related tasks there' — look through the open tasks/items list below for every item that matches what they described, call propose_create_section once, then call propose_move_task once per matching item using sectionId \"NEW_SECTION\" to mean the section you just created. Don't stop at just creating the section — actually move every matching item, and don't ask the user to confirm which items match, use your best judgment.",
     "Always include a short natural-language reply summarizing what you're proposing, in addition to any tool calls.",
@@ -776,6 +809,9 @@ Deno.serve(async (req) => {
     "",
     "## Family notes",
     familyFactsBlock,
+    "",
+    "## Activity in the last 7 days",
+    activitySummary,
   ].join("\n");
 
   const userParts: GeminiPart[] = [];
