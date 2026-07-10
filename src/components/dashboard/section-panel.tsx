@@ -82,7 +82,7 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
               {...dragHandleProps.attributes}
               {...dragHandleProps.listeners}
               className="cursor-grab touch-none text-muted-foreground/50 hover:text-muted-foreground"
-              aria-label="Drag"
+              aria-label={t("drag")}
             >
               <GripVertical className="size-4" />
             </button>
