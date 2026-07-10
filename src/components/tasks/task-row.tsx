@@ -6,7 +6,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, ChevronRight, GripVertical, Plus } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { useIdentity } from "@/lib/identity";
-import { useT } from "@/lib/i18n/store";
+import { useLocaleStore, useT } from "@/lib/i18n/store";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +92,8 @@ function TaskRowContent({
   const createTask = useAppStore((s) => s.createTask);
   const actingMemberId = useIdentity((s) => s.actingMemberId);
   const t = useT();
+  const locale = useLocaleStore((s) => s.locale);
+  const dateLocale = locale === "he" ? "he-IL" : "en-US";
   const [expanded, setExpanded] = useState(true);
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -104,7 +106,7 @@ function TaskRowContent({
             {...dragHandleProps.attributes}
             {...dragHandleProps.listeners}
             className="cursor-grab touch-none opacity-0 group-hover:opacity-100"
-            aria-label="Drag"
+            aria-label={t("drag")}
           >
             <GripVertical className="size-4" />
           </button>
@@ -130,7 +132,7 @@ function TaskRowContent({
             {...dragHandleProps.attributes}
             {...dragHandleProps.listeners}
             className="cursor-grab touch-none text-muted-foreground opacity-0 group-hover:opacity-100"
-            aria-label="Drag"
+            aria-label={t("drag")}
           >
             <GripVertical className="size-4" />
           </button>
@@ -142,6 +144,8 @@ function TaskRowContent({
           <button
             onClick={() => setExpanded((e) => !e)}
             className="text-muted-foreground"
+            aria-label={expanded ? t("collapse") : t("expand")}
+            aria-expanded={expanded}
           >
             {expanded ? (
               <ChevronDown className="size-4" />
@@ -157,6 +161,7 @@ function TaskRowContent({
           checked={node.is_completed}
           onCheckedChange={() => toggleTaskCompleted(node.id, actingMemberId)}
           className="size-5 rounded-full"
+          aria-label={node.title || t("toggleComplete")}
         />
 
         <button
@@ -196,13 +201,13 @@ function TaskRowContent({
               ) : null}
               {node.due_at && (
                 <Badge variant="outline" className="h-5 text-xs">
-                  {new Date(node.due_at).toLocaleDateString("he-IL", {
+                  {new Date(node.due_at).toLocaleDateString(dateLocale, {
                     day: "numeric",
                     month: "numeric",
                   })}
                   {node.due_end_at &&
                     new Date(node.due_end_at).toDateString() !== new Date(node.due_at).toDateString() &&
-                    ` – ${new Date(node.due_end_at).toLocaleDateString("he-IL", { day: "numeric", month: "numeric" })}`}
+                    ` – ${new Date(node.due_end_at).toLocaleDateString(dateLocale, { day: "numeric", month: "numeric" })}`}
                 </Badge>
               )}
             </span>
@@ -220,6 +225,7 @@ function TaskRowContent({
           size="icon"
           className="size-6 opacity-0 group-hover:opacity-100"
           onClick={() => setAddingSubtask((v) => !v)}
+          aria-label={t("addSubtask")}
         >
           <Plus className="size-3.5" />
         </Button>

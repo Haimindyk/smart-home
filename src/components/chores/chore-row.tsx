@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Check, History } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { useIdentity } from "@/lib/identity";
-import { useT } from "@/lib/i18n/store";
+import { useLocaleStore, useT } from "@/lib/i18n/store";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -20,6 +20,8 @@ export function ChoreRow({ chore }: { chore: Chore }) {
   const members = useAppStore((s) => s.members);
   const actingMemberId = useIdentity((s) => s.actingMemberId);
   const t = useT();
+  const locale = useLocaleStore((s) => s.locale);
+  const dateLocale = locale === "he" ? "he-IL" : "en-US";
   const [editing, setEditing] = useState(false);
   const now = useNow();
 
@@ -64,7 +66,7 @@ export function ChoreRow({ chore }: { chore: Chore }) {
           </Badge>
           {!isDue && (
             <span className="text-[11px] text-muted-foreground">
-              {new Date(chore.next_due_at).toLocaleDateString("he-IL")}
+              {new Date(chore.next_due_at).toLocaleDateString(dateLocale)}
             </span>
           )}
         </div>
@@ -87,7 +89,7 @@ export function ChoreRow({ chore }: { chore: Chore }) {
             {history.map((h) => (
               <li key={h.id} className="flex justify-between text-xs">
                 <span>{members[h.completed_by]?.display_name ?? "?"}</span>
-                <span className="text-muted-foreground">{new Date(h.completed_at).toLocaleDateString("he-IL")}</span>
+                <span className="text-muted-foreground">{new Date(h.completed_at).toLocaleDateString(dateLocale)}</span>
               </li>
             ))}
           </ul>
