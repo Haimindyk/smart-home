@@ -62,7 +62,9 @@ export function CategoryTabs({ sections }: { sections: Section[] }) {
     // strip under the header on notched phones, where the header grows
     // taller than on a regular screen.
     <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-30 -mx-4 mb-4 px-4">
-      <div className="glass surface-shadow w-full overflow-x-auto rounded-full px-2 py-2 ring-1 ring-border/40">
+      <div
+        className="glass surface-shadow w-full overflow-x-auto rounded-full px-2 py-2 ring-1 ring-border/40 [-webkit-mask-image:linear-gradient(to_right,transparent,black_20px,black_calc(100%-20px),transparent)] [mask-image:linear-gradient(to_right,transparent,black_20px,black_calc(100%-20px),transparent)]"
+      >
         <div className="flex w-max gap-1.5">
           {sections.map((section) => (
             <button
