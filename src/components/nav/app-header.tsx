@@ -51,8 +51,9 @@ export function AppHeader() {
   const canBroadcast = me?.email === BROADCAST_SENDER_EMAIL;
 
   return (
-    <div className="sticky top-0 z-40 pt-[env(safe-area-inset-top)] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))]">
-      <header className="glass surface-shadow mx-auto flex w-full max-w-3xl items-center gap-3 rounded-full px-4 py-2 ring-1 ring-border/40">
+    <>
+      <header className="glass surface-shadow sticky top-0 z-40 w-full rounded-b-3xl border-b border-border/40 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-2 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+      <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4">
       <Link href="/" className="flex items-center gap-2 text-lg font-bold">
         <span className="text-xl">💙</span>
         <span className="hidden text-foreground sm:inline">{t("appName")}</span>
@@ -139,6 +140,7 @@ export function AppHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      </div>
       </header>
 
       <ProfileEditDialog memberId={actingMemberId} open={profileOpen} onOpenChange={setProfileOpen} />
@@ -150,6 +152,6 @@ export function AppHeader() {
       )}
       <BarcodeScannerDialog open={scannerOpen} onOpenChange={setScannerOpen} createdBy={actingMemberId} />
       <AssistantDialog open={assistantOpen} onOpenChange={setAssistantOpen} />
-    </div>
+    </>
   );
 }
