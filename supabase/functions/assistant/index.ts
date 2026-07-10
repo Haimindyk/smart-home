@@ -17,6 +17,8 @@
 //   - "joke" mode writes a broadcast message straight to activity_log once a
 //     day — a pure FYI with nothing to "apply", riding the existing
 //     broadcast -> push pipeline.
+//   - "digest" mode does the same once a week, summarizing the week ahead
+//     (upcoming events/due tasks, chores coming due).
 //   - remember_family_fact (a tool available in every intent) lets the model
 //     grow its own free-text memory of family relationships/preferences
 //     directly, since it's the assistant's own background knowledge, not
@@ -328,6 +330,29 @@ function buildActivitySummary(rows: { action: string; summary: string | null; cr
     .join("\n");
 }
 
+/** "2026-07-10" -> Israel-local date string N days later, same shape. */
+function addDaysStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + days));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+}
+
+function toIsraelDateStr(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
+}
+
+/** Rolls a yearly-recurring event's month/day forward to its next
+ * occurrence on/after `todayStr` — a light JS mirror of the
+ * family_event_next_occurrence SQL function (see migration 0010), close
+ * enough for "is this in the next 7 days" filtering. */
+function nextYearlyOccurrence(eventDateStr: string, todayStr: string): string {
+  const [, m, d] = eventDateStr.split("-");
+  const [todayYear] = todayStr.split("-");
+  let candidate = `${todayYear}-${m}-${d}`;
+  if (candidate < todayStr) candidate = `${Number(todayYear) + 1}-${m}-${d}`;
+  return candidate;
+}
+
 function getBearerToken(req: Request): string | null {
   const header = req.headers.get("Authorization") ?? req.headers.get("authorization");
   if (!header?.startsWith("Bearer ")) return null;
@@ -364,7 +389,7 @@ Deno.serve(async (req) => {
   }
 
   let body: {
-    intent?: "chat" | "insights" | "joke";
+    intent?: "chat" | "insights" | "joke" | "digest";
     message?: string;
     imageBase64?: string;
     imageMimeType?: string;
@@ -379,12 +404,12 @@ Deno.serve(async (req) => {
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-  // The insights sweep and the daily joke both write straight into
-  // everyone's dashboard/feed (unlike chat, which only a human can act on)
-  // — gate them with a shared secret so an open endpoint can't be used to
-  // spam the household. Chat stays open to anyone with the link, same as
-  // the rest of the app.
-  if (body.intent === "insights" || body.intent === "joke") {
+  // The insights sweep, the daily joke, and the weekly digest all write
+  // straight into everyone's dashboard/feed (unlike chat, which only a
+  // human can act on) — gate them with a shared secret so an open endpoint
+  // can't be used to spam the household. Chat stays open to anyone with
+  // the link, same as the rest of the app.
+  if (body.intent === "insights" || body.intent === "joke" || body.intent === "digest") {
     const secret = getBearerToken(req);
     const { data: valid } = secret
       ? await supabase.rpc("verify_assistant_trigger_secret", { p_secret: secret })
@@ -463,6 +488,109 @@ Deno.serve(async (req) => {
     return json({ sent: true });
   }
 
+  if (body.intent === "digest") {
+    const { data: assistantMember } = await supabase
+      .from("members")
+      .select("id")
+      .eq("email", "assistant@kh.family")
+      .maybeSingle();
+    const assistantId = (assistantMember as { id: string } | null)?.id ?? null;
+
+    // A digest is once-a-week; guard against a double-fire the same way the
+    // daily joke guards against firing twice in a day, just with a wider
+    // window, and a marker prefix so a joke sent earlier the same week
+    // doesn't count as "already sent a digest".
+    if (assistantId) {
+      const sixDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+      const { data: existing } = await supabase
+        .from("activity_log")
+        .select("id, summary")
+        .eq("actor_id", assistantId)
+        .eq("entity_type", "broadcast")
+        .gte("created_at", sixDaysAgo.toISOString())
+        .ilike("summary", "🗓️%")
+        .limit(1);
+      if (existing && existing.length > 0) {
+        return json({ sent: false, reason: "already_sent_this_week" });
+      }
+    }
+
+    const todayStr = toIsraelDateStr(new Date().toISOString());
+    const weekAheadStr = addDaysStr(todayStr, 7);
+
+    const [{ data: events }, { data: dueTasks }, { data: dueChores }] = await Promise.all([
+      supabase.from("family_events").select("title, emoji, event_date, recurrence").is("deleted_at", null),
+      supabase
+        .from("tasks")
+        .select("title, due_at")
+        .is("deleted_at", null)
+        .eq("is_note", false)
+        .eq("is_completed", false)
+        .not("due_at", "is", null),
+      supabase.from("chores").select("title, next_due_at").is("deleted_at", null),
+    ]);
+
+    const upcomingEventLines = (events ?? [])
+      .map((e: { title: string; emoji: string | null; event_date: string; recurrence: string }) => ({
+        ...e,
+        next: e.recurrence === "yearly" ? nextYearlyOccurrence(e.event_date, todayStr) : e.event_date,
+      }))
+      .filter((e) => e.next >= todayStr && e.next <= weekAheadStr)
+      .sort((a, b) => a.next.localeCompare(b.next))
+      .map((e) => `- ${e.next}: ${e.emoji ? e.emoji + " " : ""}${e.title}`);
+
+    const dueTaskLines = (dueTasks ?? [])
+      .map((t: { title: string; due_at: string }) => ({ title: t.title, date: toIsraelDateStr(t.due_at) }))
+      .filter((t) => t.date <= weekAheadStr)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((t) => `- ${t.date}: ${t.title}`);
+
+    const dueChoreLines = (dueChores ?? [])
+      .map((c: { title: string; next_due_at: string }) => ({ title: c.title, date: toIsraelDateStr(c.next_due_at) }))
+      .filter((c) => c.date <= weekAheadStr)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((c) => `- ${c.date}: ${c.title}`);
+
+    if (upcomingEventLines.length === 0 && dueTaskLines.length === 0 && dueChoreLines.length === 0) {
+      return json({ sent: false, reason: "nothing_this_week" });
+    }
+
+    const systemInstruction = [
+      "You are 'העוזר', the household AI embedded in the K&H family organizer app.",
+      "Write a short, warm, genuinely funny weekly recap for the household — a few sentences covering what's coming up this week from the lists below (events, due tasks/appointments, chores coming due). Keep the same playful personality as the household's daily joke, not a dry status report.",
+      "Only mention things actually in the lists below — never invent dates or items. If a list is empty, just don't mention that category.",
+      "Do not call any tools. Reply with just the recap text — no preamble, no markdown, no bullet points; write it as natural prose a person would text to their family group chat.",
+      LANGUAGE_INSTRUCTION,
+      "",
+      "## Events this week",
+      upcomingEventLines.join("\n") || "(none)",
+      "",
+      "## Tasks/appointments due this week",
+      dueTaskLines.join("\n") || "(none)",
+      "",
+      "## Chores coming due this week",
+      dueChoreLines.join("\n") || "(none)",
+    ].join("\n");
+
+    const { reply, memoryFacts } = await callGemini(geminiKey, systemInstruction, [
+      { text: "תכתוב לי סיכום שבועי חם ומצחיק למשפחה, על סמך הרשימות." },
+    ]);
+    await saveFamilyFacts(supabase, memoryFacts, (familyFacts ?? []) as { fact: string }[]);
+
+    const digestText = reply.trim();
+    if (!digestText) return json({ sent: false, reason: "empty" });
+
+    await supabase.from("activity_log").insert({
+      entity_type: "broadcast",
+      entity_id: crypto.randomUUID(),
+      action: "message",
+      actor_id: assistantId,
+      summary: `🗓️ ${digestText}`,
+    });
+
+    return json({ sent: true });
+  }
+
   if (body.intent === "insights") {
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const { data: activity } = await supabase
@@ -475,7 +603,7 @@ Deno.serve(async (req) => {
     const systemInstruction = [
       "You are the K&H family household assistant. Look at the recent activity log and the current open tasks/chores below, and see if there's a genuinely useful, gentle observation worth surfacing as a dashboard suggestion — e.g. a chore nobody's done in a while, or a shopping item that keeps coming back.",
       "Propose AT MOST ONE suggestion. If nothing is clearly worth surfacing, propose nothing and just reply with an empty string.",
-      "Never nag about something already handled. Keep the tone warm, not naggy.",
+      "Phrase the suggestion with the same warm, genuinely funny personality as the household's daily joke — a light pun or a playful nudge — instead of a dry notification. Never nag about something already handled; the humor should serve the message, not replace it, and it must still be tied to a real, specific observation.",
       "If you notice a new, durable fact about the family that isn't already listed in the family notes below, call remember_family_fact to save it.",
       LANGUAGE_INSTRUCTION,
       "",
