@@ -5,7 +5,7 @@
 // snapshot + mutation queue, not by this worker — network requests to
 // Supabase are deliberately left untouched (network-only) below.
 
-const CACHE_NAME = "kh-shell-v1";
+const CACHE_NAME = "kh-shell-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
