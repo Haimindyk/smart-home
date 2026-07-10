@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bot, ImagePlus, Loader2, Send, Undo2, X } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
 import { useIdentity } from "@/lib/identity";
@@ -70,12 +70,32 @@ function fileToBase64(file: File): Promise<string> {
 export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useT();
   const actingMemberId = useIdentity((s) => s.actingMemberId);
+  const aiPrivateMessages = useAppStore((s) => s.aiPrivateMessages);
+  const markPrivateMessageRead = useAppStore((s) => s.markPrivateMessageRead);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const seededPrivateMessageIds = useRef<Set<string>>(new Set());
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
   const [sending, setSending] = useState(false);
+
+  // A private check-in from Mika (see personal-note-card.tsx) previously had
+  // nowhere to actually reply — this drops any not-yet-shown one straight
+  // into the conversation as soon as it's opened, so answering it is just
+  // typing a reply like any other message.
+  useEffect(() => {
+    if (!open || !actingMemberId) return;
+    const unseen = Object.values(aiPrivateMessages)
+      .filter((m) => m.member_id === actingMemberId && !m.read_at && !seededPrivateMessageIds.current.has(m.id))
+      .sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
+    if (unseen.length === 0) return;
+    for (const m of unseen) {
+      seededPrivateMessageIds.current.add(m.id);
+      void markPrivateMessageRead(m.id);
+    }
+    setMessages((prev) => [...prev, ...unseen.map((m) => ({ id: m.id, role: "assistant" as const, text: m.summary }))]);
+  }, [open, actingMemberId, aiPrivateMessages, markPrivateMessageRead]);
 
   async function submit() {
     const text = input.trim();

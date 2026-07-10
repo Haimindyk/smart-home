@@ -478,6 +478,7 @@ export type Database = {
           created_at: string
           display_name: string
           email: string
+          gender: string | null
           id: string
           is_ai_companion_target: boolean
           last_chat_at: string | null
@@ -493,6 +494,7 @@ export type Database = {
           created_at?: string
           display_name: string
           email: string
+          gender?: string | null
           id?: string
           is_ai_companion_target?: boolean
           last_chat_at?: string | null
@@ -508,6 +510,7 @@ export type Database = {
           created_at?: string
           display_name?: string
           email?: string
+          gender?: string | null
           id?: string
           is_ai_companion_target?: boolean
           last_chat_at?: string | null

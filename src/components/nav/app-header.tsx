@@ -7,6 +7,7 @@ import { useTheme } from "next-themes";
 import { useIdentity } from "@/lib/identity";
 import { useAppStore } from "@/lib/store/app-store";
 import { useSearchOpen } from "@/lib/search-ui-state";
+import { useAssistantOpen } from "@/lib/assistant-ui-state";
 import { useLocaleStore, useT } from "@/lib/i18n/store";
 import { useInstallPrompt } from "@/lib/pwa/use-install-prompt";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,8 @@ export function AppHeader() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [assistantOpen, setAssistantOpen] = useState(false);
+  const assistantOpen = useAssistantOpen((s) => s.open);
+  const setAssistantOpen = useAssistantOpen((s) => s.setOpen);
 
   const me = actingMemberId ? members[actingMemberId] : undefined;
   const canBroadcast = me?.email === BROADCAST_SENDER_EMAIL;

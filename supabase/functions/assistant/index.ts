@@ -428,6 +428,17 @@ function isShabbatGreetingTime(now: Date): boolean {
   return weekday === "Fri" && israelHour(now) === 18;
 }
 
+/** Hebrew conjugates second-person verbs/pronouns by the *listener's*
+ * gender (את/אתה, חושבת/חושב) — Mika's own feminine self-reference
+ * (MIKA_PERSONA) says nothing about who she's addressing, so without this
+ * she'll default to feminine for everyone. Returns null when the
+ * addressee's gender isn't known (better to omit than assert wrongly). */
+function addresseeGenderLine(displayName: string, gender: string | null | undefined): string | null {
+  if (gender !== "male" && gender !== "female") return null;
+  const forms = gender === "male" ? "masculine (e.g. 'אתה', 'חושב', 'מרגיש')" : "feminine (e.g. 'את', 'חושבת', 'מרגישה')";
+  return `You're speaking directly with ${displayName}. When addressing them in second person, use ${forms} Hebrew grammar for THEM — completely independent of your own (Mika's) feminine self-reference.`;
+}
+
 /** Whole days between `iso` and now, or null if `iso` is null (never happened yet). */
 function daysSince(iso: string | null): number | null {
   if (!iso) return null;
@@ -533,7 +544,7 @@ Deno.serve(async (req) => {
       supabase.from("tasks").select("id, title, section_id, is_completed, is_note, notes").is("deleted_at", null),
       supabase.from("chores").select("id, title, section_id").is("deleted_at", null),
       supabase.from("family_facts").select("fact").order("created_at", { ascending: true }).limit(200),
-      supabase.from("members").select("id, display_name").order("created_at", { ascending: true }),
+      supabase.from("members").select("id, display_name, gender").order("created_at", { ascending: true }),
       supabase.from("family_events").select("title, emoji, event_date, recurrence").is("deleted_at", null).order("event_date"),
       supabase.from("activity_log").select("action, summary, created_at").gte("created_at", sevenDaysAgo).order("seq", { ascending: false }).limit(200),
     ]);
@@ -763,11 +774,16 @@ Deno.serve(async (req) => {
   if (body.intent === "personal_checkin") {
     const { data: members } = await supabase
       .from("members")
-      .select("id, display_name, last_chat_at")
+      .select("id, display_name, last_chat_at, gender")
       .eq("is_ai_companion_target", true);
 
     let sent = 0;
-    for (const member of (members ?? []) as { id: string; display_name: string; last_chat_at: string | null }[]) {
+    for (const member of (members ?? []) as {
+      id: string;
+      display_name: string;
+      last_chat_at: string | null;
+      gender: string | null;
+    }[]) {
       // At most one personal note every couple of days per member — the
       // cron fires daily, but this keeps the actual cadence to "every few
       // days, if there's something worth saying" per the household's ask.
@@ -802,8 +818,10 @@ Deno.serve(async (req) => {
             ? `${member.display_name} last chatted with you directly ${daysSinceChat} day(s) ago.`
             : `${member.display_name} chatted with you directly earlier today.`;
 
+      const genderLine = addresseeGenderLine(member.display_name, member.gender);
       const systemInstruction = [
         MIKA_PERSONA,
+        ...(genderLine ? [genderLine] : []),
         `You're checking in personally, one-on-one, with ${member.display_name} — this is private, only they will ever see or hear it, never the rest of the household.`,
         lastChatLine,
         "If it's genuinely been a while since they talked to you directly, you can gently note that — warm, never guilt-tripping. If one of your past notes to them (below) set up an inside joke or an open thread, feel free to build on it naturally.",
@@ -874,8 +892,11 @@ Deno.serve(async (req) => {
   }
 
   // Default: chat mode.
+  const addressee = body.memberId ? (members ?? []).find((m: { id: string }) => m.id === body.memberId) : null;
+  const addresseeLine = addressee ? addresseeGenderLine(addressee.display_name, addressee.gender) : null;
   const systemInstruction = [
     MIKA_PERSONA,
+    ...(addresseeLine ? [addresseeLine] : []),
     "You can read the household's full current data below — members, sections, open and completed tasks, notes, chores, calendar events, family notes, and recent activity — and propose concrete actions using the tools available. You never apply anything yourself, a human always confirms.",
     "When resolving a vague request (e.g. 'get something for dinner') or a pasted recipe or a photographed receipt, propose one propose_create_task call per concrete item, using the most fitting existing section (usually a 'shopping' kind section).",
     "When the user asks you to reorganize existing items — e.g. 'create a Trips section and move all the trip-related tasks there' — look through the open tasks/items list below for every item that matches what they described, call propose_create_section once, then call propose_move_task once per matching item using sectionId \"NEW_SECTION\" to mean the section you just created. Don't stop at just creating the section — actually move every matching item, and don't ask the user to confirm which items match, use your best judgment.",
