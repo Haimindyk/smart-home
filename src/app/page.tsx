@@ -7,6 +7,7 @@ import { CategoryTabs } from "@/components/dashboard/category-tabs";
 import { SectionPanels } from "@/components/dashboard/section-panels";
 import { NewSectionDialog } from "@/components/dashboard/new-section-dialog";
 import { InsightCards } from "@/components/assistant/insight-card";
+import { PersonalNoteCards } from "@/components/assistant/personal-note-card";
 import { useAppStore } from "@/lib/store/app-store";
 import { useIdentity } from "@/lib/identity";
 import { useLocaleStore, useT } from "@/lib/i18n/store";
@@ -75,6 +76,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        <PersonalNoteCards />
         <InsightCards />
 
         {!hydrated ? (

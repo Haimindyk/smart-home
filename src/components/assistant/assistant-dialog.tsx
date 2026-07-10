@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Bot, ImagePlus, Loader2, Send, Undo2, X } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
+import { useIdentity } from "@/lib/identity";
 import { useT } from "@/lib/i18n/store";
 import { askAssistant } from "@/lib/assistant/client";
 import { applyProposedAction } from "@/lib/assistant/apply-actions";
@@ -68,6 +69,7 @@ function fileToBase64(file: File): Promise<string> {
 
 export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useT();
+  const actingMemberId = useIdentity((s) => s.actingMemberId);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -96,6 +98,7 @@ export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenC
       message: text || undefined,
       imageBase64,
       imageMimeType: image?.file.type,
+      memberId: actingMemberId,
     });
     setSending(false);
 

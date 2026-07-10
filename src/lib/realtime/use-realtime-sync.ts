@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAppStore } from "@/lib/store/app-store";
 import { loadSnapshot, saveSnapshot } from "@/lib/offline/db";
 import { flushMutationQueue } from "@/lib/offline/queue";
-import type { Member, Section, Task, Chore, ChoreCompletion, Attachment, ActivityLog, FamilyEvent, AiSuggestion } from "@/types/domain";
+import type { Member, Section, Task, Chore, ChoreCompletion, Attachment, ActivityLog, FamilyEvent, AiSuggestion, AiPrivateMessage } from "@/types/domain";
 
 /** Delay before rejoining the realtime channel after an error/timeout/close, to avoid retry storms. */
 const REJOIN_DELAY_MS = 2000;
@@ -21,6 +21,7 @@ type Snapshot = {
   activityLog: ActivityLog[];
   familyEvents: FamilyEvent[];
   aiSuggestions: AiSuggestion[];
+  aiPrivateMessages: AiPrivateMessage[];
 };
 
 const TABLES = [
@@ -33,11 +34,12 @@ const TABLES = [
   "activity_log",
   "family_events",
   "ai_suggestions",
+  "ai_private_messages",
 ] as const;
 
 async function fetchAll(): Promise<Snapshot> {
   const supabase = createClient();
-  const [members, sections, tasks, chores, choreCompletions, attachments, activityLog, familyEvents, aiSuggestions] =
+  const [members, sections, tasks, chores, choreCompletions, attachments, activityLog, familyEvents, aiSuggestions, aiPrivateMessages] =
     await Promise.all([
       supabase.from("members").select("*"),
       supabase.from("sections").select("*").order("position"),
@@ -48,6 +50,12 @@ async function fetchAll(): Promise<Snapshot> {
       supabase.from("activity_log").select("*").order("seq", { ascending: false }).limit(200),
       supabase.from("family_events").select("*").order("event_date"),
       supabase.from("ai_suggestions").select("*").eq("status", "open").order("created_at", { ascending: false }),
+      // Fetches every member's private messages, not just the current
+      // device's acting member — the same soft, UX-level privacy as the rest
+      // of this app (see migration 0026): the UI only ever *displays* a
+      // member their own rows (personal-note-card.tsx), it isn't enforced
+      // here or by RLS.
+      supabase.from("ai_private_messages").select("*").order("created_at", { ascending: false }),
     ]);
   return {
     members: (members.data ?? []) as Member[],
@@ -59,6 +67,7 @@ async function fetchAll(): Promise<Snapshot> {
     activityLog: (activityLog.data ?? []) as ActivityLog[],
     familyEvents: (familyEvents.data ?? []) as FamilyEvent[],
     aiSuggestions: (aiSuggestions.data ?? []) as AiSuggestion[],
+    aiPrivateMessages: (aiPrivateMessages.data ?? []) as AiPrivateMessage[],
   };
 }
 
@@ -175,6 +184,7 @@ export function useRealtimeSync() {
           .slice(0, 200),
         familyEvents: Object.values(state.familyEvents),
         aiSuggestions: Object.values(state.aiSuggestions),
+        aiPrivateMessages: Object.values(state.aiPrivateMessages),
       });
     });
 

@@ -26,6 +26,10 @@ type ActivityLogRow = {
   summary: string | null;
   created_at: string;
   seq?: number;
+  // Only set for action === "personal" (Mika's one-on-one notes, see
+  // migration 0026) — targets exactly this one member instead of the usual
+  // "everyone but the actor" household fan-out.
+  target_member_id?: string;
 };
 
 type PushSubscriptionRow = {
@@ -44,6 +48,7 @@ type NotificationPrefsRow = {
   on_shopping: boolean;
   on_due: boolean;
   on_broadcast: boolean;
+  on_ai_personal: boolean;
   muted: boolean;
 };
 
@@ -62,6 +67,7 @@ const DEFAULT_PREFS: Omit<NotificationPrefsRow, "member_id"> = {
   on_shopping: true,
   on_due: true,
   on_broadcast: true,
+  on_ai_personal: true,
   muted: false,
 };
 
@@ -144,7 +150,47 @@ Deno.serve(async (req) => {
     return json({ error: "invalid body" }, 400);
   }
 
-  const { entity_type: entityType, entity_id: entityId, action, actor_id: actorId, summary } = activity;
+  const { entity_type: entityType, entity_id: entityId, action, actor_id: actorId, summary, target_member_id: targetMemberId } = activity;
+
+  // Mika's one-on-one notes (see migration 0026) — targets ONLY that one
+  // member's own subscriptions, never the household-wide "everyone but the
+  // actor" fan-out the rest of this function uses. Handled as an entirely
+  // separate path since its targeting/gating/title logic doesn't overlap
+  // with the generic case at all.
+  if (action === "personal" && targetMemberId) {
+    const [{ data: personalSubs }, { data: personalPrefsRows }] = await Promise.all([
+      supabase.from("push_subscriptions").select("id, member_id, endpoint, p256dh, auth").eq("member_id", targetMemberId),
+      supabase.from("notification_prefs").select("*").eq("member_id", targetMemberId).maybeSingle(),
+    ]);
+
+    const prefs = (personalPrefsRows as NotificationPrefsRow | null) ?? { member_id: targetMemberId, ...DEFAULT_PREFS };
+    if (prefs.muted || !prefs.on_ai_personal) {
+      return json({ sent: 0, skipped: (personalSubs ?? []).length });
+    }
+
+    let sent = 0;
+    let skipped = 0;
+    const payload = { title: "💜 מיקה", body: truncateForPush(summary ?? ""), url: "/", tag: `${entityType}-${entityId}` };
+
+    await Promise.all(
+      ((personalSubs ?? []) as PushSubscriptionRow[]).map(async (sub) => {
+        try {
+          await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, JSON.stringify(payload));
+          sent++;
+        } catch (err) {
+          const statusCode = (err as { statusCode?: number; status?: number })?.statusCode ??
+            (err as { statusCode?: number; status?: number })?.status;
+          if (statusCode === 410 || statusCode === 404) {
+            await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+          }
+          console.error(`send-push: personal notification failed for subscription ${sub.id}`, statusCode, err);
+          skipped++;
+        }
+      })
+    );
+
+    return json({ sent, skipped });
+  }
 
   // Assignee targeting only applies to tasks/chores — sections have no
   // assignees. A new/renamed section still gets a (generic, non-targeted)

@@ -1,4 +1,4 @@
-// The K&H AI assistant ("העוזר"). Reads the household's live data
+// Mika ("מיקה") — the K&H family's AI assistant. Reads the household's live data
 // server-side with the anon key (the same reach any browser already has —
 // see the "no real auth" note in 0002_open_access.sql) and calls a
 // free-tier LLM (Google Gemini) to turn a chat message — optionally with a
@@ -7,7 +7,7 @@
 // src/lib/assistant/apply-actions.ts, the one place on the client that
 // actually applies a confirmed action, through the same useAppStore
 // mutations a human action would use, so attribution, the offline queue,
-// and realtime sync all behave identically. Three exceptions, all
+// and realtime sync all behave identically. A few exceptions, all
 // low-stakes/reversible rather than household-data mutations a human needs
 // to confirm:
 //   - "insights" mode inserts rows straight into ai_suggestions — those are
@@ -19,6 +19,12 @@
 //     broadcast -> push pipeline.
 //   - "digest" mode does the same once a week, summarizing the week ahead
 //     (upcoming events/due tasks, chores coming due).
+//   - "personal_checkin" mode writes a one-on-one note straight to
+//     ai_private_messages for one specific member at a time — Mika's own
+//     individual relationship with each person (noticing when someone's
+//     been quiet, an inside joke), never shown to the rest of the
+//     household (see migration 0026). Excludes Louis (a placeholder member
+//     row for the family dog) and Mika's own row.
 //   - remember_family_fact (a tool available in every intent) lets the model
 //     grow its own free-text memory of family relationships/preferences
 //     directly, since it's the assistant's own background knowledge, not
@@ -57,6 +63,12 @@ const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-flash-lite-latest"];
 
 const LANGUAGE_INSTRUCTION =
   "Always respond in Hebrew, naturally and briefly. Never respond in English or any other language, regardless of what language the user writes in.";
+
+// The household asked for the assistant to feel like a genuine member of
+// the family, not a generic tool — a name, a gender, and a real personality.
+// Reused as the opening line of every intent's system prompt.
+const MIKA_PERSONA =
+  "Your name is מיקה (Mika). You're not a generic assistant — you're a true member of the K&H family, with a warm personality of your own, who genuinely cares about each person, not just about getting tasks done. You are female — always refer to yourself using feminine Hebrew grammar (e.g. 'אני חושבת', 'אני שמחה', never masculine forms like 'אני חושב').";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -374,6 +386,12 @@ function isWithinNotificationWindow(now: Date): boolean {
   return israelHour(now) >= 9;
 }
 
+/** Whole days between `iso` and now, or null if `iso` is null (never happened yet). */
+function daysSince(iso: string | null): number | null {
+  if (!iso) return null;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60 * 1000));
+}
+
 function getBearerToken(req: Request): string | null {
   const header = req.headers.get("Authorization") ?? req.headers.get("authorization");
   if (!header?.startsWith("Bearer ")) return null;
@@ -410,10 +428,11 @@ Deno.serve(async (req) => {
   }
 
   let body: {
-    intent?: "chat" | "insights" | "joke" | "digest";
+    intent?: "chat" | "insights" | "joke" | "digest" | "personal_checkin";
     message?: string;
     imageBase64?: string;
     imageMimeType?: string;
+    memberId?: string;
   };
   try {
     body = await req.json();
@@ -430,18 +449,17 @@ Deno.serve(async (req) => {
   // human can act on) — gate them with a shared secret so an open endpoint
   // can't be used to spam the household. Chat stays open to anyone with
   // the link, same as the rest of the app.
-  if (body.intent === "insights" || body.intent === "joke" || body.intent === "digest") {
+  if (body.intent === "insights" || body.intent === "joke" || body.intent === "digest" || body.intent === "personal_checkin") {
     const secret = getBearerToken(req);
     const { data: valid } = secret
       ? await supabase.rpc("verify_assistant_trigger_secret", { p_secret: secret })
       : { data: false };
     if (!valid) return json({ error: "unauthorized" }, 401);
 
-    // These three are the assistant's own unsolicited notifications (unlike
-    // chat, which only ever responds to a human) — keep them to daytime/
-    // evening hours regardless of which cron slot happened to trigger this
-    // call. Bail before spending a Gemini call or counting against the
-    // daily cap.
+    // These are all Mika's own unsolicited notifications (unlike chat, which
+    // only ever responds to a human) — keep them to daytime/evening hours
+    // regardless of which cron slot happened to trigger this call. Bail
+    // before spending a Gemini call or counting against the daily cap.
     if (!isWithinNotificationWindow(new Date())) {
       return json({ sent: false, reason: "outside_notification_window" });
     }
@@ -490,7 +508,7 @@ Deno.serve(async (req) => {
     }
 
     const systemInstruction = [
-      "You are 'העוזר', the household AI embedded in the K&H family organizer app.",
+      MIKA_PERSONA,
       "Write exactly one short, warm, funny family-friendly joke for the household. You may (but don't have to) reference the family notes below — e.g. Louis the dog.",
       "Keep the whole joke under about 140 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence.",
       "Do not call any tools. Reply with just the joke text — no preamble, no quotation marks.",
@@ -587,7 +605,7 @@ Deno.serve(async (req) => {
     }
 
     const systemInstruction = [
-      "You are 'העוזר', the household AI embedded in the K&H family organizer app.",
+      MIKA_PERSONA,
       "Write a short, warm, genuinely funny weekly recap for the household — a few sentences covering what's coming up this week from the lists below (events, due tasks/appointments, chores coming due). Keep the same playful personality as the household's daily joke, not a dry status report.",
       "Keep the whole recap under about 200 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence. If there's too much to fit, pick only the 1-2 most important things and skip the rest rather than listing everything.",
       "Only mention things actually in the lists below — never invent dates or items. If a list is empty, just don't mention that category.",
@@ -623,6 +641,83 @@ Deno.serve(async (req) => {
     return json({ sent: true });
   }
 
+  if (body.intent === "personal_checkin") {
+    const { data: members } = await supabase
+      .from("members")
+      .select("id, display_name, last_chat_at")
+      .eq("is_ai_companion_target", true);
+
+    let sent = 0;
+    for (const member of (members ?? []) as { id: string; display_name: string; last_chat_at: string | null }[]) {
+      // At most one personal note every couple of days per member — the
+      // cron fires daily, but this keeps the actual cadence to "every few
+      // days, if there's something worth saying" per the household's ask.
+      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+      const { data: recentToThem } = await supabase
+        .from("ai_private_messages")
+        .select("id")
+        .eq("member_id", member.id)
+        .gte("created_at", twoDaysAgo.toISOString())
+        .limit(1);
+      if (recentToThem && recentToThem.length > 0) continue;
+
+      const { data: pastMessages } = await supabase
+        .from("ai_private_messages")
+        .select("summary, created_at")
+        .eq("member_id", member.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      const { data: theirActivity } = await supabase
+        .from("activity_log")
+        .select("action, summary, created_at")
+        .eq("actor_id", member.id)
+        .order("seq", { ascending: false })
+        .limit(20);
+
+      const daysSinceChat = daysSince(member.last_chat_at);
+      const lastChatLine =
+        daysSinceChat === null
+          ? `${member.display_name} has never chatted with you directly yet.`
+          : daysSinceChat >= 1
+            ? `${member.display_name} last chatted with you directly ${daysSinceChat} day(s) ago.`
+            : `${member.display_name} chatted with you directly earlier today.`;
+
+      const systemInstruction = [
+        MIKA_PERSONA,
+        `You're checking in personally, one-on-one, with ${member.display_name} — this is private, only they will ever see or hear it, never the rest of the household.`,
+        lastChatLine,
+        "If it's genuinely been a while since they talked to you directly, you can gently note that — warm, never guilt-tripping. If one of your past notes to them (below) set up an inside joke or an open thread, feel free to build on it naturally.",
+        "If you don't genuinely have anything warm or meaningful to say to this specific person right now, reply with just an empty string — never force a check-in just to have said something.",
+        "Keep it under about 140 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence.",
+        "Do not call any tools. Reply with just the message text — no preamble, no quotation marks.",
+        LANGUAGE_INSTRUCTION,
+        "",
+        "## Your past private notes to them (most recent first)",
+        buildActivitySummary((pastMessages ?? []).map((m) => ({ action: "note", summary: m.summary, created_at: m.created_at }))),
+        "",
+        "## Their recent activity in the app",
+        buildActivitySummary(theirActivity ?? []),
+        "",
+        "## Family notes",
+        familyFactsBlock,
+      ].join("\n");
+
+      const { reply, memoryFacts } = await callGemini(geminiKey, systemInstruction, [
+        { text: `תכתבי הודעה אישית וחמה ל${member.display_name}, רק אם באמת יש לך משהו לומר.` },
+      ]);
+      await saveFamilyFacts(supabase, memoryFacts, (familyFacts ?? []) as { fact: string }[]);
+
+      const noteText = reply.trim();
+      if (!noteText) continue;
+
+      await supabase.from("ai_private_messages").insert({ member_id: member.id, summary: noteText });
+      sent++;
+    }
+
+    return json({ sent });
+  }
+
   if (body.intent === "insights") {
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const { data: activity } = await supabase
@@ -633,7 +728,8 @@ Deno.serve(async (req) => {
       .limit(200);
 
     const systemInstruction = [
-      "You are the K&H family household assistant. Look at the recent activity log and the current open tasks/chores below, and see if there's a genuinely useful, gentle observation worth surfacing as a dashboard suggestion — e.g. a chore nobody's done in a while, or a shopping item that keeps coming back.",
+      MIKA_PERSONA,
+      "Look at the recent activity log and the current open tasks/chores below, and see if there's a genuinely useful, gentle observation worth surfacing as a dashboard suggestion — e.g. a chore nobody's done in a while, or a shopping item that keeps coming back.",
       "Propose AT MOST ONE suggestion. If nothing is clearly worth surfacing, propose nothing and just reply with an empty string.",
       "Phrase the suggestion with the same warm, genuinely funny personality as the household's daily joke — a light pun or a playful nudge — instead of a dry notification. Never nag about something already handled; the humor should serve the message, not replace it, and it must still be tied to a real, specific observation.",
       "Keep it under about 140 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence.",
@@ -668,7 +764,7 @@ Deno.serve(async (req) => {
 
   // Default: chat mode.
   const systemInstruction = [
-    "You are 'העוזר' (the assistant), a helpful household AI embedded in the K&H family organizer app.",
+    MIKA_PERSONA,
     "You can read the household's current sections, open tasks, and chores (given below) and propose concrete actions using the tools available — you never apply anything yourself, a human always confirms.",
     "When resolving a vague request (e.g. 'get something for dinner') or a pasted recipe or a photographed receipt, propose one propose_create_task call per concrete item, using the most fitting existing section (usually a 'shopping' kind section).",
     "When the user asks you to reorganize existing items — e.g. 'create a Trips section and move all the trip-related tasks there' — look through the open tasks/items list below for every item that matches what they described, call propose_create_section once, then call propose_move_task once per matching item using sectionId \"NEW_SECTION\" to mean the section you just created. Don't stop at just creating the section — actually move every matching item, and don't ask the user to confirm which items match, use your best judgment.",
@@ -694,6 +790,11 @@ Deno.serve(async (req) => {
   try {
     const { reply, proposedActions, memoryFacts } = await callGemini(geminiKey, systemInstruction, userParts);
     await saveFamilyFacts(supabase, memoryFacts, (familyFacts ?? []) as { fact: string }[]);
+    // Lets a later personal_checkin honestly notice "it's been a while"
+    // instead of that being a canned line — see migration 0026.
+    if (body.memberId) {
+      await supabase.from("members").update({ last_chat_at: new Date().toISOString() }).eq("id", body.memberId);
+    }
     return json({ reply, proposedActions });
   } catch (err) {
     console.error("assistant: Gemini call failed", err);
