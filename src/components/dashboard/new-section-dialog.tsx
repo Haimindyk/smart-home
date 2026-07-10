@@ -56,16 +56,16 @@ export function NewSectionDialog() {
         <div className="flex flex-col gap-4 py-2">
           <div className="flex gap-2">
             <div className="grid gap-2">
-              <Label>Emoji</Label>
+              <Label>{t("emoji")}</Label>
               <Input value={emoji} onChange={(e) => setEmoji(e.target.value.slice(0, 4))} className="w-16 text-center" placeholder="✨" />
             </div>
             <div className="grid flex-1 gap-2">
-              <Label>שם</Label>
+              <Label>{t("name")}</Label>
               <Input dir="auto" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} autoFocus />
             </div>
           </div>
           <div className="grid gap-2">
-            <Label>סוג</Label>
+            <Label>{t("sectionType")}</Label>
             <Select value={kind} onValueChange={(v) => v && setKind(v as SectionKind)}>
               <SelectTrigger>
                 <SelectValue>

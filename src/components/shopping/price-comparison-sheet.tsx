@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, TriangleAlert } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useT } from "@/lib/i18n/store";
@@ -29,31 +30,41 @@ export function PriceComparisonSheet({
 }) {
   const t = useT();
   const [comparison, setComparison] = useState<BasketComparison | null>(null);
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   // Reset to "nothing computed yet" each time the sheet opens — adjusting
   // state during render per
   // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
   const [syncedOpen, setSyncedOpen] = useState(open);
   if (open !== syncedOpen) {
     setSyncedOpen(open);
-    if (open) setComparison(null);
+    if (open) {
+      setComparison(null);
+      setError(false);
+    }
   }
-  const loading = items.length > 0 && comparison === null;
+  const loading = items.length > 0 && comparison === null && !error;
 
   useEffect(() => {
     if (!open || items.length === 0) return;
     let cancelled = false;
-    void compareBasketPrices(items, excludeChains).then((result) => {
-      if (!cancelled) setComparison(result);
-    });
+    compareBasketPrices(items, excludeChains)
+      .then((result) => {
+        if (!cancelled) setComparison(result);
+      })
+      .catch(() => {
+        if (!cancelled) setError(true);
+      });
     return () => {
       cancelled = true;
     };
     // `items`/`excludeChains` are array literals built fresh every render by
     // the caller — comparing contents (not identity) is handled inside
     // compareBasketPrices' own cache key, so re-running on every render here
-    // is unnecessary; only `open` should retrigger a fetch.
+    // is unnecessary; only `open`/`attempt` (the manual retry) should
+    // retrigger a fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, attempt]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -69,6 +80,21 @@ export function PriceComparisonSheet({
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {items.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">{t("basketEmptyForComparison")}</p>
+          ) : error ? (
+            <div className="flex flex-col items-center gap-3 py-10 text-sm text-muted-foreground">
+              <TriangleAlert className="size-5" />
+              {t("priceComparisonError")}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setError(false);
+                  setAttempt((a) => a + 1);
+                }}
+              >
+                {t("tryAgain")}
+              </Button>
+            </div>
           ) : loading || !comparison ? (
             <div className="flex flex-col items-center gap-3 py-10 text-sm text-muted-foreground">
               <Loader2 className="size-5 animate-spin" />
@@ -78,6 +104,15 @@ export function PriceComparisonSheet({
             <p className="py-10 text-center text-sm text-muted-foreground">{t("noChainsAvailable")}</p>
           ) : (
             <div className="flex flex-col gap-3">
+              {comparison.cheapest && comparison.savingsAmount != null && comparison.savingsAmount > 0 && (
+                <div className="surface-shadow rounded-2xl bg-primary/5 px-4 py-3 text-sm ring-1 ring-primary/30">
+                  <p className="font-semibold" dir="auto">
+                    {comparison.cheapest.chainName} — {t("youSave")} ₪{comparison.savingsAmount.toFixed(2)}
+                    {comparison.savingsPercent != null && ` (${comparison.savingsPercent}%)`}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{t("vsMostExpensive")}</p>
+                </div>
+              )}
               {comparison.ranked.map((chain) => (
                 <ChainCard
                   key={chain.chain}
@@ -140,7 +175,7 @@ function ChainCard({
               {chain.chainName}
             </span>
             {isCheapest && (
-              <Badge className="h-5 gap-1 border-0 bg-emerald-600 text-white">🟢 {t("cheapestBasket")}</Badge>
+              <Badge className="h-5 gap-1 border-0 bg-emerald-600 text-white">{t("cheapestBasket")}</Badge>
             )}
           </div>
           <p className="text-xs text-muted-foreground">
@@ -153,7 +188,7 @@ function ChainCard({
           <p className="text-lg font-bold tabular-nums">₪{chain.total!.toFixed(2)}</p>
           {!isCheapest && savings != null && savings > 0 && (
             <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-              💰 ₪{savings.toFixed(2)} ({savingsPercent}%)
+              ₪{savings.toFixed(2)} ({savingsPercent}%)
             </p>
           )}
         </div>

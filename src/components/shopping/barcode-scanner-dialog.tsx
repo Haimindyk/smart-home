@@ -112,6 +112,7 @@ export function BarcodeScannerDialog({
   // scanning once the person confirms or skips a name.
   const busyRef = useRef(false);
   const lastCodeRef = useRef<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
   // Reset to "scanning" each time the dialog opens — adjusting state during
   // render per https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
   const [syncedOpen, setSyncedOpen] = useState(open);
@@ -122,6 +123,11 @@ export function BarcodeScannerDialog({
       setPendingCode(null);
       setManualName("");
     }
+  }
+
+  function retryCamera() {
+    setStatus("scanning");
+    setRetryToken((n) => n + 1);
   }
 
   function resumeScanning() {
@@ -223,7 +229,7 @@ export function BarcodeScannerDialog({
     // camera stream on every unrelated re-render. `createTask`/`addItem`
     // don't need to restart scanning either; all are read via closure.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, videoMounted, targetSectionId, createdBy]);
+  }, [open, videoMounted, targetSectionId, createdBy, retryToken]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -275,8 +281,11 @@ export function BarcodeScannerDialog({
                 </div>
               )}
               {status === "error" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-4 text-center text-sm text-white">
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 p-4 text-center text-sm text-white">
                   {t("cameraUnavailable")}
+                  <Button variant="outline" size="sm" onClick={retryCamera} className="border-white/40 text-white hover:bg-white/10 hover:text-white">
+                    {t("tryAgain")}
+                  </Button>
                 </div>
               )}
             </div>

@@ -17,6 +17,23 @@ import type { TaskNode, SectionKind } from "@/types/domain";
 
 const PRIORITY_COLOR = ["", "bg-blue-500", "bg-amber-500", "bg-red-500"];
 
+/** Touch devices have no hover, so hover-revealed controls (drag handle, add
+ * subtask) need a resting-visible fallback there — `pointer-coarse:` and
+ * `group-hover:` are mutually exclusive in practice (coarse-pointer devices
+ * don't fire real hover), so there's no ordering conflict between them. */
+const TOUCH_VISIBLE = "opacity-0 group-hover:opacity-100 pointer-coarse:opacity-60";
+
+function dueUrgency(dueAt: string, isCompleted: boolean): "overdue" | "today" | "future" {
+  if (isCompleted) return "future";
+  const due = new Date(dueAt);
+  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime();
+  const today = new Date();
+  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  if (dueDay < todayDay) return "overdue";
+  if (dueDay === todayDay) return "today";
+  return "future";
+}
+
 /** Top-level task row: participates in the section's drag-to-reorder list. */
 export function TaskRow({
   node,
@@ -105,7 +122,7 @@ function TaskRowContent({
           <button
             {...dragHandleProps.attributes}
             {...dragHandleProps.listeners}
-            className="cursor-grab touch-none opacity-0 group-hover:opacity-100"
+            className={cn("cursor-grab touch-none", TOUCH_VISIBLE)}
             aria-label={t("drag")}
           >
             <GripVertical className="size-4" />
@@ -131,7 +148,7 @@ function TaskRowContent({
           <button
             {...dragHandleProps.attributes}
             {...dragHandleProps.listeners}
-            className="cursor-grab touch-none text-muted-foreground opacity-0 group-hover:opacity-100"
+            className={cn("cursor-grab touch-none text-muted-foreground", TOUCH_VISIBLE)}
             aria-label={t("drag")}
           >
             <GripVertical className="size-4" />
@@ -150,7 +167,7 @@ function TaskRowContent({
             {expanded ? (
               <ChevronDown className="size-4" />
             ) : (
-              <ChevronRight className="size-4" />
+              <ChevronRight className="size-4 rtl:rotate-180" />
             )}
           </button>
         ) : (
@@ -200,7 +217,16 @@ function TaskRowContent({
                 </Badge>
               ) : null}
               {node.due_at && (
-                <Badge variant="outline" className="h-5 text-xs">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "h-5 text-xs",
+                    dueUrgency(node.due_at, node.is_completed) === "overdue" &&
+                      "border-destructive/40 bg-destructive/10 text-destructive",
+                    dueUrgency(node.due_at, node.is_completed) === "today" &&
+                      "border-primary/40 bg-primary/10 font-semibold text-primary"
+                  )}
+                >
                   {new Date(node.due_at).toLocaleDateString(dateLocale, {
                     day: "numeric",
                     month: "numeric",
@@ -223,7 +249,7 @@ function TaskRowContent({
         <Button
           variant="ghost"
           size="icon"
-          className="size-6 opacity-0 group-hover:opacity-100"
+          className={cn("size-6", TOUCH_VISIBLE)}
           onClick={() => setAddingSubtask((v) => !v)}
           aria-label={t("addSubtask")}
         >

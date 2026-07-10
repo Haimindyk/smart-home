@@ -65,7 +65,11 @@ export function IdentityGate({ children }: { children: React.ReactNode }) {
           <p className="mt-1.5 text-sm text-muted-foreground">{t("enterYourCode")}</p>
         </div>
 
-        <div className={cn("flex justify-center gap-3", shake && "animate-shake")}>
+        <div
+          className={cn("flex justify-center gap-3", shake && "animate-shake")}
+          role="status"
+          aria-live="polite"
+        >
           {Array.from({ length: PIN_LENGTH }).map((_, i) => (
             <span
               key={i}
@@ -75,6 +79,7 @@ export function IdentityGate({ children }: { children: React.ReactNode }) {
               )}
             />
           ))}
+          <span className="sr-only">{shake ? t("wrongPin") : ""}</span>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
@@ -86,6 +91,7 @@ export function IdentityGate({ children }: { children: React.ReactNode }) {
                 key={i}
                 type="button"
                 onClick={() => press(key)}
+                aria-label={key === "back" ? t("delete") : key}
                 className="flex h-12 items-center justify-center rounded-2xl bg-accent/50 text-lg font-medium transition-[background-color,transform] duration-150 ease-(--ease-premium) hover:bg-accent active:scale-90"
               >
                 {key === "back" ? <Delete className="size-5" /> : key}

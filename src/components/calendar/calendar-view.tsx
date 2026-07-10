@@ -121,6 +121,8 @@ export function CalendarView() {
           selected={selectedDate}
           onSelect={(d) => d && setSelectedDate(d)}
           locale={locale === "he" ? heLocale : enUS}
+          className="w-full [--cell-size:--spacing(9)]"
+          classNames={{ root: "w-full", month: "w-full" }}
           modifiers={runModifiers}
           modifiersClassNames={{
             itemSingle:
@@ -132,25 +134,42 @@ export function CalendarView() {
         />
 
         <div className="flex w-full flex-col gap-2">
+          <h3 className="text-xs font-medium text-muted-foreground">
+            {selectedDate.toLocaleDateString(locale === "he" ? "he-IL" : "en-US", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            })}
+          </h3>
           {selectedItems.length === 0 ? (
             <p className="py-2 text-center text-sm text-muted-foreground">{t("noEventsYet")}</p>
           ) : (
-            selectedItems.map((item) => (
-              <button
-                key={`${item.kind}-${item.id}`}
-                disabled={item.kind === "task"}
-                onClick={() => {
-                  if (item.kind === "event" && item.event) {
-                    setEditingEvent(item.event);
-                    setDialogOpen(true);
-                  }
-                }}
-                className="flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2 text-start text-sm disabled:cursor-default"
-              >
-                <span>{item.emoji ?? (item.kind === "task" ? "✅" : "📌")}</span>
-                <span dir="auto" className="flex-1">{item.title}</span>
-              </button>
-            ))
+            selectedItems.map((item) =>
+              item.kind === "task" ? (
+                <div
+                  key={`${item.kind}-${item.id}`}
+                  className="flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2 text-sm"
+                >
+                  <span>{item.emoji ?? "✅"}</span>
+                  <span dir="auto" className="flex-1">{item.title}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{t("fromTasks")}</span>
+                </div>
+              ) : (
+                <button
+                  key={`${item.kind}-${item.id}`}
+                  onClick={() => {
+                    if (item.event) {
+                      setEditingEvent(item.event);
+                      setDialogOpen(true);
+                    }
+                  }}
+                  className="flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2 text-start text-sm transition-colors hover:bg-accent/60"
+                >
+                  <span>{item.emoji ?? "📌"}</span>
+                  <span dir="auto" className="flex-1">{item.title}</span>
+                </button>
+              )
+            )
           )}
         </div>
 
