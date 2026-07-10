@@ -19,6 +19,8 @@
 //     broadcast -> push pipeline.
 //   - "digest" mode does the same once a week, summarizing the week ahead
 //     (upcoming events/due tasks, chores coming due).
+//   - "shabbat_greeting" mode does the same every Friday at 18:00 Israel
+//     time, a warm Shabbat Shalom message for the whole household.
 //   - "personal_checkin" mode writes a one-on-one note straight to
 //     ai_private_messages for one specific member at a time — Mika's own
 //     individual relationship with each person (noticing when someone's
@@ -417,6 +419,15 @@ function isWithinNotificationWindow(now: Date): boolean {
   return israelHour(now) >= 9;
 }
 
+/** Friday, 18:00 Israel local time — the cron fires every 15 minutes across
+ * a window that safely covers 18:00 Israel time under both DST offsets
+ * (see the cron.schedule call in migration 0027), and this does the exact
+ * match so the greeting only actually sends once, right at 18:00. */
+function isShabbatGreetingTime(now: Date): boolean {
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Jerusalem", weekday: "short" }).format(now);
+  return weekday === "Fri" && israelHour(now) === 18;
+}
+
 /** Whole days between `iso` and now, or null if `iso` is null (never happened yet). */
 function daysSince(iso: string | null): number | null {
   if (!iso) return null;
@@ -459,7 +470,7 @@ Deno.serve(async (req) => {
   }
 
   let body: {
-    intent?: "chat" | "insights" | "joke" | "digest" | "personal_checkin";
+    intent?: "chat" | "insights" | "joke" | "digest" | "personal_checkin" | "shabbat_greeting";
     message?: string;
     imageBase64?: string;
     imageMimeType?: string;
@@ -480,7 +491,13 @@ Deno.serve(async (req) => {
   // human can act on) — gate them with a shared secret so an open endpoint
   // can't be used to spam the household. Chat stays open to anyone with
   // the link, same as the rest of the app.
-  if (body.intent === "insights" || body.intent === "joke" || body.intent === "digest" || body.intent === "personal_checkin") {
+  if (
+    body.intent === "insights" ||
+    body.intent === "joke" ||
+    body.intent === "digest" ||
+    body.intent === "personal_checkin" ||
+    body.intent === "shabbat_greeting"
+  ) {
     const secret = getBearerToken(req);
     const { data: valid } = secret
       ? await supabase.rpc("verify_assistant_trigger_secret", { p_secret: secret })
@@ -682,6 +699,67 @@ Deno.serve(async (req) => {
     return json({ sent: true });
   }
 
+  if (body.intent === "shabbat_greeting") {
+    if (!isShabbatGreetingTime(new Date())) {
+      return json({ sent: false, reason: "not_shabbat_greeting_time" });
+    }
+
+    const { data: assistantMember } = await supabase
+      .from("members")
+      .select("id")
+      .eq("email", "assistant@kh.family")
+      .maybeSingle();
+    const assistantId = (assistantMember as { id: string } | null)?.id ?? null;
+
+    // The cron checks every 15 minutes across a multi-hour window (see
+    // migration 0027) so it can only actually send once per Friday — a
+    // 20-hour lookback comfortably covers "today" without reaching into
+    // the following Friday.
+    if (assistantId) {
+      const twentyHoursAgo = new Date(Date.now() - 20 * 60 * 60 * 1000);
+      const { data: existing } = await supabase
+        .from("activity_log")
+        .select("id")
+        .eq("actor_id", assistantId)
+        .eq("entity_type", "broadcast")
+        .gte("created_at", twentyHoursAgo.toISOString())
+        .ilike("summary", "🕯️%")
+        .limit(1);
+      if (existing && existing.length > 0) {
+        return json({ sent: false, reason: "already_sent_today" });
+      }
+    }
+
+    const systemInstruction = [
+      MIKA_PERSONA,
+      "Write one short, warm, cute Shabbat Shalom message for the whole household, wishing them a peaceful, restful Friday evening together — candles, family time, that kind of warmth.",
+      "Keep it under about 140 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence.",
+      "Do not call any tools. Reply with just the message text — no preamble, no quotation marks.",
+      LANGUAGE_INSTRUCTION,
+      "",
+      "## Family notes",
+      familyFactsBlock,
+    ].join("\n");
+
+    const { reply, memoryFacts } = await callGemini(geminiKey, systemInstruction, [
+      { text: "תכתבי לנו איחול שבת שלום חמוד וחם." },
+    ]);
+    await saveFamilyFacts(supabase, memoryFacts, (familyFacts ?? []) as { fact: string }[]);
+
+    const greetingText = reply.trim();
+    if (!greetingText) return json({ sent: false, reason: "empty" });
+
+    await supabase.from("activity_log").insert({
+      entity_type: "broadcast",
+      entity_id: crypto.randomUUID(),
+      action: "message",
+      actor_id: assistantId,
+      summary: `🕯️ ${greetingText}`,
+    });
+
+    return json({ sent: true });
+  }
+
   if (body.intent === "personal_checkin") {
     const { data: members } = await supabase
       .from("members")
@@ -802,7 +880,8 @@ Deno.serve(async (req) => {
     "When resolving a vague request (e.g. 'get something for dinner') or a pasted recipe or a photographed receipt, propose one propose_create_task call per concrete item, using the most fitting existing section (usually a 'shopping' kind section).",
     "When the user asks you to reorganize existing items — e.g. 'create a Trips section and move all the trip-related tasks there' — look through the open tasks/items list below for every item that matches what they described, call propose_create_section once, then call propose_move_task once per matching item using sectionId \"NEW_SECTION\" to mean the section you just created. Don't stop at just creating the section — actually move every matching item, and don't ask the user to confirm which items match, use your best judgment.",
     "Always include a short natural-language reply summarizing what you're proposing, in addition to any tool calls.",
-    "If you notice a new, durable fact about the family — a relationship, a preference, a recurring pattern — that isn't already listed in the family notes below, call remember_family_fact to save it silently, without mentioning that you did.",
+    "You're building a close, ongoing relationship with this person, not just processing requests — be genuinely curious about them. When it fits naturally (not every single message, and never instead of actually helping with what they asked), ask a warm follow-up question about what they mentioned, or check in on something from a past conversation. Small talk and curiosity are welcome, not just task completion.",
+    "If you notice a new, durable fact about the family — a relationship, a preference, a recurring pattern — that isn't already listed in the family notes below, call remember_family_fact to save it silently, without mentioning that you did. Actively listen for these throughout the conversation, not just once.",
     LANGUAGE_INSTRUCTION,
     "",
     contextBlock,
