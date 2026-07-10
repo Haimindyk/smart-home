@@ -86,6 +86,23 @@ function verbFor(action: string, locale: string | null): string {
   return locale === "he" ? entry.he : entry.en;
 }
 
+// Web push bodies get visually truncated by the OS/browser notification UI
+// somewhere around 3-4 lines with no ellipsis of its own — a mid-word cutoff
+// reads as broken. This is a defensive cap applied uniformly to every
+// notification body (regardless of source: a human broadcast, the AI's daily
+// joke/weekly digest, an insight card, a due reminder), truncating at the
+// last word boundary and adding our own "…" so a long body still reads as a
+// complete-looking sentence instead of getting chopped by the platform.
+const MAX_PUSH_BODY_LENGTH = 200;
+
+function truncateForPush(text: string, maxLen = MAX_PUSH_BODY_LENGTH): string {
+  if (text.length <= maxLen) return text;
+  const slice = text.slice(0, maxLen);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cut = lastSpace > maxLen * 0.6 ? slice.slice(0, lastSpace) : slice;
+  return `${cut.trimEnd()}…`;
+}
+
 function getBearerToken(req: Request): string | null {
   const header = req.headers.get("Authorization") ?? req.headers.get("authorization");
   if (!header?.startsWith("Bearer ")) return null;
@@ -253,7 +270,7 @@ Deno.serve(async (req) => {
 
       const payload = {
         title,
-        body,
+        body: truncateForPush(body),
         url: "/",
         tag: `${entityType}-${entityId}`,
         icon: actor?.avatar_photo_url ?? undefined,

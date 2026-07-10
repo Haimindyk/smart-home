@@ -353,6 +353,27 @@ function nextYearlyOccurrence(eventDateStr: string, todayStr: string): string {
   return candidate;
 }
 
+/** Hour-of-day (0-23) in Israel local time, DST-aware — used to keep the
+ * assistant's own unsolicited notifications (joke/digest/insights) inside
+ * reasonable hours, regardless of what UTC time the cron happens to fire at
+ * (pg_cron schedules are fixed UTC and don't track Israel's DST shifts). */
+function israelHour(now: Date): number {
+  const hourPart = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Jerusalem",
+    hour: "2-digit",
+    hourCycle: "h23",
+  })
+    .formatToParts(now)
+    .find((p) => p.type === "hour");
+  return hourPart ? Number(hourPart.value) : 0;
+}
+
+/** The household only wants proactive AI notifications (never human ones)
+ * between 9am and midnight Israel time — nothing overnight. */
+function isWithinNotificationWindow(now: Date): boolean {
+  return israelHour(now) >= 9;
+}
+
 function getBearerToken(req: Request): string | null {
   const header = req.headers.get("Authorization") ?? req.headers.get("authorization");
   if (!header?.startsWith("Bearer ")) return null;
@@ -415,6 +436,15 @@ Deno.serve(async (req) => {
       ? await supabase.rpc("verify_assistant_trigger_secret", { p_secret: secret })
       : { data: false };
     if (!valid) return json({ error: "unauthorized" }, 401);
+
+    // These three are the assistant's own unsolicited notifications (unlike
+    // chat, which only ever responds to a human) — keep them to daytime/
+    // evening hours regardless of which cron slot happened to trigger this
+    // call. Bail before spending a Gemini call or counting against the
+    // daily cap.
+    if (!isWithinNotificationWindow(new Date())) {
+      return json({ sent: false, reason: "outside_notification_window" });
+    }
   }
 
   const { data: callsToday, error: usageError } = await supabase.rpc("increment_ai_usage");
@@ -462,6 +492,7 @@ Deno.serve(async (req) => {
     const systemInstruction = [
       "You are 'העוזר', the household AI embedded in the K&H family organizer app.",
       "Write exactly one short, warm, funny family-friendly joke for the household. You may (but don't have to) reference the family notes below — e.g. Louis the dog.",
+      "Keep the whole joke under about 140 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence.",
       "Do not call any tools. Reply with just the joke text — no preamble, no quotation marks.",
       LANGUAGE_INSTRUCTION,
       "",
@@ -558,6 +589,7 @@ Deno.serve(async (req) => {
     const systemInstruction = [
       "You are 'העוזר', the household AI embedded in the K&H family organizer app.",
       "Write a short, warm, genuinely funny weekly recap for the household — a few sentences covering what's coming up this week from the lists below (events, due tasks/appointments, chores coming due). Keep the same playful personality as the household's daily joke, not a dry status report.",
+      "Keep the whole recap under about 200 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence. If there's too much to fit, pick only the 1-2 most important things and skip the rest rather than listing everything.",
       "Only mention things actually in the lists below — never invent dates or items. If a list is empty, just don't mention that category.",
       "Do not call any tools. Reply with just the recap text — no preamble, no markdown, no bullet points; write it as natural prose a person would text to their family group chat.",
       LANGUAGE_INSTRUCTION,
@@ -604,6 +636,7 @@ Deno.serve(async (req) => {
       "You are the K&H family household assistant. Look at the recent activity log and the current open tasks/chores below, and see if there's a genuinely useful, gentle observation worth surfacing as a dashboard suggestion — e.g. a chore nobody's done in a while, or a shopping item that keeps coming back.",
       "Propose AT MOST ONE suggestion. If nothing is clearly worth surfacing, propose nothing and just reply with an empty string.",
       "Phrase the suggestion with the same warm, genuinely funny personality as the household's daily joke — a light pun or a playful nudge — instead of a dry notification. Never nag about something already handled; the humor should serve the message, not replace it, and it must still be tied to a real, specific observation.",
+      "Keep it under about 140 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence.",
       "If you notice a new, durable fact about the family that isn't already listed in the family notes below, call remember_family_fact to save it.",
       LANGUAGE_INSTRUCTION,
       "",
