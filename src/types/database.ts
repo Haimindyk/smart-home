@@ -819,7 +819,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_ai_daily_joke: { Args: never; Returns: undefined }
       check_ai_insights: { Args: never; Returns: undefined }
       check_ai_personal_checkin: { Args: never; Returns: undefined }
       check_ai_weekly_digest: { Args: never; Returns: undefined }
