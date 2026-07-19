@@ -14,11 +14,10 @@
 //     already just a proposal sitting in an inbox, applied the same way as
 //     a chat action once a human taps it. It also now fires a push
 //     notification (see migration 0024) so a new suggestion isn't silent.
-//   - "joke" mode writes a broadcast message straight to activity_log once a
-//     day — a pure FYI with nothing to "apply", riding the existing
-//     broadcast -> push pipeline.
-//   - "digest" mode does the same once a week, summarizing the week ahead
-//     (upcoming events/due tasks, chores coming due).
+//   - "digest" mode writes a broadcast message straight to activity_log once
+//     a week — a pure FYI with nothing to "apply", riding the existing
+//     broadcast -> push pipeline — summarizing the week ahead (upcoming
+//     events/due tasks, chores coming due).
 //   - "shabbat_greeting" mode does the same every Friday at 18:00 Israel
 //     time, a warm Shabbat Shalom message for the whole household.
 //   - "personal_checkin" mode writes a one-on-one note straight to
@@ -37,13 +36,13 @@
 // which exclude supabase/functions/**.
 //
 // Deployed with verify_jwt disabled: chat has no auth by design (same anon
-// reach as the rest of this app), and the insights/joke intents use their
+// reach as the rest of this app), and the scheduled intents use their
 // own shared-secret check (verify_assistant_trigger_secret) rather than a
 // Supabase-issued JWT — the pg_cron jobs' net.http_post calls send a random
 // Vault secret as the bearer token, not a JWT, so gateway-level verify_jwt
 // would reject them before this code ever ran.
 //
-// Everything this assistant writes (chat replies, insight notes, jokes) is
+// Everything this assistant writes (chat replies, insight notes, digests) is
 // Hebrew-only by design — this household's whole app is Hebrew-first.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -399,7 +398,7 @@ function nextYearlyOccurrence(eventDateStr: string, todayStr: string): string {
 }
 
 /** Hour-of-day (0-23) in Israel local time, DST-aware — used to keep the
- * assistant's own unsolicited notifications (joke/digest/insights) inside
+ * assistant's own unsolicited notifications (digest/insights) inside
  * reasonable hours, regardless of what UTC time the cron happens to fire at
  * (pg_cron schedules are fixed UTC and don't track Israel's DST shifts). */
 function israelHour(now: Date): number {
@@ -481,7 +480,7 @@ Deno.serve(async (req) => {
   }
 
   let body: {
-    intent?: "chat" | "insights" | "joke" | "digest" | "personal_checkin" | "shabbat_greeting";
+    intent?: "chat" | "insights" | "digest" | "personal_checkin" | "shabbat_greeting";
     message?: string;
     imageBase64?: string;
     imageMimeType?: string;
@@ -497,14 +496,13 @@ Deno.serve(async (req) => {
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-  // The insights sweep, the daily joke, and the weekly digest all write
-  // straight into everyone's dashboard/feed (unlike chat, which only a
-  // human can act on) — gate them with a shared secret so an open endpoint
-  // can't be used to spam the household. Chat stays open to anyone with
-  // the link, same as the rest of the app.
+  // The insights sweep and the weekly digest write straight into
+  // everyone's dashboard/feed (unlike chat, which only a human can act
+  // on) — gate them with a shared secret so an open endpoint can't be
+  // used to spam the household. Chat stays open to anyone with the link,
+  // same as the rest of the app.
   if (
     body.intent === "insights" ||
-    body.intent === "joke" ||
     body.intent === "digest" ||
     body.intent === "personal_checkin" ||
     body.intent === "shabbat_greeting"
@@ -535,7 +533,7 @@ Deno.serve(async (req) => {
 
   // Full household context, shared by chat and insights (the two "general
   // knowledge" intents) — Mika should know everything a human already sees
-  // in the app, not a narrowed-down subset. joke/digest/personal_checkin
+  // in the app, not a narrowed-down subset. digest/personal_checkin
   // each pull their own narrower, purpose-specific data instead of this.
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const [{ data: sections }, { data: tasks }, { data: chores }, { data: familyFacts }, { data: members }, { data: events }, { data: activity }] =
@@ -553,59 +551,6 @@ Deno.serve(async (req) => {
   const familyFactsBlock = buildFamilyFactsBlock((familyFacts ?? []) as { fact: string }[]);
   const activitySummary = buildActivitySummary(activity ?? []);
 
-  if (body.intent === "joke") {
-    const { data: assistantMember } = await supabase
-      .from("members")
-      .select("id")
-      .eq("email", "assistant@kh.family")
-      .maybeSingle();
-    const assistantId = (assistantMember as { id: string } | null)?.id ?? null;
-
-    if (assistantId) {
-      const startOfDay = new Date();
-      startOfDay.setUTCHours(0, 0, 0, 0);
-      const { data: existing } = await supabase
-        .from("activity_log")
-        .select("id")
-        .eq("actor_id", assistantId)
-        .eq("entity_type", "broadcast")
-        .gte("created_at", startOfDay.toISOString())
-        .limit(1);
-      if (existing && existing.length > 0) {
-        return json({ sent: false, reason: "already_sent_today" });
-      }
-    }
-
-    const systemInstruction = [
-      MIKA_PERSONA,
-      "Write exactly one short, warm, funny family-friendly joke for the household. You may (but don't have to) reference the family notes below — e.g. Louis the dog.",
-      "Keep the whole joke under about 140 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence.",
-      "Do not call any tools. Reply with just the joke text — no preamble, no quotation marks.",
-      LANGUAGE_INSTRUCTION,
-      "",
-      "## Family notes",
-      familyFactsBlock,
-    ].join("\n");
-
-    const { reply, memoryFacts } = await callGemini(geminiKey, systemInstruction, [
-      { text: "תן לי בדיחה חמה ומצחיקה למשפחה." },
-    ]);
-    await saveFamilyFacts(supabase, memoryFacts, (familyFacts ?? []) as { fact: string }[]);
-
-    const jokeText = reply.trim();
-    if (!jokeText) return json({ sent: false, reason: "empty" });
-
-    await supabase.from("activity_log").insert({
-      entity_type: "broadcast",
-      entity_id: crypto.randomUUID(),
-      action: "message",
-      actor_id: assistantId,
-      summary: `😄 ${jokeText}`,
-    });
-
-    return json({ sent: true });
-  }
-
   if (body.intent === "digest") {
     const { data: assistantMember } = await supabase
       .from("members")
@@ -614,10 +559,9 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const assistantId = (assistantMember as { id: string } | null)?.id ?? null;
 
-    // A digest is once-a-week; guard against a double-fire the same way the
-    // daily joke guards against firing twice in a day, just with a wider
-    // window, and a marker prefix so a joke sent earlier the same week
-    // doesn't count as "already sent a digest".
+    // A digest is once-a-week; guard against a double-fire with a
+    // week-wide lookback, and a marker prefix so another broadcast sent
+    // earlier the same week doesn't count as "already sent a digest".
     if (assistantId) {
       const sixDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
       const { data: existing } = await supabase
@@ -675,7 +619,7 @@ Deno.serve(async (req) => {
 
     const systemInstruction = [
       MIKA_PERSONA,
-      "Write a short, warm, genuinely funny weekly recap for the household — a few sentences covering what's coming up this week from the lists below (events, due tasks/appointments, chores coming due). Keep the same playful personality as the household's daily joke, not a dry status report.",
+      "Write a short, warm, genuinely funny weekly recap for the household — a few sentences covering what's coming up this week from the lists below (events, due tasks/appointments, chores coming due). Keep it playful and warm, not a dry status report.",
       "Keep the whole recap under about 200 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence. If there's too much to fit, pick only the 1-2 most important things and skip the rest rather than listing everything.",
       "Only mention things actually in the lists below — never invent dates or items. If a list is empty, just don't mention that category.",
       "Do not call any tools. Reply with just the recap text — no preamble, no markdown, no bullet points; write it as natural prose a person would text to their family group chat.",
@@ -860,7 +804,7 @@ Deno.serve(async (req) => {
       MIKA_PERSONA,
       "Look at the recent activity log and the current open tasks/chores below, and see if there's a genuinely useful, gentle observation worth surfacing as a dashboard suggestion — e.g. a chore nobody's done in a while, or a shopping item that keeps coming back.",
       "Propose AT MOST ONE suggestion. If nothing is clearly worth surfacing, propose nothing and just reply with an empty string.",
-      "Phrase the suggestion with the same warm, genuinely funny personality as the household's daily joke — a light pun or a playful nudge — instead of a dry notification. Never nag about something already handled; the humor should serve the message, not replace it, and it must still be tied to a real, specific observation.",
+      "Phrase the suggestion with a warm, genuinely funny personality — a light pun or a playful nudge — instead of a dry notification. Never nag about something already handled; the humor should serve the message, not replace it, and it must still be tied to a real, specific observation.",
       "Keep it under about 140 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence.",
       "If you notice a new, durable fact about the family that isn't already listed in the family notes below, call remember_family_fact to save it.",
       LANGUAGE_INSTRUCTION,

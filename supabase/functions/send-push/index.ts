@@ -95,8 +95,8 @@ function verbFor(action: string, locale: string | null): string {
 // Web push bodies get visually truncated by the OS/browser notification UI
 // somewhere around 3-4 lines with no ellipsis of its own — a mid-word cutoff
 // reads as broken. This is a defensive cap applied uniformly to every
-// notification body (regardless of source: a human broadcast, the AI's daily
-// joke/weekly digest, an insight card, a due reminder), truncating at the
+// notification body (regardless of source: a human broadcast, the AI's
+// weekly digest, an insight card, a due reminder), truncating at the
 // last word boundary and adding our own "…" so a long body still reads as a
 // complete-looking sentence instead of getting chopped by the platform.
 const MAX_PUSH_BODY_LENGTH = 200;
