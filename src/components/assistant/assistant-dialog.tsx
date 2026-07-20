@@ -54,8 +54,6 @@ function describeAction(action: ProposedAction, t: (key: MessageKey) => string):
       return `✅ ${chores[action.choreId]?.title ?? action.choreId}`;
     case "create_family_event":
       return `📅 ${action.title} (${action.eventDate}${action.endDate ? ` – ${action.endDate}` : ""})`;
-    case "send_broadcast":
-      return `📣 ${action.message}`;
   }
 }
 
