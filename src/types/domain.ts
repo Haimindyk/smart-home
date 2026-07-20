@@ -46,7 +46,10 @@ export function buildTaskTree(tasks: Task[]): TaskNode[] {
     byParent.set(key, list);
   }
   for (const list of byParent.values()) {
-    list.sort((a, b) => (a.position < b.position ? -1 : a.position > b.position ? 1 : 0));
+    list.sort((a, b) => {
+      if (a.is_completed !== b.is_completed) return a.is_completed ? 1 : -1;
+      return a.position < b.position ? -1 : a.position > b.position ? 1 : 0;
+    });
   }
 
   function attach(parentId: string | null): TaskNode[] {

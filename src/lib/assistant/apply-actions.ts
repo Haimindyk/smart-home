@@ -45,6 +45,13 @@ export async function applyProposedAction(action: ProposedAction): Promise<Apply
           quantity: action.quantity ?? null,
           unit: action.unit ?? null,
           notes: action.notes ?? null,
+          // createTask auto-assigns to createdBy, but that's the assistant's
+          // own member row here (see ASSISTANT_EMAIL above) — the household
+          // member who actually asked for this isn't who confirmed it, so
+          // leave it unassigned rather than showing it "assigned to 🤖".
+          assignee_kind: "unassigned",
+          assignee_member_id: null,
+          assignee_member_ids: [],
         },
       });
       return { createdId: id, undo: () => store.softDeleteTask(id) };
