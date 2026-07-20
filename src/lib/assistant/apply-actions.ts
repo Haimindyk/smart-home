@@ -20,8 +20,7 @@ export type ApplyResult = {
   createdId?: string;
   /** Reverses this action, if it's safely reversible. Missing for
    * complete_chore (no clean way to un-record a completion without new
-   * plumbing) and send_broadcast (a push notification can't be recalled
-   * once sent). */
+   * plumbing). */
   undo?: () => Promise<void>;
 };
 
@@ -115,8 +114,5 @@ export async function applyProposedAction(action: ProposedAction): Promise<Apply
       });
       return { createdId: id, undo: () => store.deleteFamilyEvent(id) };
     }
-    case "send_broadcast":
-      await store.sendBroadcastMessage(action.message, actorId);
-      return {};
   }
 }

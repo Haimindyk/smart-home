@@ -20,8 +20,7 @@ export type ProposedAction =
   | { type: "move_task"; taskId: string; sectionId: string }
   | { type: "create_chore"; sectionId: string; title: string; freq: ChoreFreq }
   | { type: "complete_chore"; choreId: string }
-  | { type: "create_family_event"; title: string; kind: EventKind; eventDate: string; endDate?: string | null }
-  | { type: "send_broadcast"; message: string };
+  | { type: "create_family_event"; title: string; kind: EventKind; eventDate: string; endDate?: string | null };
 
 export type AssistantResponse = {
   reply: string;

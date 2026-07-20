@@ -181,15 +181,6 @@ const TOOLS = [
     },
   },
   {
-    name: "propose_send_broadcast",
-    description: "Draft a broadcast message to the whole household (e.g. a reply to something someone asked).",
-    parameters: {
-      type: "OBJECT",
-      properties: { message: { type: "STRING" } },
-      required: ["message"],
-    },
-  },
-  {
     name: "remember_family_fact",
     description:
       "Silently save one short, durable fact about the family — a relationship (who's married to whom, who's whose parent, a beloved pet), a preference, a recurring pattern — that you picked up on in this conversation and that isn't already listed in the family notes below. Only for things genuinely worth remembering long-term, not routine chit-chat. Never use this to record a task/chore/event; those go through the other tools.",
@@ -220,7 +211,6 @@ const TOOL_TO_ACTION: Record<string, string> = {
   propose_create_chore: "create_chore",
   propose_complete_chore: "complete_chore",
   propose_create_family_event: "create_family_event",
-  propose_send_broadcast: "send_broadcast",
 };
 
 /** Turns a Gemini response's parts into (reply text, proposed actions, new
