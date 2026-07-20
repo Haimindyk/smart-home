@@ -13,7 +13,6 @@ import type {
   Section,
   SectionKind,
   Task,
-  AssigneeKind,
   Chore,
   ChoreCompletion,
   Attachment,
@@ -408,6 +407,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     const position = rankAtEnd(lastPosition);
     const now = new Date().toISOString();
 
+    // Whoever adds an item is assigned to it by default — the person typing
+    // it in is almost always the one handling it. Notes have no assignee
+    // (see task-row.tsx's early return for is_note) so leave those unassigned.
+    const isNote = extra?.is_note ?? false;
+    const autoAssignee: Pick<Task, "assignee_kind" | "assignee_member_id" | "assignee_member_ids"> =
+      createdBy && !isNote
+        ? { assignee_kind: "member", assignee_member_id: createdBy, assignee_member_ids: [createdBy] }
+        : { assignee_kind: "unassigned", assignee_member_id: null, assignee_member_ids: [] };
+
     const optimistic: Task = {
       id,
       section_id: sectionId,
@@ -424,9 +432,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       tags: [],
       detected_links: [],
       is_note: false,
-      assignee_kind: "unassigned" as AssigneeKind,
-      assignee_member_id: null,
-      assignee_member_ids: [],
+      ...autoAssignee,
       is_completed: false,
       completed_at: null,
       completed_by: null,
@@ -449,7 +455,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       {
         table: "tasks",
         op: "insert",
-        payload: { id, section_id: sectionId, parent_task_id: parentTaskId, position, title, created_by: createdBy, ...extra },
+        payload: { id, section_id: sectionId, parent_task_id: parentTaskId, position, title, created_by: createdBy, ...autoAssignee, ...extra },
       },
       () =>
         set((s) => {
