@@ -53,6 +53,7 @@ struct NicknameOnboardingView: View {
             .frame(width: 200)
         }
         .padding()
+        .background(AmbientBackgroundView())
         .onAppear { focused = true }
     }
 

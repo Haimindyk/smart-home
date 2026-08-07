@@ -17,6 +17,7 @@ struct SectionsHomeView: View {
                 } else {
                     ScrollView {
                         BroadcastBannerView(store: store)
+                            .padding(.top, 4)
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 12) {
                             ForEach(visibleSections) { section in
                                 NavigationLink(value: section) {
@@ -38,6 +39,7 @@ struct SectionsHomeView: View {
                     }
                 }
             }
+            .background(AmbientBackgroundView())
             .navigationTitle(store.area.name)
             .toolbar {
                 if store.canWrite {
@@ -80,6 +82,10 @@ struct SectionsHomeView: View {
     }
 }
 
+/// Mirrors the website's dashboard `SectionPanel` treatment: a translucent
+/// "glass" card with a thin colored strip along the top and a colored
+/// emoji badge, the color picked by section *kind* (not the app's own
+/// accent) so cards stay visually distinguishable from one another.
 struct SectionCardView: View {
     let section: WorkspaceSection
     let tasks: [TaskItem]
@@ -87,32 +93,45 @@ struct SectionCardView: View {
 
     private var topLevel: [TaskItem] { tasks.filter { $0.parentTaskId == nil } }
     private var completed: Int { topLevel.filter(\.isCompleted).count }
+    private var kindColor: Color { Theme.SectionKindColor.forKind(section.kind) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(section.emoji ?? section.kind.defaultEmoji).font(.title)
-                Spacer()
-            }
-            Text(section.name).font(.headline).lineLimit(1)
-            if !topLevel.isEmpty {
-                ProgressView(value: Double(completed), total: Double(topLevel.count))
-                Text(locale == .he ? "\(completed) מתוך \(topLevel.count)" : "\(completed) of \(topLevel.count)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text(locale == .he ? "ריק" : "Empty")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(sectionColor.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
+        ZStack(alignment: .top) {
+            kindColor.frame(height: 4)
 
-    private var sectionColor: Color {
-        section.color.flatMap(Color.init(hex:)) ?? .indigo
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(section.emoji ?? section.kind.defaultEmoji)
+                        .font(.title3)
+                        .frame(width: 34, height: 34)
+                        .background(kindColor, in: RoundedRectangle(cornerRadius: 11))
+                    Spacer()
+                }
+                Text(section.name)
+                    .font(.headline)
+                    .lineLimit(1)
+                if !topLevel.isEmpty {
+                    ProgressView(value: Double(completed), total: Double(topLevel.count))
+                        .tint(kindColor)
+                    Text(locale == .he ? "\(completed) מתוך \(topLevel.count)" : "\(completed) of \(topLevel.count)")
+                        .font(.caption)
+                        .foregroundStyle(Theme.mutedForeground)
+                } else {
+                    Text(locale == .he ? "ריק" : "Empty")
+                        .font(.caption)
+                        .foregroundStyle(Theme.mutedForeground)
+                }
+            }
+            .padding(14)
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.card)
+                .strokeBorder(Theme.border, lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 6)
     }
 }

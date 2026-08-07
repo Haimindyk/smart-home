@@ -191,6 +191,27 @@ request, an approval, or being assigned to a task all push immediately; a
 "due today" digest for tasks/chores fires once a day (see
 `send_due_today_reminders()` / the `pg_cron` schedule in migration `0005`).
 
+### A note on visual design fidelity
+
+`Yachad/App/Theme.swift` ports the website's design tokens from
+`src/app/globals.css` — the warm terracotta accent color
+(`oklch(0.64 0.15 45)` light / `oklch(0.72 0.14 45)` dark), the per-
+section-kind palette from `section-panel.tsx`'s `KIND_COLOR` (indigo/
+emerald/rose/sky), corner radii, and the ambient background wash — into
+SwiftUI, and the dashboard's section cards (`SectionCardView`) mirror the
+website's "glass" card treatment (translucent material, colored top strip,
+colored emoji badge, soft shadow) as closely as a card component can
+translate between CSS and SwiftUI.
+
+The `oklch()` → sRGB conversions in `Theme.swift` were done by hand (no
+tool in this environment renders `oklch()`), so they're a close
+approximation, not a guaranteed exact match — worth a side-by-side visual
+pass against the website once this builds in Xcode. The rest of the app
+(lists, forms, buttons) intentionally stays close to stock iOS conventions
+rather than reproducing every shadcn/Tailwind component pixel-for-pixel;
+the accent color and the section-card treatment are what carries the
+website's visual identity into the app.
+
 ### A note on the Supabase Swift SDK surface
 
 This was written without access to Xcode/macOS to compile against, so
