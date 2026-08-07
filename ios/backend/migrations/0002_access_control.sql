@@ -51,7 +51,26 @@ as $$
     where m.area_id = p_area_id
       and m.device_id = public.request_device_id()
       and m.status = 'approved'
-      and m.role in ('owner', 'editor')
+      and m.role in ('owner', 'manager', 'editor')
+  );
+$$;
+
+-- Can approve/reject join requests, change another member's role, or
+-- remove another member. Owner and manager both qualify — a manager can
+-- appoint further managers, same as the owner can.
+create or replace function public.can_manage_area(p_area_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.area_members m
+    where m.area_id = p_area_id
+      and m.device_id = public.request_device_id()
+      and m.status = 'approved'
+      and m.role in ('owner', 'manager')
   );
 $$;
 
@@ -83,32 +102,38 @@ alter table public.chore_completions enable row level security;
 alter table public.calendar_events enable row level security;
 alter table public.activity_log enable row level security;
 
--- areas: readable once you're an approved member. No direct insert/update/
--- delete from the client — that only happens through the RPCs below, which
--- run as security definer, so ownership can never be forged.
+-- areas: readable once you're an approved member. No direct insert/delete
+-- from the client — creation and deletion only happen through the RPCs
+-- below, which run as security definer, so ownership can never be forged.
+-- Settings (name/emoji/join_policy/auto_join_role) can be edited directly
+-- by the owner or a manager.
 create policy "areas readable by members" on public.areas
   for select using (public.can_read_area(id));
+
+create policy "areas updatable by manager" on public.areas
+  for update using (public.can_manage_area(id)) with check (public.can_manage_area(id));
 
 -- area_members: an approved member can see the whole roster; a pending/
 -- rejected joiner can see (only) their own row, so the app can show them
 -- "waiting for approval". No direct insert (see request_join_area /
--- create_area RPCs). Only the owner can update roles/status; anyone can
--- delete (leave) their own membership row.
+-- create_area RPCs). The owner or a manager can update anyone else's
+-- role/status (approve, promote, demote); anyone can delete (leave) their
+-- own membership row, and the owner/a manager can remove someone else's.
 create policy "area_members readable by members or self" on public.area_members
   for select using (
     public.can_read_area(area_id) or device_id = public.request_device_id()
   );
 
-create policy "area_members updatable by owner" on public.area_members
-  for update using (public.is_area_owner(area_id))
-  with check (public.is_area_owner(area_id));
+create policy "area_members updatable by manager" on public.area_members
+  for update using (public.can_manage_area(area_id))
+  with check (public.can_manage_area(area_id));
 
 create policy "area_members self nickname update" on public.area_members
   for update using (device_id = public.request_device_id())
   with check (device_id = public.request_device_id());
 
-create policy "area_members deletable by owner or self" on public.area_members
-  for delete using (public.is_area_owner(area_id) or device_id = public.request_device_id());
+create policy "area_members deletable by manager or self" on public.area_members
+  for delete using (public.can_manage_area(area_id) or device_id = public.request_device_id());
 
 -- Content tables: read for any approved member, write for owner/editor.
 create policy "sections readable" on public.sections
@@ -155,10 +180,16 @@ create policy "calendar_events deletable" on public.calendar_events
 create policy "activity_log readable" on public.activity_log
   for select using (public.can_read_area(area_id));
 
--- The two UPDATE policies above are OR'd together (both permissive), so a
+-- The UPDATE policies above are OR'd together (all permissive), so a
 -- pending member could otherwise ride the "update my own row" policy to
--- approve themselves. Lock role/status/approved_at down to owner-only at the
--- trigger level, regardless of which policy let the UPDATE through.
+-- approve themselves. Lock role/status/approved_at down at the trigger
+-- level, regardless of which policy let the UPDATE through:
+--   - only the owner or a manager may change them at all;
+--   - nobody may promote anyone to 'owner' (fixed at creation — the unique
+--     partial index on role = 'owner' would reject it anyway, but failing
+--     here is a clearer error than a constraint violation);
+--   - nobody may change the owner's own row (protects the owner from being
+--     demoted/removed-in-place by a manager they appointed).
 create or replace function public.guard_area_member_privileged_columns()
 returns trigger
 language plpgsql
@@ -166,7 +197,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if not public.is_area_owner(new.area_id) then
+  if old.role = 'owner' or new.role = 'owner' or not public.can_manage_area(new.area_id) then
     new.role := old.role;
     new.status := old.status;
     new.approved_at := old.approved_at;
@@ -230,6 +261,10 @@ as $$
   where a.invite_code = translate(p_invite_code, '/+=', '_-');
 $$;
 
+-- If the area's join_policy is 'auto', anyone holding the link/QR is
+-- approved immediately with the area's auto_join_role — no waiting room.
+-- Otherwise (the default, 'manual') this inserts a 'pending' row for the
+-- owner/a manager to approve.
 create or replace function public.request_join_area(p_invite_code text, p_nickname text)
 returns public.area_members
 language plpgsql
@@ -238,28 +273,43 @@ set search_path = public
 as $$
 declare
   v_device uuid := public.request_device_id();
-  v_area_id uuid;
+  v_area public.areas;
   v_member public.area_members;
 begin
   if v_device is null then
     raise exception 'missing x-device-id header';
   end if;
 
-  select id into v_area_id from public.areas where invite_code = translate(p_invite_code, '/+=', '_-');
-  if v_area_id is null then
+  select * into v_area from public.areas where invite_code = translate(p_invite_code, '/+=', '_-');
+  if v_area.id is null then
     raise exception 'invalid invite code';
   end if;
 
-  insert into public.area_members (area_id, device_id, nickname, role, status)
-  values (v_area_id, v_device, p_nickname, 'viewer', 'pending')
-  on conflict (area_id, device_id)
-    do update set nickname = excluded.nickname
-  returning * into v_member;
+  if v_area.join_policy = 'auto' then
+    insert into public.area_members (area_id, device_id, nickname, role, status, approved_at)
+    values (v_area.id, v_device, p_nickname, v_area.auto_join_role, 'approved', now())
+    on conflict (area_id, device_id)
+      do update set nickname = excluded.nickname
+    returning * into v_member;
+
+    insert into public.activity_log (area_id, entity_type, entity_id, action, actor_id, summary)
+    values (v_area.id, 'area', v_area.id, 'approved', v_member.id, v_member.nickname);
+  else
+    insert into public.area_members (area_id, device_id, nickname, role, status)
+    values (v_area.id, v_device, p_nickname, 'viewer', 'pending')
+    on conflict (area_id, device_id)
+      do update set nickname = excluded.nickname
+    returning * into v_member;
+  end if;
 
   return v_member;
 end;
 $$;
 
+-- Approves a pending joiner, or changes an already-approved member's role
+-- (promote to manager, demote, switch viewer/editor) — the owner or any
+-- existing manager may call this for anyone except the owner's own row
+-- (blocked by the trigger above regardless).
 create or replace function public.approve_area_member(p_member_id uuid, p_role text)
 returns public.area_members
 language plpgsql
@@ -270,23 +320,48 @@ declare
   v_area_id uuid;
   v_member public.area_members;
 begin
-  if p_role not in ('editor', 'viewer') then
-    raise exception 'role must be editor or viewer';
+  if p_role not in ('manager', 'editor', 'viewer') then
+    raise exception 'role must be manager, editor, or viewer';
   end if;
 
   select area_id into v_area_id from public.area_members where id = p_member_id;
-  if not public.is_area_owner(v_area_id) then
-    raise exception 'only the owner can approve members';
+  if not public.can_manage_area(v_area_id) then
+    raise exception 'only the owner or a manager can approve or change members';
   end if;
 
+  -- If p_member_id is the owner's own row, the trigger above silently keeps
+  -- its role/status unchanged (owners can't be demoted this way) — the
+  -- update still succeeds, it just has no effect on that row.
   update public.area_members
   set status = 'approved', role = p_role, approved_at = now()
   where id = p_member_id
   returning * into v_member;
 
+  if not found then
+    raise exception 'member % not found', p_member_id;
+  end if;
+
   insert into public.activity_log (area_id, entity_type, entity_id, action, actor_id, summary)
   values (v_area_id, 'area', v_area_id, 'approved', p_member_id, v_member.nickname);
 
   return v_member;
+end;
+$$;
+
+-- Deletes an area and everything in it (cascades through every area_id
+-- foreign key). Owner-only, and deliberately not "leave" — leaving your own
+-- membership row (the normal DELETE policy above) never removes the area
+-- itself, even for the owner.
+create or replace function public.delete_area(p_area_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_area_owner(p_area_id) then
+    raise exception 'only the owner can delete the area';
+  end if;
+  delete from public.areas where id = p_area_id;
 end;
 $$;

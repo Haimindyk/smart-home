@@ -6,8 +6,11 @@ struct AreaSettingsView: View {
     @State private var showInvite = false
     @State private var showLeaveConfirm = false
     @State private var isLeaving = false
+    @State private var isUpdatingJoinPolicy = false
 
     private var locale: AppLocale { appState.locale }
+    private var isOwner: Bool { store.myMembership.role == .owner }
+    private var canManage: Bool { store.myMembership.role.canManageMembers }
 
     var body: some View {
         NavigationStack {
@@ -52,6 +55,32 @@ struct AreaSettingsView: View {
                     }
                 }
 
+                if canManage {
+                    Section {
+                        Picker(locale == .he ? "הצטרפות לאזור" : "Joining the area", selection: joinPolicyBinding) {
+                            Text(locale == .he ? "דורש אישור" : "Requires approval").tag(AreaJoinPolicy.manual)
+                            Text(locale == .he ? "אוטומטית" : "Automatic").tag(AreaJoinPolicy.auto)
+                        }
+                        if store.area.joinPolicy == .auto {
+                            Picker(locale == .he ? "הרשאה אוטומטית" : "Automatic permission", selection: autoJoinRoleBinding) {
+                                Text(AreaRole.viewer.label(locale)).tag(AreaRole.viewer)
+                                Text(AreaRole.editor.label(locale)).tag(AreaRole.editor)
+                            }
+                        }
+                    } header: {
+                        Text(locale == .he ? "מדיניות הצטרפות" : "Join policy")
+                    } footer: {
+                        Text(store.area.joinPolicy == .auto
+                             ? (locale == .he
+                                ? "כל מי שמקבל את הקישור או סורק את ה-QR מצטרף מיד, בלי לחכות לאישור."
+                                : "Anyone with the link or QR joins immediately, without waiting for approval.")
+                             : (locale == .he
+                                ? "כל בקשת הצטרפות תחכה לאישור שלך או של מנהל/ת פתק אחר/ת."
+                                : "Every join request waits for you or another manager to approve it."))
+                    }
+                    .disabled(isUpdatingJoinPolicy)
+                }
+
                 Section(locale == .he ? "שפה" : "Language") {
                     Picker("", selection: Binding(get: { locale }, set: { appState.setLocale($0) })) {
                         Text("עברית").tag(AppLocale.he)
@@ -64,7 +93,7 @@ struct AreaSettingsView: View {
                     Button(role: .destructive) {
                         showLeaveConfirm = true
                     } label: {
-                        Text(store.myMembership.role == .owner
+                        Text(isOwner
                              ? (locale == .he ? "מחיקת האזור" : "Delete area")
                              : (locale == .he ? "עזיבת האזור" : "Leave area"))
                     }
@@ -76,24 +105,57 @@ struct AreaSettingsView: View {
                 AreaInviteShareView(area: store.area)
             }
             .confirmationDialog(
-                store.myMembership.role == .owner
-                    ? (locale == .he ? "למחוק את האזור לצמיתות?" : "Delete this area permanently?")
+                isOwner
+                    ? (locale == .he ? "למחוק את האזור לצמיתות? הפעולה תמחק את כל התוכן ולא ניתן לבטל אותה." : "Delete this area permanently? This removes everything in it and can't be undone.")
                     : (locale == .he ? "לעזוב את האזור?" : "Leave this area?"),
                 isPresented: $showLeaveConfirm,
                 titleVisibility: .visible
             ) {
                 Button(locale == .he ? "אישור" : "Confirm", role: .destructive) {
-                    Task { await leave() }
+                    Task { await leaveOrDelete() }
                 }
             }
         }
     }
 
-    private func leave() async {
+    private var joinPolicyBinding: Binding<AreaJoinPolicy> {
+        Binding(
+            get: { store.area.joinPolicy },
+            set: { newPolicy in Task { await updateJoinPolicy(policy: newPolicy, autoJoinRole: store.area.autoJoinRole) } }
+        )
+    }
+
+    private var autoJoinRoleBinding: Binding<AreaRole> {
+        Binding(
+            get: { store.area.autoJoinRole },
+            set: { newRole in Task { await updateJoinPolicy(policy: store.area.joinPolicy, autoJoinRole: newRole) } }
+        )
+    }
+
+    private func updateJoinPolicy(policy: AreaJoinPolicy, autoJoinRole: AreaRole) async {
+        isUpdatingJoinPolicy = true
+        defer { isUpdatingJoinPolicy = false }
+        do {
+            try await appState.areaService.updateJoinPolicy(areaId: store.area.id, policy: policy, autoJoinRole: autoJoinRole)
+            await store.loadAll()
+        } catch {
+            store.lastError = error.localizedDescription
+        }
+    }
+
+    private func leaveOrDelete() async {
         isLeaving = true
         defer { isLeaving = false }
-        try? await appState.areaService.removeOrLeave(memberId: store.myMembership.id)
-        await appState.refreshAreas()
+        do {
+            if isOwner {
+                try await appState.areaService.deleteArea(areaId: store.area.id)
+            } else {
+                try await appState.areaService.removeOrLeave(memberId: store.myMembership.id)
+            }
+            await appState.refreshAreas()
+        } catch {
+            store.lastError = error.localizedDescription
+        }
     }
 }
 

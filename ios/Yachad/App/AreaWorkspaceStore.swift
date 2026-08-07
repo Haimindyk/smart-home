@@ -5,8 +5,8 @@ import Foundation
 /// fresh. Created when an area is opened, torn down when it's closed.
 @MainActor
 final class AreaWorkspaceStore: ObservableObject {
-    let area: Area
-    let myMembership: AreaMember
+    @Published private(set) var area: Area
+    @Published private(set) var myMembership: AreaMember
 
     @Published var sections: [WorkspaceSection] = []
     @Published var tasks: [TaskItem] = []
@@ -48,6 +48,7 @@ final class AreaWorkspaceStore: ObservableObject {
         isLoading = sections.isEmpty && tasks.isEmpty
         defer { isLoading = false }
         do {
+            async let areaResult = areaService.fetchArea(id: area.id)
             async let sectionsResult = workspaceService.fetchSections(areaId: area.id)
             async let tasksResult = workspaceService.fetchTasks(areaId: area.id)
             async let choresResult = choreService.fetchChores(areaId: area.id)
@@ -55,12 +56,19 @@ final class AreaWorkspaceStore: ObservableObject {
             async let membersResult = areaService.fetchMembers(areaId: area.id)
             async let activityResult = activityService.fetchRecent(areaId: area.id)
 
+            area = try await areaResult
             sections = try await sectionsResult
             tasks = try await tasksResult
             chores = try await choresResult
             events = try await eventsResult
             members = try await membersResult
             recentActivity = try await activityResult
+
+            // Pick up role/status changes to my own membership live (e.g. a
+            // manager promotes/demotes me while I have the area open).
+            if let updatedSelf = members.first(where: { $0.id == myMembership.id }) {
+                myMembership = updatedSelf
+            }
         } catch {
             lastError = error.localizedDescription
         }

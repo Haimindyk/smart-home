@@ -1,16 +1,29 @@
 import Foundation
 
+enum AreaJoinPolicy: String, Codable, CaseIterable, Identifiable {
+    /// Everyone who requests to join waits for the owner/a manager to approve them.
+    case manual
+    /// Anyone holding the link/QR is approved immediately, with `autoJoinRole`.
+    case auto
+
+    var id: String { rawValue }
+}
+
 struct Area: Codable, Identifiable, Hashable {
     let id: UUID
     var name: String
     var emoji: String?
     var inviteCode: String
+    var joinPolicy: AreaJoinPolicy
+    var autoJoinRole: AreaRole
     var createdAt: Date
     var updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
         case id, name, emoji
         case inviteCode = "invite_code"
+        case joinPolicy = "join_policy"
+        case autoJoinRole = "auto_join_role"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -18,18 +31,27 @@ struct Area: Codable, Identifiable, Hashable {
 
 enum AreaRole: String, Codable, CaseIterable, Identifiable {
     case owner
+    case manager
     case editor
     case viewer
 
     var id: String { rawValue }
 
-    /// Owner and editor can create/edit/complete/delete content; viewer is read-only.
+    /// Owner, manager, and editor can create/edit/complete/delete content; viewer is read-only.
     var canWrite: Bool { self != .viewer }
+
+    /// Owner and manager can approve/reject joiners, change roles, appoint further managers.
+    var canManageMembers: Bool { self == .owner || self == .manager }
+
+    /// The roles an owner/manager may assign to someone else (never `owner` — fixed at creation).
+    static var assignable: [AreaRole] { [.manager, .editor, .viewer] }
 
     func label(_ locale: AppLocale) -> String {
         switch (self, locale) {
         case (.owner, .he): return "בעל/ת האזור"
         case (.owner, .en): return "Owner"
+        case (.manager, .he): return "מנהל/ת פתק"
+        case (.manager, .en): return "Manager"
         case (.editor, .he): return "קריאה וכתיבה"
         case (.editor, .en): return "Read & write"
         case (.viewer, .he): return "קריאה בלבד"

@@ -47,13 +47,22 @@ per-area gating:
 - Row Level Security on the new backend keys off that header (see
   `ios/backend/migrations/0002_access_control.sql`): a device can only read
   an area once it has an `approved` row in `area_members` for it, and can
-  only write if that row's `role` is `owner` or `editor`.
-- Creating or joining an area only happens through two SECURITY DEFINER
-  RPCs (`create_area`, `request_join_area`) — there's no direct insert
-  policy on `areas`/`area_members`, so a device can never forge
-  membership in someone else's area or grant itself a role.
-- The area's owner approves each pending request and picks the role;
-  that's the entire "permission system."
+  only write if that row's `role` is `owner`, `manager`, or `editor`.
+- Four roles: `owner` (the creator, exactly one, fixed — no ownership
+  transfer in v1), `manager` (everything the owner can do except delete the
+  area or touch the owner's own row — including approving/rejecting
+  joiners and appointing further managers), `editor` (read & write
+  content), `viewer` (read-only).
+- Each area has a `join_policy`: `manual` (default — every request waits
+  for the owner or a manager to approve it and pick a role) or `auto`
+  (anyone holding the link/QR is approved immediately, with a configurable
+  default role). Either way, no login is ever required — just a nickname.
+- Creating or joining an area only happens through SECURITY DEFINER RPCs
+  (`create_area`, `request_join_area`, `approve_area_member`,
+  `delete_area`) — there's no direct insert policy on
+  `areas`/`area_members`, so a device can never forge membership in
+  someone else's area or grant itself a role, and only the owner can
+  delete the area outright.
 
 ## What's shipped vs. deferred
 
@@ -61,13 +70,17 @@ Following the same "ship the core, defer the rest cleanly" approach as the
 website's own README:
 
 **Shipped**: areas (create/rename via emoji+name), invite via link + QR
-code, join-request + owner approval with read-only/read-write roles,
-member management, sections (tasks/shopping/chores/info), tasks with
-unlimited-depth subtasks, shopping-flavored fields (quantity/unit/
-price/brand), house chores with daily/weekly/monthly/as-needed recurrence
-+ completion history, a month-grouped calendar (birthdays/medical/other,
-yearly recurrence), instant client-side search, a lightweight recent-
-activity log, Hebrew (RTL, default) + English (LTR), Realtime sync per area.
+code, join requests with owner/manager approval (read-only, read & write,
+or manager), an area-level toggle between "requires approval" and "anyone
+with the link joins automatically" (with a configurable default role for
+auto-join), an owner can appoint further managers who get the same
+approve/appoint/remove powers, member management, sections (tasks/shopping/
+chores/info), tasks with unlimited-depth subtasks, shopping-flavored fields
+(quantity/unit/price/brand), house chores with daily/weekly/monthly/
+as-needed recurrence + completion history, a month-grouped calendar
+(birthdays/medical/other, yearly recurrence), instant client-side search, a
+lightweight recent-activity log, Hebrew (RTL, default) + English (LTR),
+Realtime sync per area.
 
 **Deliberately deferred** (same reasoning as the website's own Phase 2
 list — clean extension points exist, but each deserves its own pass):

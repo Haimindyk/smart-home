@@ -30,12 +30,17 @@ $$;
 -- number of them, each with its own membership.
 -- ---------------------------------------------------------------------------
 create table public.areas (
-  id            uuid primary key default gen_random_uuid(),
-  name          text not null,
-  emoji         text,
-  invite_code   text not null unique default encode(gen_random_bytes(6), 'base64'),
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
+  id              uuid primary key default gen_random_uuid(),
+  name            text not null,
+  emoji           text,
+  invite_code     text not null unique default encode(gen_random_bytes(6), 'base64'),
+  -- 'manual': the owner/a manager approves every join request (default).
+  -- 'auto': anyone holding the link/QR joins immediately, with the role
+  -- below — no waiting room. Either way, no login is ever required.
+  join_policy     text not null default 'manual' check (join_policy in ('manual', 'auto')),
+  auto_join_role  text not null default 'viewer' check (auto_join_role in ('editor', 'viewer')),
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
 );
 
 create trigger areas_set_updated_at
@@ -60,16 +65,19 @@ create trigger areas_normalize_invite_code
 -- ---------------------------------------------------------------------------
 -- area_members: one row per (area, device). No auth — a "device" is a random
 -- uuid the app generates once and stores locally (see DeviceIdentity.swift).
--- Membership starts 'pending' for everyone except the creator (auto-'approved'
--- as 'owner'); the owner then picks 'viewer' (read-only) or 'editor'
--- (read-write) when approving.
+-- Membership starts 'pending' for everyone except the creator (auto-
+-- 'approved' as 'owner') unless the area's join_policy is 'auto'. Roles:
+-- 'owner' (the creator — fixed, exactly one), 'manager' (everything the
+-- owner can do except delete the area or touch the owner's own row —
+-- including approving joiners and appointing further managers), 'editor'
+-- (read & write content), 'viewer' (read-only).
 -- ---------------------------------------------------------------------------
 create table public.area_members (
   id            uuid primary key default gen_random_uuid(),
   area_id       uuid not null references public.areas(id) on delete cascade,
   device_id     uuid not null,
   nickname      text not null check (char_length(btrim(nickname)) between 1 and 40),
-  role          text not null default 'viewer' check (role in ('owner', 'editor', 'viewer')),
+  role          text not null default 'viewer' check (role in ('owner', 'manager', 'editor', 'viewer')),
   status        text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
   color         text not null default '#6366f1',
   avatar_emoji  text,

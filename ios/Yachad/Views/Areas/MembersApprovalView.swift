@@ -1,8 +1,10 @@
 import SwiftUI
 
-/// The owner's screen: pending join requests to approve/reject (choosing
-/// read-only vs read & write), plus the current roster with the ability to
-/// change someone's permission or remove them.
+/// The owner/manager screen: pending join requests to approve/reject
+/// (choosing read-only, read & write, or manager), plus the current roster
+/// with the ability to change someone's permission or remove them. Owner
+/// and manager both see the same controls — a manager can appoint further
+/// managers, same as the owner can.
 struct MembersApprovalView: View {
     @ObservedObject var store: AreaWorkspaceStore
     @EnvironmentObject private var appState: AppState
@@ -10,7 +12,7 @@ struct MembersApprovalView: View {
     @State private var error: String?
 
     private var locale: AppLocale { appState.locale }
-    private var isOwner: Bool { store.myMembership.role == .owner }
+    private var canManage: Bool { store.myMembership.role.canManageMembers }
 
     var body: some View {
         List {
@@ -46,7 +48,7 @@ struct MembersApprovalView: View {
     private func pendingRow(_ member: AreaMember) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(member.nickname).font(.body.weight(.medium))
-            if isOwner {
+            if canManage {
                 HStack {
                     Button {
                         Task { await approve(member, role: .viewer) }
@@ -62,6 +64,12 @@ struct MembersApprovalView: View {
                     }
                     .buttonStyle(.borderedProminent)
 
+                    Menu {
+                        Button(AreaRole.manager.label(locale)) { Task { await approve(member, role: .manager) } }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+
                     Spacer()
 
                     Button(role: .destructive) {
@@ -72,7 +80,7 @@ struct MembersApprovalView: View {
                 }
                 .disabled(busyMemberId == member.id)
             } else {
-                Text(locale == .he ? "ממתין לאישור בעל/ת האזור" : "Waiting for the owner")
+                Text(locale == .he ? "ממתין לאישור מנהל/ת הפתק" : "Waiting for a manager")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -88,10 +96,11 @@ struct MembersApprovalView: View {
                 Text(member.role.label(locale)).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            if isOwner && member.role != .owner {
+            if canManage && member.role != .owner {
                 Menu {
-                    Button(AreaRole.viewer.label(locale)) { Task { await approve(member, role: .viewer) } }
-                    Button(AreaRole.editor.label(locale)) { Task { await approve(member, role: .editor) } }
+                    ForEach(AreaRole.assignable) { role in
+                        Button(role.label(locale)) { Task { await approve(member, role: role) } }
+                    }
                     Button(role: .destructive) {
                         Task { await remove(member) }
                     } label: {

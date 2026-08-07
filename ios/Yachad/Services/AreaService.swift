@@ -71,6 +71,16 @@ struct AreaService {
             .value
     }
 
+    func fetchArea(id: UUID) async throws -> Area {
+        try await client
+            .from("areas")
+            .select()
+            .eq("id", value: id.uuidString)
+            .single()
+            .execute()
+            .value
+    }
+
     // MARK: - Membership management (owner)
 
     func fetchMembers(areaId: UUID) async throws -> [AreaMember] {
@@ -85,6 +95,9 @@ struct AreaService {
 
     private struct ApproveParams: Encodable { let p_member_id: String; let p_role: String }
 
+    /// Approves a pending joiner, or changes an already-approved member's
+    /// role (promote to manager, demote, switch viewer/editor) — anything
+    /// but `owner`, which is fixed at creation.
     @discardableResult
     func approve(memberId: UUID, role: AreaRole) async throws -> AreaMember {
         precondition(role != .owner)
@@ -115,6 +128,29 @@ struct AreaService {
             .from("area_members")
             .update(["nickname": nickname])
             .eq("id", value: memberId.uuidString)
+            .execute()
+    }
+
+    // MARK: - Area settings (owner/manager)
+
+    /// Whether joiners need approval, and — when they don't — what role
+    /// they get automatically. Editable by the owner or a manager.
+    func updateJoinPolicy(areaId: UUID, policy: AreaJoinPolicy, autoJoinRole: AreaRole) async throws {
+        precondition(autoJoinRole == .editor || autoJoinRole == .viewer)
+        _ = try await client
+            .from("areas")
+            .update(["join_policy": policy.rawValue, "auto_join_role": autoJoinRole.rawValue])
+            .eq("id", value: areaId.uuidString)
+            .execute()
+    }
+
+    private struct DeleteAreaParams: Encodable { let p_area_id: String }
+
+    /// Deletes the area and everything in it. Owner-only — enforced
+    /// server-side, not just hidden in the UI.
+    func deleteArea(areaId: UUID) async throws {
+        _ = try await client
+            .rpc("delete_area", params: DeleteAreaParams(p_area_id: areaId.uuidString))
             .execute()
     }
 }
