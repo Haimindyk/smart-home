@@ -52,6 +52,9 @@ struct TaskRowView: View {
                         if !assignees.isEmpty {
                             Label(assignees.map(\.nickname).joined(separator: ", "), systemImage: "person")
                         }
+                        if !node.task.detectedLinks.isEmpty {
+                            Image(systemName: "link")
+                        }
                     }
                     .font(.caption2)
                     .foregroundStyle(.secondary)

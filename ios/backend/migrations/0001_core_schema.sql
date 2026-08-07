@@ -144,6 +144,7 @@ create table public.tasks (
   due_at          timestamptz,
   due_end_at      timestamptz,
   tags            text[] not null default '{}',
+  detected_links  text[] not null default '{}',
   is_note         boolean not null default false,
 
   -- Multiple assignees, same as the website. No FK on array elements
@@ -181,6 +182,29 @@ create index tasks_tags_idx on public.tasks using gin (tags);
 create trigger tasks_set_updated_at
   before update on public.tasks
   for each row execute function public.set_updated_at();
+
+-- Auto-extract http(s) URLs from title/notes into detected_links on write
+-- (same as the website's extract_links()) — the client never sets this
+-- column directly.
+create or replace function public.extract_links()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.detected_links := coalesce(
+    (
+      select array_agg(distinct m[1])
+      from regexp_matches(coalesce(new.title, '') || ' ' || coalesce(new.notes, ''), 'https?://[^\s]+', 'g') as m
+    ),
+    '{}'
+  );
+  return new;
+end;
+$$;
+
+create trigger tasks_extract_links
+  before insert or update of title, notes on public.tasks
+  for each row execute function public.extract_links();
 
 -- Cascading soft-delete / restore for a task and its whole subtask subtree.
 create or replace function public.soft_delete_task(p_task_id uuid)

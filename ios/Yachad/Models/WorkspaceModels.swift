@@ -71,6 +71,9 @@ struct TaskItem: Codable, Identifiable, Hashable {
     var dueAt: Date?
     var dueEndAt: Date?
     var tags: [String]
+    /// Server-derived (see the `extract_links` trigger) — never set by the
+    /// client, just auto-extracted URLs from `title`/`notes`.
+    var detectedLinks: [String]
     var isNote: Bool
 
     var assigneeMemberIds: [UUID]
@@ -99,6 +102,7 @@ struct TaskItem: Codable, Identifiable, Hashable {
         case parentTaskId = "parent_task_id"
         case dueAt = "due_at"
         case dueEndAt = "due_end_at"
+        case detectedLinks = "detected_links"
         case isNote = "is_note"
         case assigneeMemberIds = "assignee_member_ids"
         case isCompleted = "is_completed"

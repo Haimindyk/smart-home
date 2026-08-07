@@ -14,6 +14,7 @@ final class AreaWorkspaceStore: ObservableObject {
     @Published var events: [CalendarEvent] = []
     @Published var members: [AreaMember] = []
     @Published var recentActivity: [ActivityLogEntry] = []
+    @Published var broadcasts: [BroadcastMessage] = []
     @Published var isLoading = true
     @Published var lastError: String?
     @Published private(set) var pendingUndo: UndoAction?
@@ -31,6 +32,7 @@ final class AreaWorkspaceStore: ObservableObject {
     private let calendarService = CalendarService()
     private let areaService: AreaService
     private let activityService = ActivityService()
+    private let broadcastService = BroadcastService()
     private let realtime = RealtimeSyncManager()
 
     var canWrite: Bool { myMembership.role.canWrite }
@@ -64,6 +66,7 @@ final class AreaWorkspaceStore: ObservableObject {
             async let eventsResult = calendarService.fetchEvents(areaId: area.id)
             async let membersResult = areaService.fetchMembers(areaId: area.id)
             async let activityResult = activityService.fetchRecent(areaId: area.id)
+            async let broadcastsResult = broadcastService.fetchRecent(areaId: area.id)
 
             area = try await areaResult
             sections = try await sectionsResult
@@ -72,6 +75,7 @@ final class AreaWorkspaceStore: ObservableObject {
             events = try await eventsResult
             members = try await membersResult
             recentActivity = try await activityResult
+            broadcasts = try await broadcastsResult
 
             // Pick up role/status changes to my own membership live (e.g. a
             // manager promotes/demotes me while I have the area open).

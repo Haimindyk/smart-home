@@ -49,6 +49,20 @@ struct TaskEditorView: View {
                         .lineLimit(2...5)
                 }
 
+                if !task.detectedLinks.isEmpty {
+                    Section(locale == .he ? "קישורים" : "Links") {
+                        ForEach(task.detectedLinks, id: \.self) { link in
+                            if let url = URL(string: link) {
+                                Link(destination: url) {
+                                    Label(link, systemImage: "link")
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if isShopping {
                     Section(locale == .he ? "פרטי קנייה" : "Shopping details") {
                         HStack {

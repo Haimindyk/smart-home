@@ -16,6 +16,7 @@ struct SectionsHomeView: View {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
+                        BroadcastBannerView(store: store)
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 12) {
                             ForEach(visibleSections) { section in
                                 NavigationLink(value: section) {

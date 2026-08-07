@@ -4,7 +4,7 @@ import Supabase
 struct ActivityService {
     var client: SupabaseClient { SupabaseService.shared }
 
-    func fetchRecent(areaId: UUID, limit: Int = 50) async throws -> [ActivityLogEntry] {
+    func fetchRecent(areaId: UUID, limit: Int = 30) async throws -> [ActivityLogEntry] {
         try await client
             .from("activity_log")
             .select()

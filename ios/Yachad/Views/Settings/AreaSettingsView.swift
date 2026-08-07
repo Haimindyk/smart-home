@@ -10,6 +10,7 @@ struct AreaSettingsView: View {
     @State private var showLeaveConfirm = false
     @State private var isLeaving = false
     @State private var isUpdatingJoinPolicy = false
+    @State private var showBroadcastCompose = false
 
     private var locale: AppLocale { appState.locale }
     private var isOwner: Bool { store.myMembership.role == .owner }
@@ -55,6 +56,13 @@ struct AreaSettingsView: View {
                         ActivityLogView(store: store)
                     } label: {
                         Label(locale == .he ? "פעילות אחרונה" : "Recent activity", systemImage: "clock.arrow.circlepath")
+                    }
+                    if canManage {
+                        Button {
+                            showBroadcastCompose = true
+                        } label: {
+                            Label(locale == .he ? "הודעת שידור לכולם" : "Broadcast to everyone", systemImage: "megaphone")
+                        }
                     }
                 }
 
@@ -114,6 +122,9 @@ struct AreaSettingsView: View {
             .navigationTitle(locale == .he ? "הגדרות" : "Settings")
             .sheet(isPresented: $showInvite) {
                 AreaInviteShareView(area: store.area)
+            }
+            .sheet(isPresented: $showBroadcastCompose) {
+                BroadcastComposeView(store: store)
             }
             .confirmationDialog(
                 isOwner

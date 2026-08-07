@@ -22,7 +22,7 @@ final class RealtimeSyncManager {
         let channel = client.channel("area-\(areaId.uuidString)")
         self.channel = channel
 
-        let tables = ["sections", "tasks", "chores", "chore_completions", "calendar_events", "area_members", "activity_log"]
+        let tables = ["sections", "tasks", "chores", "chore_completions", "calendar_events", "area_members", "activity_log", "broadcasts"]
         let filter = "area_id=eq.\(areaId.uuidString)"
 
         listenTask = Task {

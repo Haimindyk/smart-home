@@ -76,15 +76,17 @@ with the link joins automatically" (with a configurable default role for
 auto-join), an owner can appoint further managers who get the same
 approve/appoint/remove powers, member management, sections (tasks/shopping/
 chores/info), tasks with unlimited-depth subtasks and **multiple**
-assignees (new tasks auto-assign whoever created them), shopping-flavored
-fields (quantity/unit/price/brand), house chores with daily/weekly/monthly/
-as-needed recurrence + completion history, a month-grouped calendar
-(birthdays/medical/other, yearly recurrence), instant client-side search, a
-lightweight recent-activity log, **drag-and-drop reordering** (tasks within
-a section, shopping items, sections on the dashboard), **an undo toast
-after every delete**, **push notifications** (join requests, approvals,
-task assignments, a daily due-today digest), Hebrew (RTL, default) +
-English (LTR), Realtime sync per area.
+assignees (new tasks auto-assign whoever created them), **automatic link
+extraction** (URLs typed into a title/notes become tappable), shopping-
+flavored fields (quantity/unit/price/brand), house chores with daily/
+weekly/monthly/as-needed recurrence + completion history, a month-grouped
+calendar (birthdays/medical/other, yearly recurrence), instant client-side
+search, a recent-activity log (last 30), **drag-and-drop reordering**
+(tasks within a section, shopping items, sections on the dashboard), **an
+undo toast after every delete**, **broadcast messages** (owner/manager ->
+everyone, as a dashboard banner + push), **push notifications** (join
+requests, approvals, task assignments, broadcasts, a daily due-today
+digest), Hebrew (RTL, default) + English (LTR), Realtime sync per area.
 
 **Deliberately deferred** (same reasoning as the website's own Phase 2
 list — clean extension points exist, but each deserves its own pass):
