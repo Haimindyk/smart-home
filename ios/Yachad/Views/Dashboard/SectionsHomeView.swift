@@ -4,8 +4,10 @@ struct SectionsHomeView: View {
     @ObservedObject var store: AreaWorkspaceStore
     @EnvironmentObject private var appState: AppState
     @State private var showNewSection = false
+    @State private var showReorder = false
 
     private var locale: AppLocale { appState.locale }
+    private var visibleSections: [WorkspaceSection] { store.sections.filter { $0.kind != .chores } }
 
     var body: some View {
         NavigationStack {
@@ -15,11 +17,20 @@ struct SectionsHomeView: View {
                 } else {
                     ScrollView {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 12) {
-                            ForEach(store.sections.filter { $0.kind != .chores }) { section in
+                            ForEach(visibleSections) { section in
                                 NavigationLink(value: section) {
                                     SectionCardView(section: section, tasks: store.tasks(in: section.id), locale: locale)
                                 }
                                 .buttonStyle(.plain)
+                                .contextMenu {
+                                    if store.canWrite {
+                                        Button(role: .destructive) {
+                                            Task { await deleteSection(section) }
+                                        } label: {
+                                            Label(locale == .he ? "מחיקת מדור" : "Delete section", systemImage: "trash")
+                                        }
+                                    }
+                                }
                             }
                         }
                         .padding()
@@ -32,11 +43,19 @@ struct SectionsHomeView: View {
                     ToolbarItem(placement: .primaryAction) {
                         Button { showNewSection = true } label: { Image(systemName: "plus") }
                     }
+                    if visibleSections.count > 1 {
+                        ToolbarItem(placement: .secondaryAction) {
+                            Button { showReorder = true } label: { Image(systemName: "arrow.up.arrow.down") }
+                        }
+                    }
                 }
             }
             .refreshable { await store.loadAll() }
             .sheet(isPresented: $showNewSection) {
                 NewSectionView(store: store)
+            }
+            .sheet(isPresented: $showReorder) {
+                ReorderSectionsView(store: store)
             }
             .navigationDestination(for: WorkspaceSection.self) { section in
                 switch section.kind {
@@ -48,6 +67,14 @@ struct SectionsHomeView: View {
                     ChoresView(store: store, sectionFilter: section.id)
                 }
             }
+        }
+    }
+
+    private func deleteSection(_ section: WorkspaceSection) async {
+        try? await WorkspaceService().softDeleteSection(id: section.id)
+        await store.loadAll()
+        store.showUndo(message: locale == .he ? "\"\(section.name)\" נמחק" : "\"\(section.name)\" deleted") {
+            try? await WorkspaceService().restoreSection(id: section.id)
         }
     }
 }

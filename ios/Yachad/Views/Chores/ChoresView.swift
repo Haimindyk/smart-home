@@ -20,6 +20,15 @@ struct ChoresView: View {
             List {
                 ForEach(chores) { chore in
                     choreRow(chore)
+                        .swipeActions {
+                            if store.canWrite {
+                                Button(role: .destructive) {
+                                    Task { await delete(chore) }
+                                } label: {
+                                    Label(locale == .he ? "מחיקה" : "Delete", systemImage: "trash")
+                                }
+                            }
+                        }
                 }
             }
             .listStyle(.insetGrouped)
@@ -67,9 +76,10 @@ struct ChoresView: View {
                     Text(chore.freq.label(locale))
                     Text("·")
                     Text(chore.nextDueAt.formatted(date: .abbreviated, time: .omitted))
-                    if let assignee = store.member(chore.assigneeMemberId) {
+                    let assignees = store.members(chore.assigneeMemberIds)
+                    if !assignees.isEmpty {
                         Text("·")
-                        Text(assignee.nickname)
+                        Text(assignees.map(\.nickname).joined(separator: ", "))
                     }
                 }
                 .font(.caption)
@@ -88,5 +98,13 @@ struct ChoresView: View {
         defer { completingId = nil }
         try? await ChoreService().complete(choreId: chore.id, completedBy: store.myMemberId)
         await store.loadAll()
+    }
+
+    private func delete(_ chore: Chore) async {
+        try? await ChoreService().softDelete(id: chore.id)
+        await store.loadAll()
+        store.showUndo(message: locale == .he ? "\"\(chore.title)\" נמחקה" : "\"\(chore.title)\" deleted") {
+            try? await ChoreService().restore(id: chore.id)
+        }
     }
 }

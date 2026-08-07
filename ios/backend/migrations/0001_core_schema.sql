@@ -146,7 +146,11 @@ create table public.tasks (
   tags            text[] not null default '{}',
   is_note         boolean not null default false,
 
-  assignee_member_id uuid references public.area_members(id) on delete set null,
+  -- Multiple assignees, same as the website. No FK on array elements
+  -- (Postgres can't enforce that directly) — a removed member's id just
+  -- stops resolving to a name client-side, which is an acceptable
+  -- v1 trade-off for a household-sized member list.
+  assignee_member_ids uuid[] not null default '{}',
 
   is_completed    boolean not null default false,
   completed_at    timestamptz,
@@ -233,7 +237,7 @@ create table public.chores (
   emoji              text,
   position           text not null,
 
-  assignee_member_id uuid references public.area_members(id) on delete set null,
+  assignee_member_ids uuid[] not null default '{}',
 
   freq               text not null check (freq in ('daily', 'weekly', 'monthly', 'custom', 'as_needed')),
   interval_n         int not null default 1,

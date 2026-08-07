@@ -73,7 +73,7 @@ struct TaskItem: Codable, Identifiable, Hashable {
     var tags: [String]
     var isNote: Bool
 
-    var assigneeMemberId: UUID?
+    var assigneeMemberIds: [UUID]
 
     var isCompleted: Bool
     var completedAt: Date?
@@ -100,7 +100,7 @@ struct TaskItem: Codable, Identifiable, Hashable {
         case dueAt = "due_at"
         case dueEndAt = "due_end_at"
         case isNote = "is_note"
-        case assigneeMemberId = "assignee_member_id"
+        case assigneeMemberIds = "assignee_member_ids"
         case isCompleted = "is_completed"
         case completedAt = "completed_at"
         case completedBy = "completed_by"

@@ -1,8 +1,11 @@
 import SwiftUI
+import UserNotifications
+import UIKit
 
 struct AreaSettingsView: View {
     @ObservedObject var store: AreaWorkspaceStore
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var pushService: PushService
     @State private var showInvite = false
     @State private var showLeaveConfirm = false
     @State private var isLeaving = false
@@ -81,6 +84,14 @@ struct AreaSettingsView: View {
                     .disabled(isUpdatingJoinPolicy)
                 }
 
+                Section {
+                    notificationsRow
+                } footer: {
+                    Text(locale == .he
+                         ? "התראות על בקשות הצטרפות, אישור, שיוך למשימה, ותזכורות יומיות למה שמגיע היום."
+                         : "Notifications for join requests, approval, task assignments, and a daily reminder of what's due today.")
+                }
+
                 Section(locale == .he ? "שפה" : "Language") {
                     Picker("", selection: Binding(get: { locale }, set: { appState.setLocale($0) })) {
                         Text("עברית").tag(AppLocale.he)
@@ -115,6 +126,31 @@ struct AreaSettingsView: View {
                     Task { await leaveOrDelete() }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var notificationsRow: some View {
+        switch pushService.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            Label(locale == .he ? "התראות פעילות" : "Notifications on", systemImage: "bell.fill")
+                .foregroundStyle(.secondary)
+        case .denied:
+            Button {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            } label: {
+                Label(locale == .he ? "התראות כבויות — פתיחת הגדרות" : "Notifications off — open Settings", systemImage: "bell.slash")
+            }
+        case .notDetermined:
+            Button {
+                Task { await pushService.requestAuthorization() }
+            } label: {
+                Label(locale == .he ? "הפעלת התראות" : "Enable notifications", systemImage: "bell")
+            }
+        @unknown default:
+            EmptyView()
         }
     }
 

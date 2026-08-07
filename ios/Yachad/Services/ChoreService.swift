@@ -32,7 +32,7 @@ struct ChoreService {
         let title: String
         let emoji: String?
         let position: String
-        let assignee_member_id: String?
+        let assignee_member_ids: [String]
         let freq: String
         let interval_n: Int
         let weekdays: [Int]?
@@ -42,12 +42,12 @@ struct ChoreService {
     }
 
     @discardableResult
-    func createChore(areaId: UUID, sectionId: UUID, title: String, emoji: String?, position: String, assigneeMemberId: UUID?, freq: ChoreFrequency, intervalN: Int = 1, weekdays: [Int]? = nil, monthDay: Int? = nil, actorId: UUID?) async throws -> Chore {
+    func createChore(areaId: UUID, sectionId: UUID, title: String, emoji: String?, position: String, assigneeMemberIds: [UUID] = [], freq: ChoreFrequency, intervalN: Int = 1, weekdays: [Int]? = nil, monthDay: Int? = nil, actorId: UUID?) async throws -> Chore {
         try await client
             .from("chores")
             .insert(NewChore(
                 area_id: areaId.uuidString, section_id: sectionId.uuidString, title: title,
-                emoji: emoji, position: position, assignee_member_id: assigneeMemberId?.uuidString,
+                emoji: emoji, position: position, assignee_member_ids: assigneeMemberIds.map(\.uuidString),
                 freq: freq.rawValue, interval_n: intervalN, weekdays: weekdays, month_day: monthDay,
                 created_by: actorId?.uuidString, updated_by: actorId?.uuidString
             ))
@@ -61,6 +61,14 @@ struct ChoreService {
         _ = try await client
             .from("chores")
             .update(["deleted_at": ISO8601DateFormatter().string(from: Date())])
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func restore(id: UUID) async throws {
+        _ = try await client
+            .from("chores")
+            .update(ClearDeletedAtPatch())
             .eq("id", value: id.uuidString)
             .execute()
     }

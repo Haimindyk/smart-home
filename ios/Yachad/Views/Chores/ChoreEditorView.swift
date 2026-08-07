@@ -10,7 +10,7 @@ struct ChoreEditorView: View {
     @State private var title = ""
     @State private var sectionId: UUID?
     @State private var freq: ChoreFrequency = .weekly
-    @State private var assigneeId: UUID?
+    @State private var assigneeIds: [UUID] = []
     @State private var isSaving = false
     @State private var error: String?
 
@@ -36,11 +36,8 @@ struct ChoreEditorView: View {
                     }
                 }
 
-                Picker(locale == .he ? "אחראי/ת" : "Assignee", selection: $assigneeId) {
-                    Text(locale == .he ? "כל אחד" : "Anyone").tag(UUID?.none)
-                    ForEach(store.members.filter { $0.status == .approved }) { member in
-                        Text(member.nickname).tag(UUID?.some(member.id))
-                    }
+                Section(locale == .he ? "אחראים (ריק = כל אחד)" : "Assignees (empty = anyone)") {
+                    AssigneeMultiSelectRows(store: store, selected: $assigneeIds)
                 }
 
                 if let error {
@@ -82,7 +79,7 @@ struct ChoreEditorView: View {
             let position = FractionalIndex.rankAtEnd(after: store.chores.map(\.position).max())
             try await ChoreService().createChore(
                 areaId: store.area.id, sectionId: resolvedSectionId, title: title.trimmingCharacters(in: .whitespaces),
-                emoji: nil, position: position, assigneeMemberId: assigneeId, freq: freq, actorId: store.myMemberId
+                emoji: nil, position: position, assigneeMemberIds: assigneeIds, freq: freq, actorId: store.myMemberId
             )
             await store.loadAll()
             dismiss()

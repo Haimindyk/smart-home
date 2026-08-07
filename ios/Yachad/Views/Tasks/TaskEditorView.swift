@@ -12,7 +12,7 @@ struct TaskEditorView: View {
     @State private var priority: Int
     @State private var hasDueDate: Bool
     @State private var dueDate: Date
-    @State private var assigneeId: UUID?
+    @State private var assigneeIds: [UUID]
     @State private var quantity: String
     @State private var unit: String
     @State private var price: String
@@ -28,7 +28,7 @@ struct TaskEditorView: View {
         _priority = State(initialValue: task.priority ?? 0)
         _hasDueDate = State(initialValue: task.dueAt != nil)
         _dueDate = State(initialValue: task.dueAt ?? Date())
-        _assigneeId = State(initialValue: task.assigneeMemberId)
+        _assigneeIds = State(initialValue: task.assigneeMemberIds)
         _quantity = State(initialValue: task.quantity.map { String($0) } ?? "")
         _unit = State(initialValue: task.unit ?? "")
         _price = State(initialValue: task.price.map { String($0) } ?? "")
@@ -65,18 +65,16 @@ struct TaskEditorView: View {
                     if hasDueDate {
                         DatePicker(locale == .he ? "תאריך" : "Date", selection: $dueDate, displayedComponents: .date)
                     }
-                    Picker(locale == .he ? "אחראי/ת" : "Assignee", selection: $assigneeId) {
-                        Text(locale == .he ? "ללא" : "Unassigned").tag(UUID?.none)
-                        ForEach(store.members.filter { $0.status == .approved }) { member in
-                            Text(member.nickname).tag(UUID?.some(member.id))
-                        }
-                    }
                     Picker(locale == .he ? "עדיפות" : "Priority", selection: $priority) {
                         Text(locale == .he ? "ללא" : "None").tag(0)
                         Text(locale == .he ? "נמוכה" : "Low").tag(1)
                         Text(locale == .he ? "בינונית" : "Medium").tag(2)
                         Text(locale == .he ? "גבוהה" : "High").tag(3)
                     }
+                }
+
+                Section(locale == .he ? "אחראים" : "Assignees") {
+                    AssigneeMultiSelectRows(store: store, selected: $assigneeIds)
                 }
 
                 if !task.isNote {
@@ -141,7 +139,7 @@ struct TaskEditorView: View {
             notes: .some(notes.isEmpty ? nil : notes),
             priority: .some(priority == 0 ? nil : priority),
             due_at: .some(hasDueDate ? ISO8601DateFormatter().string(from: dueDate) : nil),
-            assignee_member_id: .some(assigneeId?.uuidString),
+            assignee_member_ids: assigneeIds.map(\.uuidString),
             quantity: isShopping ? .some(Double(quantity)) : nil,
             unit: isShopping ? .some(unit.isEmpty ? nil : unit) : nil,
             price: isShopping ? .some(Double(price)) : nil,
@@ -179,5 +177,8 @@ struct TaskEditorView: View {
         try? await WorkspaceService().softDeleteTask(id: task.id)
         await store.loadAll()
         dismiss()
+        store.showUndo(message: locale == .he ? "\"\(task.title)\" נמחקה" : "\"\(task.title)\" deleted") {
+            try? await WorkspaceService().restoreTask(id: task.id)
+        }
     }
 }

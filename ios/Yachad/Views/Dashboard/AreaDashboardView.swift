@@ -35,6 +35,9 @@ struct AreaDashboardView: View {
             AreaSettingsView(store: store)
                 .tabItem { Label(locale == .he ? "הגדרות" : "Settings", systemImage: "gearshape") }
         }
+        .safeAreaInset(edge: .bottom) {
+            UndoToastView(store: store)
+        }
         .task { await store.start() }
         .onDisappear { store.stop() }
     }

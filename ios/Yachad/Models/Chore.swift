@@ -34,7 +34,7 @@ struct Chore: Codable, Identifiable, Hashable {
     var emoji: String?
     var position: String
 
-    var assigneeMemberId: UUID?
+    var assigneeMemberIds: [UUID]
 
     var freq: ChoreFrequency
     var intervalN: Int
@@ -53,7 +53,7 @@ struct Chore: Codable, Identifiable, Hashable {
         case id, title, notes, emoji, position, freq, weekdays
         case areaId = "area_id"
         case sectionId = "section_id"
-        case assigneeMemberId = "assignee_member_id"
+        case assigneeMemberIds = "assignee_member_ids"
         case intervalN = "interval_n"
         case monthDay = "month_day"
         case anchorDate = "anchor_date"

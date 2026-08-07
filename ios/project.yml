@@ -38,6 +38,7 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: com.haimindyk.yachad
             CFBundleURLSchemes: [yachad]
+        UIBackgroundModes: [remote-notification]
         SUPABASE_URL: "$(SUPABASE_URL)"
         SUPABASE_ANON_KEY: "$(SUPABASE_ANON_KEY)"
     settings:
@@ -49,6 +50,7 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         SWIFT_STRICT_CONCURRENCY: complete
         ENABLE_PREVIEWS: "YES"
+        CODE_SIGN_ENTITLEMENTS: Yachad/Yachad.entitlements
     dependencies:
       - package: Supabase
         product: Supabase

@@ -76,6 +76,9 @@ struct CalendarView: View {
                     Task {
                         try? await CalendarService().softDelete(id: event.id)
                         await store.loadAll()
+                        store.showUndo(message: locale == .he ? "\"\(event.title)\" נמחק" : "\"\(event.title)\" deleted") {
+                            try? await CalendarService().restore(id: event.id)
+                        }
                     }
                 } label: {
                     Label(locale == .he ? "מחיקה" : "Delete", systemImage: "trash")

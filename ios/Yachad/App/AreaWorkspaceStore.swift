@@ -16,6 +16,15 @@ final class AreaWorkspaceStore: ObservableObject {
     @Published var recentActivity: [ActivityLogEntry] = []
     @Published var isLoading = true
     @Published var lastError: String?
+    @Published private(set) var pendingUndo: UndoAction?
+
+    struct UndoAction: Identifiable {
+        let id = UUID()
+        let message: String
+        let restore: () async -> Void
+    }
+
+    private var undoDismissTask: Task<Void, Never>?
 
     private let workspaceService = WorkspaceService()
     private let choreService = ChoreService()
@@ -79,11 +88,42 @@ final class AreaWorkspaceStore: ObservableObject {
         return members.first { $0.id == id }
     }
 
+    func members(_ ids: [UUID]) -> [AreaMember] {
+        ids.compactMap { id in members.first { $0.id == id } }
+    }
+
     func tasks(in sectionId: UUID) -> [TaskItem] {
         tasks.filter { $0.sectionId == sectionId }
     }
 
     func pendingMembers: [AreaMember] {
         members.filter { $0.status == .pending }
+    }
+
+    /// Shows a bottom "X deleted · Undo" banner (see `UndoToastView`) for a
+    /// few seconds. `restore` should undo exactly the one delete that
+    /// triggered this — soft-deletes are cheap to reverse, so every delete
+    /// action in the app routes through this instead of just vanishing.
+    func showUndo(message: String, restore: @escaping () async -> Void) {
+        undoDismissTask?.cancel()
+        pendingUndo = UndoAction(message: message, restore: restore)
+        undoDismissTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.pendingUndo = nil
+        }
+    }
+
+    func performUndo() async {
+        guard let action = pendingUndo else { return }
+        undoDismissTask?.cancel()
+        pendingUndo = nil
+        await action.restore()
+        await loadAll()
+    }
+
+    func dismissUndo() {
+        undoDismissTask?.cancel()
+        pendingUndo = nil
     }
 }

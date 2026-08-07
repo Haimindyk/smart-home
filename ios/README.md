@@ -75,12 +75,16 @@ or manager), an area-level toggle between "requires approval" and "anyone
 with the link joins automatically" (with a configurable default role for
 auto-join), an owner can appoint further managers who get the same
 approve/appoint/remove powers, member management, sections (tasks/shopping/
-chores/info), tasks with unlimited-depth subtasks, shopping-flavored fields
-(quantity/unit/price/brand), house chores with daily/weekly/monthly/
+chores/info), tasks with unlimited-depth subtasks and **multiple**
+assignees (new tasks auto-assign whoever created them), shopping-flavored
+fields (quantity/unit/price/brand), house chores with daily/weekly/monthly/
 as-needed recurrence + completion history, a month-grouped calendar
 (birthdays/medical/other, yearly recurrence), instant client-side search, a
-lightweight recent-activity log, Hebrew (RTL, default) + English (LTR),
-Realtime sync per area.
+lightweight recent-activity log, **drag-and-drop reordering** (tasks within
+a section, shopping items, sections on the dashboard), **an undo toast
+after every delete**, **push notifications** (join requests, approvals,
+task assignments, a daily due-today digest), Hebrew (RTL, default) +
+English (LTR), Realtime sync per area.
 
 **Deliberately deferred** (same reasoning as the website's own Phase 2
 list — clean extension points exist, but each deserves its own pass):
@@ -89,16 +93,14 @@ list — clean extension points exist, but each deserves its own pass):
   read-cache + replay-on-reconnect queue; this app assumes connectivity
   and refetches on reconnect. Worth adding with SwiftData once the core
   flows are validated in Xcode.
-- **Push notifications.** Needs APNs certificates/keys and a notification
-  service — orthogonal to the sharing model this task asked for.
 - **Price comparison / barcode scanning / AI assistant.** These are tied to
   Israeli grocery-chain scraping and an LLM-backed assistant with its own
   cron infrastructure on the website; out of scope for a general-purpose
-  "shared note with anyone" app.
-- **Drag-and-drop reordering UI.** The backend already supports it
-  (fractional-indexing `position` columns, `FractionalIndex.swift`); only
-  the SwiftUI drag gesture wiring is deferred.
+  "shared note with anyone" app, per explicit request.
 - **Area ownership transfer / deleting a single member's content.**
+- **Subtask reordering.** Drag-and-drop reorders top-level tasks/items
+  (a subtask tree moves as a unit with its parent); reordering *within* a
+  subtask list isn't wired up yet.
 
 ## Setup
 
@@ -139,6 +141,54 @@ open Yachad.xcodeproj
 Xcode will resolve the `supabase-swift` Swift Package dependency
 automatically on first build. Pick a simulator (iOS 17+) and run.
 
+### 4. Push notifications (optional, but "shipped" assumes you do this)
+
+Push has three moving parts, none of which can be provisioned from this
+repo alone — they all need your own Apple Developer account and Supabase
+project:
+
+1. **APNs Auth Key.** In [Apple Developer → Certificates, IDs & Profiles →
+   Keys](https://developer.apple.com/account/resources/authkeys/list),
+   create a key with the "Apple Push Notifications service (APNs)" capability
+   and download the `.p8` file (you only get one chance to download it).
+   Note the **Key ID** and your **Team ID**.
+2. **Deploy the Edge Function** (`ios/backend/functions/send-push/`):
+   ```bash
+   supabase functions deploy send-push --no-verify-jwt --project-ref <your-ref>
+   supabase secrets set --project-ref <your-ref> \
+     APNS_KEY_ID=<key id> \
+     APNS_TEAM_ID=<team id> \
+     APNS_BUNDLE_ID=com.haimindyk.yachad \
+     APNS_ENVIRONMENT=sandbox \
+     PUSH_EDGE_SECRET=$(openssl rand -hex 32) \
+     APNS_PRIVATE_KEY="$(cat AuthKey_XXXXXXXXXX.p8)"
+   ```
+   (`APNS_ENVIRONMENT=sandbox` while testing from Xcode/TestFlight-via-Xcode;
+   switch to `production` once you're distributing through TestFlight/App
+   Store proper — see the entitlements note below.)
+3. **Tell Postgres how to reach the function**, using the *same*
+   `PUSH_EDGE_SECRET` from step 2, in the Supabase SQL editor:
+   ```sql
+   select vault.create_secret('https://<your-ref>.functions.supabase.co/send-push', 'push_edge_url');
+   select vault.create_secret('<same PUSH_EDGE_SECRET as above>', 'push_edge_secret');
+   ```
+   Until both secrets exist, `notify_devices()` (migration `0005`) silently
+   no-ops — the rest of the app works fine without push configured.
+4. If `create extension pg_net` / `pg_cron` in migration `0005` errors on
+   your plan, enable them instead from the Supabase dashboard's
+   **Database → Extensions**, then re-run the rest of that migration file.
+
+**In Xcode**: the entitlements file (`Yachad/Yachad.entitlements`) ships
+with `aps-environment: development`. For a TestFlight/App Store archive,
+either flip that to `production`, or let Xcode's automatic signing manage
+it for you if your team has that configured — check before shipping, since
+a mismatched entitlement means push silently fails to register.
+
+Once set up: open the app → Settings → "Enable notifications". A join
+request, an approval, or being assigned to a task all push immediately; a
+"due today" digest for tasks/chores fires once a day (see
+`send_due_today_reminders()` / the `pg_cron` schedule in migration `0005`).
+
 ### A note on the Supabase Swift SDK surface
 
 This was written without access to Xcode/macOS to compile against, so
@@ -173,3 +223,13 @@ version Xcode resolves.
   than a universal link — no domain or hosted
   `apple-app-site-association` file required. The bare invite code (shown
   under the QR) works too, for "just tell me the code."
+- **Undo** (`AreaWorkspaceStore.showUndo`/`performUndo`) is generic across
+  every entity: every delete call site passes a message + a `restore`
+  closure (usually just the matching service's `restore(id:)`, which clears
+  `deleted_at`); one `UndoToastView`, mounted once in `AreaDashboardView`,
+  covers all five tabs.
+- **Push** is device-scoped, not area- or person-scoped (`push_tokens`,
+  keyed by `device_id`) — a device holding membership in three areas gets
+  one token covering all of them. Delivery is Postgres trigger → `pg_net` →
+  a Supabase Edge Function → APNs; nothing calls Apple directly from the
+  app or from client code.

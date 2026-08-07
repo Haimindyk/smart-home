@@ -25,10 +25,21 @@ struct ShoppingListView: View {
             ForEach(items) { item in
                 row(item)
             }
+            .onDelete { offsets in
+                Task { await delete(at: offsets) }
+            }
+            .onMove { offsets, newOffset in
+                Task { await reorder(from: offsets, to: newOffset) }
+            }
         }
         .listStyle(.insetGrouped)
         .navigationTitle(section.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if store.canWrite && items.count > 1 {
+                ToolbarItem(placement: .primaryAction) { EditButton() }
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             if store.canWrite {
                 HStack {
@@ -99,6 +110,30 @@ struct ShoppingListView: View {
 
     private func toggle(_ item: TaskItem) async {
         try? await WorkspaceService().setCompleted(id: item.id, isCompleted: !item.isCompleted, actorId: store.myMemberId)
+        await store.loadAll()
+    }
+
+    private func delete(at offsets: IndexSet) async {
+        let deleted = offsets.map { items[$0] }
+        for item in deleted {
+            try? await WorkspaceService().softDeleteTask(id: item.id)
+        }
+        await store.loadAll()
+
+        let message = deleted.count == 1
+            ? (locale == .he ? "\"\(deleted[0].title)\" נמחק" : "\"\(deleted[0].title)\" deleted")
+            : (locale == .he ? "\(deleted.count) פריטים נמחקו" : "\(deleted.count) items deleted")
+        store.showUndo(message: message) {
+            for item in deleted {
+                try? await WorkspaceService().restoreTask(id: item.id)
+            }
+        }
+    }
+
+    private func reorder(from offsets: IndexSet, to newOffset: Int) async {
+        var reordered = items.map(\.id)
+        reordered.move(fromOffsets: offsets, toOffset: newOffset)
+        try? await WorkspaceService().reorderTasks(reordered)
         await store.loadAll()
     }
 }

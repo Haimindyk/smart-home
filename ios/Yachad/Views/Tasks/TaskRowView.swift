@@ -48,8 +48,9 @@ struct TaskRowView: View {
                         if let due = node.task.dueAt {
                             Label(due.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
                         }
-                        if let assignee = store.member(node.task.assigneeMemberId) {
-                            Label(assignee.nickname, systemImage: "person")
+                        let assignees = store.members(node.task.assigneeMemberIds)
+                        if !assignees.isEmpty {
+                            Label(assignees.map(\.nickname).joined(separator: ", "), systemImage: "person")
                         }
                     }
                     .font(.caption2)

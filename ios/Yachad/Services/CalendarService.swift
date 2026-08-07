@@ -59,4 +59,12 @@ struct CalendarService {
             .eq("id", value: id.uuidString)
             .execute()
     }
+
+    func restore(id: UUID) async throws {
+        _ = try await client
+            .from("calendar_events")
+            .update(ClearDeletedAtPatch())
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
 }

@@ -1,6 +1,14 @@
 import Foundation
 import Supabase
 
+/// Shared by every service's `restore` call: forces an explicit JSON
+/// `null` for `deleted_at` (a plain `nil` value on a normal Optional
+/// property gets *omitted* by Swift's synthesized Encodable instead of
+/// sent as null, which would leave the row soft-deleted).
+struct ClearDeletedAtPatch: Encodable {
+    var deleted_at: String?? = .some(nil)
+}
+
 /// Sections + tasks (including unlimited-depth subtasks and the
 /// shopping-flavored fields) for one area. Mirrors the website's unified
 /// `tasks` table design — one realtime feed, one write path for tasks,
@@ -71,6 +79,24 @@ struct WorkspaceService {
             .execute()
     }
 
+    func restoreSection(id: UUID) async throws {
+        _ = try await client
+            .from("sections")
+            .update(ClearDeletedAtPatch())
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    /// Bulk-persists a full reordering — simplest-correct approach for a
+    /// household-sized list: recompute a fresh, evenly-spaced position for
+    /// every item in its new order rather than only the moved one.
+    func reorderSections(_ orderedIds: [UUID]) async throws {
+        let positions = FractionalIndex.ranksForCount(orderedIds.count)
+        for (id, position) in zip(orderedIds, positions) {
+            try await reorderSection(id: id, position: position)
+        }
+    }
+
     // MARK: - Tasks
 
     func fetchTasks(areaId: UUID) async throws -> [TaskItem] {
@@ -95,18 +121,24 @@ struct WorkspaceService {
         let quantity: Double?
         let unit: String?
         let brand: String?
+        let assignee_member_ids: [String]
         let created_by: String?
         let updated_by: String?
     }
 
+    /// New tasks default to assigning whoever created them (matches the
+    /// website's behavior) — pass `assigneeIds` to override, e.g. an empty
+    /// array for an explicitly-unassigned subtask.
     @discardableResult
-    func createTask(areaId: UUID, sectionId: UUID, parentTaskId: UUID?, position: String, title: String, isNote: Bool = false, emoji: String? = nil, quantity: Double? = nil, unit: String? = nil, brand: String? = nil, actorId: UUID?) async throws -> TaskItem {
-        try await client
+    func createTask(areaId: UUID, sectionId: UUID, parentTaskId: UUID?, position: String, title: String, isNote: Bool = false, emoji: String? = nil, quantity: Double? = nil, unit: String? = nil, brand: String? = nil, assigneeIds: [UUID]? = nil, actorId: UUID?) async throws -> TaskItem {
+        let assignees = assigneeIds ?? actorId.map { [$0] } ?? []
+        return try await client
             .from("tasks")
             .insert(NewTask(
                 area_id: areaId.uuidString, section_id: sectionId.uuidString,
                 parent_task_id: parentTaskId?.uuidString, position: position, title: title,
                 is_note: isNote, emoji: emoji, quantity: quantity, unit: unit, brand: brand,
+                assignee_member_ids: assignees.map(\.uuidString),
                 created_by: actorId?.uuidString, updated_by: actorId?.uuidString
             ))
             .select()
@@ -125,7 +157,7 @@ struct WorkspaceService {
         var priority: Int?? = nil
         var due_at: String?? = nil
         var tags: [String]? = nil
-        var assignee_member_id: String?? = nil
+        var assignee_member_ids: [String]? = nil
         var quantity: Double?? = nil
         var unit: String?? = nil
         var price: Double?? = nil
@@ -167,6 +199,24 @@ struct WorkspaceService {
             .update(["section_id": toSectionId.uuidString, "position": position])
             .eq("id", value: id.uuidString)
             .execute()
+    }
+
+    func reorderTask(id: UUID, position: String) async throws {
+        _ = try await client
+            .from("tasks")
+            .update(["position": position])
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    /// Bulk-persists a full reordering of a flat list of siblings (top-level
+    /// tasks in a section, or shopping items) — see `reorderSections` for
+    /// why this recomputes every position instead of just the moved one.
+    func reorderTasks(_ orderedIds: [UUID]) async throws {
+        let positions = FractionalIndex.ranksForCount(orderedIds.count)
+        for (id, position) in zip(orderedIds, positions) {
+            try await reorderTask(id: id, position: position)
+        }
     }
 
     private struct TaskIdParams: Encodable { let p_task_id: String }
