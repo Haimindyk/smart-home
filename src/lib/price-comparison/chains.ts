@@ -31,3 +31,12 @@ export const CHAINS: ChainMeta[] = [
 export function excludedChainsForSection(sectionName: string): ChainKey[] {
   return sectionName.trim() === "קניות בסופר" ? ["super_pharm"] : [];
 }
+
+/** Sections that actually map to a physical grocery/pharmacy run — as
+ * opposed to other "shopping"-kind lists (e.g. AliExpress) that aren't
+ * worth sending to WhatsApp as a store list. */
+const GROCERY_RUN_SECTION_NAMES = ["קניות בסופר", "סופר פארם"];
+
+export function isGroceryRunSection(sectionName: string): boolean {
+  return GROCERY_RUN_SECTION_NAMES.includes(sectionName.trim());
+}
