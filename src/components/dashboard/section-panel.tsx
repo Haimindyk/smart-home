@@ -22,7 +22,7 @@ import { ChoreQuickAdd } from "@/components/chores/chore-quick-add";
 import { ChoreRow } from "@/components/chores/chore-row";
 import { PriceComparisonButton } from "@/components/shopping/price-comparison-button";
 import { ShareWhatsappButton } from "@/components/shopping/share-whatsapp-button";
-import { excludedChainsForSection } from "@/lib/price-comparison/chains";
+import { excludedChainsForSection, isGroceryRunSection } from "@/lib/price-comparison/chains";
 import { sortByPosition } from "@/lib/ordering/rank";
 import { cn } from "@/lib/utils";
 import type { Section, SectionKind } from "@/types/domain";
@@ -160,7 +160,9 @@ export const SectionPanel = forwardRef<HTMLDivElement, { section: Section; dragH
         {section.kind === "shopping" && (
           <div className="mb-3 flex flex-col gap-2 sm:flex-row">
             <PriceComparisonButton items={shoppingItems} excludeChains={excludedChainsForSection(section.name)} />
-            <ShareWhatsappButton sectionName={section.name} items={shoppingItems} />
+            {isGroceryRunSection(section.name) && (
+              <ShareWhatsappButton sectionName={section.name} items={shoppingItems} />
+            )}
           </div>
         )}
 
