@@ -1,0 +1,8 @@
+.DS_Store
+/Generated/
+/Yachad.xcodeproj/
+/Yachad/Config/Secrets.xcconfig
+.swiftpm/
+.build/
+xcuserdata/
+*.xcuserstate
