@@ -6,7 +6,7 @@ import { useIdentity } from "@/lib/identity";
 import { useAssistantOpen } from "@/lib/assistant-ui-state";
 import { useT } from "@/lib/i18n/store";
 
-/** Mika's private, one-on-one notes (see supabase/functions/assistant's
+/** Jessica's private, one-on-one notes (see supabase/functions/assistant's
  * "personal_checkin" mode + migration 0026's ai_private_messages table) —
  * shown only to the member they're addressed to. Like the rest of this
  * app's identity model, that's a display-layer filter (actingMemberId is

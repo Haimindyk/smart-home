@@ -1,6 +1,6 @@
 -- Hebrew conjugates second-person verbs/pronouns by the *listener's*
--- gender (את/אתה, חושבת/חושב), not just the speaker's. Mika's own
--- feminine self-reference (MIKA_PERSONA in the Edge Function) says nothing
+-- gender (את/אתה, חושבת/חושב), not just the speaker's. Jessica's own
+-- feminine self-reference (JESSICA_PERSONA in the Edge Function) says nothing
 -- about who she's talking TO — without this, she defaulted to addressing
 -- everyone in feminine form, which read as wrong for the household's male
 -- members (e.g. קורן was addressed as if a girl).

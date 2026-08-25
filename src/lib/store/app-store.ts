@@ -769,7 +769,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // ---------------------------------------------------------------------
-  // Mika's personal one-on-one notes (see supabase/functions/assistant's
+  // Jessica's personal one-on-one notes (see supabase/functions/assistant's
   // "personal_checkin" mode + migration 0026's ai_private_messages table) —
   // dismissing one just marks it read; there's nothing to "apply".
   // ---------------------------------------------------------------------

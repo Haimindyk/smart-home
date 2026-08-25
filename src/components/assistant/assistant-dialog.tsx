@@ -85,7 +85,7 @@ export function AssistantDialog({ open, onOpenChange }: { open: boolean; onOpenC
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [open, messages, sending]);
 
-  // A private check-in from Mika (see personal-note-card.tsx) previously had
+  // A private check-in from Jessica (see personal-note-card.tsx) previously had
   // nowhere to actually reply — this drops any not-yet-shown one straight
   // into the conversation as soon as it's opened, so answering it is just
   // typing a reply like any other message.
