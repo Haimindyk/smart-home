@@ -26,7 +26,7 @@ type ActivityLogRow = {
   summary: string | null;
   created_at: string;
   seq?: number;
-  // Only set for action === "personal" (Mika's one-on-one notes, see
+  // Only set for action === "personal" (Jessica's one-on-one notes, see
   // migration 0026) — targets exactly this one member instead of the usual
   // "everyone but the actor" household fan-out.
   target_member_id?: string;
@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
 
   const { entity_type: entityType, entity_id: entityId, action, actor_id: actorId, summary, target_member_id: targetMemberId } = activity;
 
-  // Mika's one-on-one notes (see migration 0026) — targets ONLY that one
+  // Jessica's one-on-one notes (see migration 0026) — targets ONLY that one
   // member's own subscriptions, never the household-wide "everyone but the
   // actor" fan-out the rest of this function uses. Handled as an entirely
   // separate path since its targeting/gating/title logic doesn't overlap

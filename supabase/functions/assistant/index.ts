@@ -1,4 +1,4 @@
-// Mika ("מיקה") — the K&H family's AI assistant. Reads the household's live data
+// Jessica ("ג'סיקה") — the K&H family's AI assistant. Reads the household's live data
 // server-side with the anon key (the same reach any browser already has —
 // see the "no real auth" note in 0002_open_access.sql) and calls a
 // free-tier LLM (Google Gemini) to turn a chat message — optionally with a
@@ -21,11 +21,11 @@
 //   - "shabbat_greeting" mode does the same every Friday at 18:00 Israel
 //     time, a warm Shabbat Shalom message for the whole household.
 //   - "personal_checkin" mode writes a one-on-one note straight to
-//     ai_private_messages for one specific member at a time — Mika's own
+//     ai_private_messages for one specific member at a time — Jessica's own
 //     individual relationship with each person (noticing when someone's
 //     been quiet, an inside joke), never shown to the rest of the
 //     household (see migration 0026). Excludes Louis (a placeholder member
-//     row for the family dog) and Mika's own row.
+//     row for the family dog) and Jessica's own row.
 //   - remember_family_fact (a tool available in every intent) lets the model
 //     grow its own free-text memory of family relationships/preferences
 //     directly, since it's the assistant's own background knowledge, not
@@ -68,8 +68,8 @@ const LANGUAGE_INSTRUCTION =
 // The household asked for the assistant to feel like a genuine member of
 // the family, not a generic tool — a name, a gender, and a real personality.
 // Reused as the opening line of every intent's system prompt.
-const MIKA_PERSONA =
-  "Your name is מיקה (Mika). You're not a generic assistant — you're a true member of the K&H family, with a warm personality of your own, who genuinely cares about each person, not just about getting tasks done. You are female — always refer to yourself using feminine Hebrew grammar (e.g. 'אני חושבת', 'אני שמחה', never masculine forms like 'אני חושב').";
+const JESSICA_PERSONA =
+  "Your name is ג'סיקה (Jessica). You're not a generic assistant — you're a true member of the K&H family, with a warm personality of your own, who genuinely cares about each person, not just about getting tasks done. You are female — always refer to yourself using feminine Hebrew grammar (e.g. 'אני חושבת', 'אני שמחה', never masculine forms like 'אני חושב').";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -418,14 +418,14 @@ function isShabbatGreetingTime(now: Date): boolean {
 }
 
 /** Hebrew conjugates second-person verbs/pronouns by the *listener's*
- * gender (את/אתה, חושבת/חושב) — Mika's own feminine self-reference
- * (MIKA_PERSONA) says nothing about who she's addressing, so without this
+ * gender (את/אתה, חושבת/חושב) — Jessica's own feminine self-reference
+ * (JESSICA_PERSONA) says nothing about who she's addressing, so without this
  * she'll default to feminine for everyone. Returns null when the
  * addressee's gender isn't known (better to omit than assert wrongly). */
 function addresseeGenderLine(displayName: string, gender: string | null | undefined): string | null {
   if (gender !== "male" && gender !== "female") return null;
   const forms = gender === "male" ? "masculine (e.g. 'אתה', 'חושב', 'מרגיש')" : "feminine (e.g. 'את', 'חושבת', 'מרגישה')";
-  return `You're speaking directly with ${displayName}. When addressing them in second person, use ${forms} Hebrew grammar for THEM — completely independent of your own (Mika's) feminine self-reference.`;
+  return `You're speaking directly with ${displayName}. When addressing them in second person, use ${forms} Hebrew grammar for THEM — completely independent of your own (Jessica's) feminine self-reference.`;
 }
 
 /** Whole days between `iso` and now, or null if `iso` is null (never happened yet). */
@@ -503,7 +503,7 @@ Deno.serve(async (req) => {
       : { data: false };
     if (!valid) return json({ error: "unauthorized" }, 401);
 
-    // These are all Mika's own unsolicited notifications (unlike chat, which
+    // These are all Jessica's own unsolicited notifications (unlike chat, which
     // only ever responds to a human) — keep them to daytime/evening hours
     // regardless of which cron slot happened to trigger this call. Bail
     // before spending a Gemini call or counting against the daily cap.
@@ -522,7 +522,7 @@ Deno.serve(async (req) => {
   }
 
   // Full household context, shared by chat and insights (the two "general
-  // knowledge" intents) — Mika should know everything a human already sees
+  // knowledge" intents) — Jessica should know everything a human already sees
   // in the app, not a narrowed-down subset. digest/personal_checkin
   // each pull their own narrower, purpose-specific data instead of this.
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -608,7 +608,7 @@ Deno.serve(async (req) => {
     }
 
     const systemInstruction = [
-      MIKA_PERSONA,
+      JESSICA_PERSONA,
       "Write a short, warm, genuinely funny weekly recap for the household — a few sentences covering what's coming up this week from the lists below (events, due tasks/appointments, chores coming due). Keep it playful and warm, not a dry status report.",
       "Keep the whole recap under about 200 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence. If there's too much to fit, pick only the 1-2 most important things and skip the rest rather than listing everything.",
       "Only mention things actually in the lists below — never invent dates or items. If a list is empty, just don't mention that category.",
@@ -676,7 +676,7 @@ Deno.serve(async (req) => {
     }
 
     const systemInstruction = [
-      MIKA_PERSONA,
+      JESSICA_PERSONA,
       "Write one short, warm, cute Shabbat Shalom message for the whole household, wishing them a peaceful, restful Friday evening together — candles, family time, that kind of warmth.",
       "Keep it under about 140 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence.",
       "Do not call any tools. Reply with just the message text — no preamble, no quotation marks.",
@@ -754,7 +754,7 @@ Deno.serve(async (req) => {
 
       const genderLine = addresseeGenderLine(member.display_name, member.gender);
       const systemInstruction = [
-        MIKA_PERSONA,
+        JESSICA_PERSONA,
         ...(genderLine ? [genderLine] : []),
         `You're checking in personally, one-on-one, with ${member.display_name} — this is private, only they will ever see or hear it, never the rest of the household.`,
         lastChatLine,
@@ -791,7 +791,7 @@ Deno.serve(async (req) => {
 
   if (body.intent === "insights") {
     const systemInstruction = [
-      MIKA_PERSONA,
+      JESSICA_PERSONA,
       "Look at the recent activity log and the current open tasks/chores below, and see if there's a genuinely useful, gentle observation worth surfacing as a dashboard suggestion — e.g. a chore nobody's done in a while, or a shopping item that keeps coming back.",
       "Propose AT MOST ONE suggestion. If nothing is clearly worth surfacing, propose nothing and just reply with an empty string.",
       "Phrase the suggestion with a warm, genuinely funny personality — a light pun or a playful nudge — instead of a dry notification. Never nag about something already handled; the humor should serve the message, not replace it, and it must still be tied to a real, specific observation.",
@@ -829,7 +829,7 @@ Deno.serve(async (req) => {
   const addressee = body.memberId ? (members ?? []).find((m: { id: string }) => m.id === body.memberId) : null;
   const addresseeLine = addressee ? addresseeGenderLine(addressee.display_name, addressee.gender) : null;
   const systemInstruction = [
-    MIKA_PERSONA,
+    JESSICA_PERSONA,
     ...(addresseeLine ? [addresseeLine] : []),
     "You can read the household's full current data below — members, sections, open and completed tasks, notes, chores, calendar events, family notes, and recent activity — and propose concrete actions using the tools available. IMPORTANT: any tool call you make here is applied to the household's real data immediately, with no further human confirmation step — asking the person a clarifying question first is your ONLY safety net, so use it.",
     "Only call a creation/change tool (propose_create_task, propose_create_chore, propose_create_family_event, propose_move_task, etc.) when it's clearly what the person wants. If it's genuinely ambiguous whether they want you to add/change something at all — they mentioned something in passing, were just thinking out loud, or it's unclear what exactly to add — do not call any tool; just ask a short clarifying question in your reply, and act on it once they confirm. This is different from a request that's clearly asking you to add something but vague on the specifics (e.g. 'get something for dinner', a pasted recipe, a photographed receipt) — there, go ahead and propose one propose_create_task call per concrete item, using the most fitting existing section (usually a 'shopping' kind section), since the intent to add is already clear.",
