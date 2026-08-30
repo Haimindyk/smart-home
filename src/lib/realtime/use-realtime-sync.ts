@@ -15,6 +15,8 @@ import type {
   Attachment,
   ActivityLog,
   ActivityLogReaction,
+  Board,
+  BoardMember,
   FamilyEvent,
   AiSuggestion,
   AiPrivateMessage,
@@ -32,6 +34,8 @@ type Snapshot = {
   attachments: Attachment[];
   activityLog: ActivityLog[];
   activityLogReactions: ActivityLogReaction[];
+  boards: Board[];
+  boardMembers: BoardMember[];
   familyEvents: FamilyEvent[];
   aiSuggestions: AiSuggestion[];
   aiPrivateMessages: AiPrivateMessage[];
@@ -46,6 +50,8 @@ const TABLES = [
   "attachments",
   "activity_log",
   "activity_log_reactions",
+  "boards",
+  "board_members",
   "family_events",
   "ai_suggestions",
   "ai_private_messages",
@@ -62,11 +68,18 @@ async function fetchAll(): Promise<Snapshot> {
     attachments,
     activityLog,
     activityLogReactions,
+    boards,
+    boardMembers,
     familyEvents,
     aiSuggestions,
     aiPrivateMessages,
   ] = await Promise.all([
     supabase.from("members").select("*"),
+    // RLS (see migration 0034) filters this to every section the current
+    // device's signed-in member can see: the shared household board
+    // (board_id null) plus any private board they're a member of — so a
+    // board's sections/tasks/chores ride along in the exact same fetch as
+    // everything else, with no separate "which board am I viewing" query.
     supabase.from("sections").select("*").order("position"),
     supabase.from("tasks").select("*").order("position"),
     supabase.from("chores").select("*").order("position"),
@@ -74,6 +87,12 @@ async function fetchAll(): Promise<Snapshot> {
     supabase.from("attachments").select("*"),
     supabase.from("activity_log").select("*").order("seq", { ascending: false }).limit(200),
     supabase.from("activity_log_reactions").select("*"),
+    // Also RLS-filtered to boards this device's member can see — see
+    // migration 0034's "board members can view their boards" policy, the
+    // actual privacy boundary a board relies on (unlike every other
+    // "private" thing in this app, which is UI-only — see migration 0026).
+    supabase.from("boards").select("*"),
+    supabase.from("board_members").select("*"),
     supabase.from("family_events").select("*").order("event_date"),
     supabase.from("ai_suggestions").select("*").eq("status", "open").order("created_at", { ascending: false }),
     // Fetches every member's private messages, not just the current
@@ -92,6 +111,8 @@ async function fetchAll(): Promise<Snapshot> {
     attachments: (attachments.data ?? []) as Attachment[],
     activityLog: (activityLog.data ?? []) as ActivityLog[],
     activityLogReactions: (activityLogReactions.data ?? []) as ActivityLogReaction[],
+    boards: (boards.data ?? []) as Board[],
+    boardMembers: (boardMembers.data ?? []) as BoardMember[],
     familyEvents: (familyEvents.data ?? []) as FamilyEvent[],
     aiSuggestions: (aiSuggestions.data ?? []) as AiSuggestion[],
     aiPrivateMessages: (aiPrivateMessages.data ?? []) as AiPrivateMessage[],
@@ -210,6 +231,8 @@ export function useRealtimeSync() {
           .sort((a, b) => b.seq - a.seq)
           .slice(0, 200),
         activityLogReactions: Object.values(state.activityLogReactions),
+        boards: Object.values(state.boards),
+        boardMembers: Object.values(state.boardMembers),
         familyEvents: Object.values(state.familyEvents),
         aiSuggestions: Object.values(state.aiSuggestions),
         aiPrivateMessages: Object.values(state.aiPrivateMessages),

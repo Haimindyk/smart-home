@@ -7,6 +7,7 @@ import { useAppStore } from "@/lib/store/app-store";
 import { useT } from "@/lib/i18n/store";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { pinLogin } from "@/lib/auth/pin-login";
 
 const PIN_LENGTH = 4;
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"] as const;
@@ -19,10 +20,12 @@ export function IdentityGate({ children }: { children: React.ReactNode }) {
   const t = useT();
   const [pin, setPin] = useState("");
   const [shake, setShake] = useState(false);
+  const [pending, setPending] = useState(false);
 
   const memberList = Object.values(members);
 
   function press(key: string) {
+    if (pending) return;
     if (key === "back") {
       setPin((p) => p.slice(0, -1));
       return;
@@ -33,16 +36,35 @@ export function IdentityGate({ children }: { children: React.ReactNode }) {
     setPin(next);
     if (next.length < PIN_LENGTH) return;
 
-    const match = memberList.find((m) => m.pin && m.pin === next);
-    if (match) {
-      setActingMemberId(match.id);
-    } else {
+    // The authoritative match now happens server-side (see supabase/
+    // functions/pin-login) — it's what mints a real per-member auth
+    // session, which private boards rely on. But that function (and the
+    // vault secret it needs) has to be deployed/configured separately from
+    // this code, so a genuinely wrong PIN is the only case treated as
+    // final: anything else (the function not deployed yet, not configured,
+    // a network hiccup) falls back to the old local match below, exactly
+    // like before this existed — a household member's day-to-day login
+    // must never depend on that rollout step having already happened.
+    setPending(true);
+    void pinLogin(next).then((result) => {
+      if ("memberId" in result) {
+        setActingMemberId(result.memberId);
+        return;
+      }
+      if (result.error !== "invalid_pin") {
+        const fallbackMatch = memberList.find((m) => m.pin && m.pin === next);
+        if (fallbackMatch) {
+          setActingMemberId(fallbackMatch.id);
+          return;
+        }
+      }
+      setPending(false);
       setShake(true);
       setTimeout(() => {
         setShake(false);
         setPin("");
       }, 500);
-    }
+    });
   }
 
   // Don't block on a slow network — once we know who's here, or once data has

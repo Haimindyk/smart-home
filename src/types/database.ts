@@ -282,6 +282,74 @@ export type Database = {
           },
         ]
       }
+      board_members: {
+        Row: {
+          added_at: string
+          board_id: string
+          id: string
+          member_id: string
+        }
+        Insert: {
+          added_at?: string
+          board_id: string
+          id?: string
+          member_id: string
+        }
+        Update: {
+          added_at?: string
+          board_id?: string
+          id?: string
+          member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "board_members_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_members_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      boards: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          emoji: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          emoji?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          emoji?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "boards_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chore_completions: {
         Row: {
           chore_id: string
@@ -647,6 +715,7 @@ export type Database = {
       }
       sections: {
         Row: {
+          board_id: string | null
           color: string | null
           created_at: string
           created_by: string | null
@@ -661,6 +730,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          board_id?: string | null
           color?: string | null
           created_at?: string
           created_by?: string | null
@@ -675,6 +745,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          board_id?: string | null
           color?: string | null
           created_at?: string
           created_by?: string | null
@@ -689,6 +760,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sections_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sections_created_by_fkey"
             columns: ["created_by"]
@@ -858,6 +936,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_board: { Args: { p_board_id: string }; Returns: boolean }
+      can_access_chore: { Args: { p_chore_id: string }; Returns: boolean }
+      can_access_section: { Args: { p_section_id: string }; Returns: boolean }
       check_ai_insights: { Args: never; Returns: undefined }
       check_ai_personal_checkin: { Args: never; Returns: undefined }
       check_ai_weekly_digest: { Args: never; Returns: undefined }
@@ -867,10 +948,16 @@ export type Database = {
         Args: { p_chore_id: string; p_completed_by: string }
         Returns: undefined
       }
+      create_board: {
+        Args: { p_emoji?: string; p_member_ids?: string[]; p_name: string }
+        Returns: string
+      }
+      current_member_id: { Args: never; Returns: string }
       family_event_next_occurrence: {
         Args: { p_as_of?: string; p_event_date: string; p_recurrence: string }
         Returns: string
       }
+      get_pin_login_pepper: { Args: never; Returns: string }
       get_push_config: {
         Args: { p_secret: string }
         Returns: {

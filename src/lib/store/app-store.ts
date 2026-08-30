@@ -18,6 +18,8 @@ import type {
   Attachment,
   ActivityLog,
   ActivityLogReaction,
+  Board,
+  BoardMember,
   FamilyEvent,
   AiSuggestion,
   AiPrivateMessage,
@@ -35,6 +37,8 @@ type AppState = {
   attachments: ById<Attachment>;
   activityLog: ById<ActivityLog>;
   activityLogReactions: ById<ActivityLogReaction>;
+  boards: ById<Board>;
+  boardMembers: ById<BoardMember>;
   familyEvents: ById<FamilyEvent>;
   aiSuggestions: ById<AiSuggestion>;
   aiPrivateMessages: ById<AiPrivateMessage>;
@@ -49,6 +53,8 @@ type AppState = {
     attachments: Attachment[];
     activityLog: ActivityLog[];
     activityLogReactions?: ActivityLogReaction[];
+    boards?: Board[];
+    boardMembers?: BoardMember[];
     familyEvents?: FamilyEvent[];
     aiSuggestions?: AiSuggestion[];
     aiPrivateMessages?: AiPrivateMessage[];
@@ -64,6 +70,8 @@ type AppState = {
       | "attachments"
       | "activity_log"
       | "activity_log_reactions"
+      | "boards"
+      | "board_members"
       | "family_events"
       | "ai_suggestions"
       | "ai_private_messages",
@@ -73,6 +81,7 @@ type AppState = {
   ) => void;
 
   toggleReaction: (activityLogId: string, memberId: string, emoji: string) => Promise<void>;
+  createBoard: (input: { name: string; emoji?: string | null; memberIds: string[] }) => Promise<string | null>;
 
   updateAiSuggestionStatus: (id: string, status: "applied" | "dismissed") => Promise<void>;
   markPrivateMessageRead: (id: string) => Promise<void>;
@@ -85,7 +94,13 @@ type AppState = {
     color: string;
   }) => Promise<{ member: Member } | { error: "pin_taken" | "unknown" }>;
 
-  createSection: (input: { name: string; emoji?: string; kind: SectionKind; createdBy: string | null }) => Promise<string>;
+  createSection: (input: {
+    name: string;
+    emoji?: string;
+    kind: SectionKind;
+    createdBy: string | null;
+    boardId?: string | null;
+  }) => Promise<string>;
   renameSection: (id: string, name: string, emoji?: string) => Promise<void>;
   updateSectionNote: (id: string, description: string | null) => Promise<void>;
   reorderSection: (id: string, beforeId: string | null, afterId: string | null) => Promise<void>;
@@ -202,6 +217,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   attachments: {},
   activityLog: {},
   activityLogReactions: {},
+  boards: {},
+  boardMembers: {},
   familyEvents: {},
   aiSuggestions: {},
   aiPrivateMessages: {},
@@ -217,6 +234,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       attachments: keyify(data.attachments),
       activityLog: keyify(data.activityLog),
       activityLogReactions: keyify(data.activityLogReactions ?? []),
+      boards: keyify(data.boards ?? []),
+      boardMembers: keyify(data.boardMembers ?? []),
       familyEvents: keyify(data.familyEvents ?? []),
       aiSuggestions: keyify(data.aiSuggestions ?? []),
       aiPrivateMessages: keyify(data.aiPrivateMessages ?? []),
@@ -233,6 +252,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       attachments: "attachments",
       activity_log: "activityLog",
       activity_log_reactions: "activityLogReactions",
+      boards: "boards",
+      board_members: "boardMembers",
       family_events: "familyEvents",
       ai_suggestions: "aiSuggestions",
       ai_private_messages: "aiPrivateMessages",
@@ -246,6 +267,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       | "attachments"
       | "activityLog"
       | "activityLogReactions"
+      | "boards"
+      | "boardMembers"
       | "familyEvents"
       | "aiSuggestions"
       | "aiPrivateMessages";
@@ -312,10 +335,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ---------------------------------------------------------------------
   // Sections
   // ---------------------------------------------------------------------
-  createSection: async ({ name, emoji, kind, createdBy }) => {
+  createSection: async ({ name, emoji, kind, createdBy, boardId = null }) => {
     const id = crypto.randomUUID();
     const lastPosition = Object.values(get().sections)
-      .filter((s) => !s.deleted_at)
+      .filter((s) => !s.deleted_at && (s.board_id ?? null) === boardId)
       .sort((a, b) => (a.position > b.position ? -1 : 1))[0]?.position;
     const position = rankAtEnd(lastPosition);
     const now = new Date().toISOString();
@@ -328,6 +351,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       color: null,
       description: null,
       position,
+      board_id: boardId,
       deleted_at: null,
       created_by: createdBy,
       updated_by: createdBy,
@@ -337,7 +361,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ sections: { ...s.sections, [id]: optimistic } }));
 
     await runMutation(
-      { table: "sections", op: "insert", payload: { id, name, emoji, kind, position, created_by: createdBy } },
+      { table: "sections", op: "insert", payload: { id, name, emoji, kind, position, created_by: createdBy, board_id: boardId } },
       () =>
         set((s) => {
           const next = { ...s.sections };
@@ -403,6 +427,30 @@ export const useAppStore = create<AppState>((set, get) => ({
       () => prev && set((s) => ({ sections: { ...s.sections, [id]: prev } })),
       "לא הצלחנו לשחזר את הקטגוריה"
     );
+  },
+
+  // ---------------------------------------------------------------------
+  // Boards — a completely separate mini-house (its own sections/tasks/
+  // chores, via createSection's boardId) visible only to whoever the
+  // creator picked (see migration 0034's create_board RPC and RLS). Not
+  // queueable/optimistic like the rest of this file: creating one only
+  // succeeds if the device has a real per-member session (see
+  // src/lib/auth/pin-login.ts) for RLS to authorize it against, so this
+  // talks to Supabase directly and reports failure immediately rather than
+  // silently queuing a write that RLS would reject the moment it's replayed.
+  // ---------------------------------------------------------------------
+  createBoard: async ({ name, emoji, memberIds }) => {
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc("create_board", {
+      p_name: name,
+      p_emoji: emoji ?? undefined,
+      p_member_ids: memberIds,
+    });
+    if (error || !data) {
+      toast.error("לא הצלחנו ליצור את הלוח");
+      return null;
+    }
+    return data;
   },
 
   // ---------------------------------------------------------------------

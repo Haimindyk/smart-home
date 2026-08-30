@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import type { SectionKind } from "@/types/domain";
 
-export function NewSectionDialog() {
+export function NewSectionDialog({ boardId = null }: { boardId?: string | null }) {
   const createSection = useAppStore((s) => s.createSection);
   const actingMemberId = useIdentity((s) => s.actingMemberId);
   const t = useT();
@@ -36,7 +36,7 @@ export function NewSectionDialog() {
 
   function submit() {
     if (!name.trim()) return;
-    void createSection({ name: name.trim(), emoji: emoji || undefined, kind, createdBy: actingMemberId });
+    void createSection({ name: name.trim(), emoji: emoji || undefined, kind, createdBy: actingMemberId, boardId });
     setName("");
     setEmoji("");
     setKind("tasks");

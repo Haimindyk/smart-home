@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Moon, Sun, Laptop, Users, Pencil, History, Bell, Check, ChevronDown, CalendarDays, Megaphone, ScanBarcode, Bot, MoreHorizontal } from "lucide-react";
+import { Search, Moon, Sun, Laptop, Users, Pencil, History, Bell, Check, ChevronDown, CalendarDays, Megaphone, ScanBarcode, Bot, MoreHorizontal, Lock } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useIdentity } from "@/lib/identity";
 import { useAppStore } from "@/lib/store/app-store";
@@ -18,6 +18,7 @@ import { BroadcastMessageDialog, BROADCAST_SENDER_EMAIL } from "@/components/pus
 import { BarcodeScannerDialog } from "@/components/shopping/barcode-scanner-dialog";
 import { MemberAvatar } from "@/components/identity/member-avatar";
 import { MembersDialog } from "@/components/identity/members-dialog";
+import { BoardsDialog } from "@/components/boards/boards-dialog";
 import { AssistantDialog } from "@/components/assistant/assistant-dialog";
 import {
   DropdownMenu,
@@ -39,6 +40,7 @@ export function AppHeader() {
   const t = useT();
   const [profileOpen, setProfileOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [boardsOpen, setBoardsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
@@ -118,6 +120,9 @@ export function AppHeader() {
               <DropdownMenuItem onClick={() => setHistoryOpen(true)}>
                 <History className="size-4" /> {t("history")}
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setBoardsOpen(true)}>
+                <Lock className="size-4" /> {t("boards")}
+              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
@@ -150,6 +155,7 @@ export function AppHeader() {
 
       <ProfileEditDialog memberId={actingMemberId} open={profileOpen} onOpenChange={setProfileOpen} />
       <MembersDialog open={membersOpen} onOpenChange={setMembersOpen} />
+      <BoardsDialog open={boardsOpen} onOpenChange={setBoardsOpen} />
       <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
       <NotificationSettingsDialog open={notificationsOpen} onOpenChange={setNotificationsOpen} />
       {canBroadcast && (

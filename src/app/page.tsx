@@ -36,8 +36,12 @@ export default function DashboardPage() {
   const hydrated = useAppStore((s) => s.hydrated);
   const me = actingMemberId ? members[actingMemberId] : undefined;
 
+  // Board-scoped sections (see migration 0034) ride along in this same
+  // store bucket — RLS is what actually keeps them private, but the main
+  // dashboard still needs to only ever render the shared household board,
+  // never a private board's sections mixed in.
   const sections = useMemo(
-    () => sortByPosition(Object.values(sectionsById).filter((s) => !s.deleted_at)),
+    () => sortByPosition(Object.values(sectionsById).filter((s) => !s.deleted_at && s.board_id === null)),
     [sectionsById]
   );
 

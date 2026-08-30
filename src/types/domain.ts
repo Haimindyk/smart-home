@@ -2,6 +2,9 @@ import type { Tables } from "./database";
 
 export type Member = Tables<"members">;
 
+export type Board = Tables<"boards">;
+export type BoardMember = Tables<"board_members">;
+
 export type SectionKind = "tasks" | "shopping" | "chores" | "info";
 export type Section = Omit<Tables<"sections">, "kind"> & { kind: SectionKind };
 

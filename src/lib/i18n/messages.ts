@@ -206,6 +206,13 @@ export const messages = {
     theNewSection: "הקטגוריה החדשה",
     dismiss: "התעלמות",
     addReaction: "הוספת תגובה",
+    boards: "לוחות פרטיים",
+    newBoard: "לוח חדש",
+    noBoardsYet: "עדיין אין לך לוחות פרטיים",
+    boardName: "שם הלוח",
+    boardMembersLabel: "מי רואה את הלוח הזה",
+    createBoard: "יצירת לוח",
+    backToHome: "חזרה הביתה",
   },
   en: {
     appName: "K&H",
@@ -414,6 +421,13 @@ export const messages = {
     theNewSection: "the new section",
     dismiss: "Dismiss",
     addReaction: "Add reaction",
+    boards: "Private boards",
+    newBoard: "New board",
+    noBoardsYet: "You don't have any private boards yet",
+    boardName: "Board name",
+    boardMembersLabel: "Who can see this board",
+    createBoard: "Create board",
+    backToHome: "Back home",
   },
 } as const;
 
