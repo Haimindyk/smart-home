@@ -1,0 +1,12 @@
+-- Migration 0030 renamed the assistant from מיקה (Mika) to ג'סיקה (Jessica),
+-- but nothing stopped her, before that rename, from using remember_family_fact
+-- to save a self-referential "fact" about her own name/identity (e.g. "I'll
+-- always be Mika no matter what they rename me") — see the household's report
+-- that she kept insisting on the old name in personal notifications. Family
+-- facts are permanent, unmoderated free text (see 0024) with no expiry, so
+-- any such row would keep contradicting the current persona forever.
+--
+-- remember_family_fact's tool description now forbids saving anything about
+-- her own name/identity going forward (see the assistant Edge Function) —
+-- this migration just purges whatever may have already been saved.
+delete from public.family_facts where fact ilike '%מיקה%';

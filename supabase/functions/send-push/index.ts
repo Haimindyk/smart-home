@@ -158,9 +158,10 @@ Deno.serve(async (req) => {
   // separate path since its targeting/gating/title logic doesn't overlap
   // with the generic case at all.
   if (action === "personal" && targetMemberId) {
-    const [{ data: personalSubs }, { data: personalPrefsRows }] = await Promise.all([
+    const [{ data: personalSubs }, { data: personalPrefsRows }, { data: assistantMember }] = await Promise.all([
       supabase.from("push_subscriptions").select("id, member_id, endpoint, p256dh, auth").eq("member_id", targetMemberId),
       supabase.from("notification_prefs").select("*").eq("member_id", targetMemberId).maybeSingle(),
+      actorId ? supabase.from("members").select("display_name").eq("id", actorId).maybeSingle() : Promise.resolve({ data: null }),
     ]);
 
     const prefs = (personalPrefsRows as NotificationPrefsRow | null) ?? { member_id: targetMemberId, ...DEFAULT_PREFS };
@@ -170,7 +171,11 @@ Deno.serve(async (req) => {
 
     let sent = 0;
     let skipped = 0;
-    const payload = { title: "💜 מיקה", body: truncateForPush(summary ?? ""), url: "/", tag: `${entityType}-${entityId}` };
+    // Assistant's display name is looked up live (rather than hardcoded)
+    // so a rename (see migration 0030) is reflected immediately, with no
+    // separate place left to forget to update.
+    const assistantName = (assistantMember as { display_name: string } | null)?.display_name ?? "העוזרת האישית";
+    const payload = { title: `💜 ${assistantName}`, body: truncateForPush(summary ?? ""), url: "/", tag: `${entityType}-${entityId}` };
 
     await Promise.all(
       ((personalSubs ?? []) as PushSubscriptionRow[]).map(async (sub) => {

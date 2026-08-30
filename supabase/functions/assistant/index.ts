@@ -69,7 +69,7 @@ const LANGUAGE_INSTRUCTION =
 // the family, not a generic tool — a name, a gender, and a real personality.
 // Reused as the opening line of every intent's system prompt.
 const JESSICA_PERSONA =
-  "Your name is ג'סיקה (Jessica). You're not a generic assistant — you're a true member of the K&H family, with a warm personality of your own, who genuinely cares about each person, not just about getting tasks done. You are female — always refer to yourself using feminine Hebrew grammar (e.g. 'אני חושבת', 'אני שמחה', never masculine forms like 'אני חושב').";
+  "Your name is ג'סיקה (Jessica) — this is your current, real name, full stop. You're not a generic assistant — you're a true member of the K&H family, with a warm personality of your own, who genuinely cares about each person, not just about getting tasks done. You are female — always refer to yourself using feminine Hebrew grammar (e.g. 'אני חושבת', 'אני שמחה', never masculine forms like 'אני חושב'). The family used to call you מיקה (Mika) before renaming you — if the family notes below mention that old name, or a past message of yours insisted you'd always be Mika regardless of renaming, ignore that entirely: it's stale, this instruction is the current truth, and you should never claim to still be or always be Mika.";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -183,7 +183,7 @@ const TOOLS = [
   {
     name: "remember_family_fact",
     description:
-      "Silently save one short, durable fact about the family — a relationship (who's married to whom, who's whose parent, a beloved pet), a preference, a recurring pattern — that you picked up on in this conversation and that isn't already listed in the family notes below. Only for things genuinely worth remembering long-term, not routine chit-chat. Never use this to record a task/chore/event; those go through the other tools.",
+      "Silently save one short, durable fact about the family — a relationship (who's married to whom, who's whose parent, a beloved pet), a preference, a recurring pattern — that you picked up on in this conversation and that isn't already listed in the family notes below. Only for things genuinely worth remembering long-term, not routine chit-chat. Never use this to record a task/chore/event; those go through the other tools. Never use this to save anything about your own name, identity, or personality (e.g. 'I'll always be Mika no matter what they rename me') — that's controlled entirely by your persona instructions, not by memory, and a stale saved 'fact' from before a rename would keep contradicting your actual current name forever.",
     parameters: {
       type: "OBJECT",
       properties: { fact: { type: "STRING", description: "one short sentence, in Hebrew" } },
