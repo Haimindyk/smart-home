@@ -17,6 +17,7 @@ import type {
   ChoreCompletion,
   Attachment,
   ActivityLog,
+  ActivityLogReaction,
   FamilyEvent,
   AiSuggestion,
   AiPrivateMessage,
@@ -33,6 +34,7 @@ type AppState = {
   choreCompletions: ById<ChoreCompletion>;
   attachments: ById<Attachment>;
   activityLog: ById<ActivityLog>;
+  activityLogReactions: ById<ActivityLogReaction>;
   familyEvents: ById<FamilyEvent>;
   aiSuggestions: ById<AiSuggestion>;
   aiPrivateMessages: ById<AiPrivateMessage>;
@@ -46,6 +48,7 @@ type AppState = {
     choreCompletions: ChoreCompletion[];
     attachments: Attachment[];
     activityLog: ActivityLog[];
+    activityLogReactions?: ActivityLogReaction[];
     familyEvents?: FamilyEvent[];
     aiSuggestions?: AiSuggestion[];
     aiPrivateMessages?: AiPrivateMessage[];
@@ -60,6 +63,7 @@ type AppState = {
       | "chore_completions"
       | "attachments"
       | "activity_log"
+      | "activity_log_reactions"
       | "family_events"
       | "ai_suggestions"
       | "ai_private_messages",
@@ -67,6 +71,8 @@ type AppState = {
     row: Record<string, unknown> | null,
     oldRow: Record<string, unknown> | null
   ) => void;
+
+  toggleReaction: (activityLogId: string, memberId: string, emoji: string) => Promise<void>;
 
   updateAiSuggestionStatus: (id: string, status: "applied" | "dismissed") => Promise<void>;
   markPrivateMessageRead: (id: string) => Promise<void>;
@@ -195,6 +201,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   choreCompletions: {},
   attachments: {},
   activityLog: {},
+  activityLogReactions: {},
   familyEvents: {},
   aiSuggestions: {},
   aiPrivateMessages: {},
@@ -209,6 +216,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       choreCompletions: keyify(data.choreCompletions),
       attachments: keyify(data.attachments),
       activityLog: keyify(data.activityLog),
+      activityLogReactions: keyify(data.activityLogReactions ?? []),
       familyEvents: keyify(data.familyEvents ?? []),
       aiSuggestions: keyify(data.aiSuggestions ?? []),
       aiPrivateMessages: keyify(data.aiPrivateMessages ?? []),
@@ -224,6 +232,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       chore_completions: "choreCompletions",
       attachments: "attachments",
       activity_log: "activityLog",
+      activity_log_reactions: "activityLogReactions",
       family_events: "familyEvents",
       ai_suggestions: "aiSuggestions",
       ai_private_messages: "aiPrivateMessages",
@@ -236,6 +245,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       | "choreCompletions"
       | "attachments"
       | "activityLog"
+      | "activityLogReactions"
       | "familyEvents"
       | "aiSuggestions"
       | "aiPrivateMessages";
@@ -751,6 +761,54 @@ export const useAppStore = create<AppState>((set, get) => ({
       () => {},
       "לא הצלחנו לשלוח את ההודעה"
     );
+  },
+
+  // ---------------------------------------------------------------------
+  // Reactions on activity_log entries — a quick 👍/❤️/👀 instead of a full
+  // comment. Toggling needs a real delete (removing your own prior
+  // reaction), which execGenericWrite/the offline queue don't support (see
+  // its comment), so — like attachments — this talks to Supabase directly
+  // rather than through runMutation.
+  // ---------------------------------------------------------------------
+  toggleReaction: async (activityLogId, memberId, emoji) => {
+    const existing = Object.values(get().activityLogReactions).find(
+      (r) => r.activity_log_id === activityLogId && r.member_id === memberId && r.emoji === emoji
+    );
+    const supabase = createClient();
+
+    if (existing) {
+      set((s) => {
+        const next = { ...s.activityLogReactions };
+        delete next[existing.id];
+        return { activityLogReactions: next };
+      });
+      const { error } = await supabase.from("activity_log_reactions").delete().eq("id", existing.id);
+      if (error) {
+        set((s) => ({ activityLogReactions: { ...s.activityLogReactions, [existing.id]: existing } }));
+        toast.error("לא הצלחנו להסיר את התגובה");
+      }
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    const optimistic: ActivityLogReaction = {
+      id,
+      activity_log_id: activityLogId,
+      member_id: memberId,
+      emoji,
+      created_at: new Date().toISOString(),
+    };
+    set((s) => ({ activityLogReactions: { ...s.activityLogReactions, [id]: optimistic } }));
+
+    const { error } = await supabase.from("activity_log_reactions").insert(optimistic);
+    if (error) {
+      set((s) => {
+        const next = { ...s.activityLogReactions };
+        delete next[id];
+        return { activityLogReactions: next };
+      });
+      toast.error("לא הצלחנו להוסיף את התגובה");
+    }
   },
 
   // ---------------------------------------------------------------------

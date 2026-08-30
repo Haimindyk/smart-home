@@ -6,7 +6,19 @@ import { createClient } from "@/lib/supabase/client";
 import { useAppStore } from "@/lib/store/app-store";
 import { loadSnapshot, saveSnapshot } from "@/lib/offline/db";
 import { flushMutationQueue } from "@/lib/offline/queue";
-import type { Member, Section, Task, Chore, ChoreCompletion, Attachment, ActivityLog, FamilyEvent, AiSuggestion, AiPrivateMessage } from "@/types/domain";
+import type {
+  Member,
+  Section,
+  Task,
+  Chore,
+  ChoreCompletion,
+  Attachment,
+  ActivityLog,
+  ActivityLogReaction,
+  FamilyEvent,
+  AiSuggestion,
+  AiPrivateMessage,
+} from "@/types/domain";
 
 /** Delay before rejoining the realtime channel after an error/timeout/close, to avoid retry storms. */
 const REJOIN_DELAY_MS = 2000;
@@ -19,6 +31,7 @@ type Snapshot = {
   choreCompletions: ChoreCompletion[];
   attachments: Attachment[];
   activityLog: ActivityLog[];
+  activityLogReactions: ActivityLogReaction[];
   familyEvents: FamilyEvent[];
   aiSuggestions: AiSuggestion[];
   aiPrivateMessages: AiPrivateMessage[];
@@ -32,6 +45,7 @@ const TABLES = [
   "chore_completions",
   "attachments",
   "activity_log",
+  "activity_log_reactions",
   "family_events",
   "ai_suggestions",
   "ai_private_messages",
@@ -39,24 +53,36 @@ const TABLES = [
 
 async function fetchAll(): Promise<Snapshot> {
   const supabase = createClient();
-  const [members, sections, tasks, chores, choreCompletions, attachments, activityLog, familyEvents, aiSuggestions, aiPrivateMessages] =
-    await Promise.all([
-      supabase.from("members").select("*"),
-      supabase.from("sections").select("*").order("position"),
-      supabase.from("tasks").select("*").order("position"),
-      supabase.from("chores").select("*").order("position"),
-      supabase.from("chore_completions").select("*"),
-      supabase.from("attachments").select("*"),
-      supabase.from("activity_log").select("*").order("seq", { ascending: false }).limit(200),
-      supabase.from("family_events").select("*").order("event_date"),
-      supabase.from("ai_suggestions").select("*").eq("status", "open").order("created_at", { ascending: false }),
-      // Fetches every member's private messages, not just the current
-      // device's acting member — the same soft, UX-level privacy as the rest
-      // of this app (see migration 0026): the UI only ever *displays* a
-      // member their own rows (personal-note-card.tsx), it isn't enforced
-      // here or by RLS.
-      supabase.from("ai_private_messages").select("*").order("created_at", { ascending: false }),
-    ]);
+  const [
+    members,
+    sections,
+    tasks,
+    chores,
+    choreCompletions,
+    attachments,
+    activityLog,
+    activityLogReactions,
+    familyEvents,
+    aiSuggestions,
+    aiPrivateMessages,
+  ] = await Promise.all([
+    supabase.from("members").select("*"),
+    supabase.from("sections").select("*").order("position"),
+    supabase.from("tasks").select("*").order("position"),
+    supabase.from("chores").select("*").order("position"),
+    supabase.from("chore_completions").select("*"),
+    supabase.from("attachments").select("*"),
+    supabase.from("activity_log").select("*").order("seq", { ascending: false }).limit(200),
+    supabase.from("activity_log_reactions").select("*"),
+    supabase.from("family_events").select("*").order("event_date"),
+    supabase.from("ai_suggestions").select("*").eq("status", "open").order("created_at", { ascending: false }),
+    // Fetches every member's private messages, not just the current
+    // device's acting member — the same soft, UX-level privacy as the rest
+    // of this app (see migration 0026): the UI only ever *displays* a
+    // member their own rows (personal-note-card.tsx), it isn't enforced
+    // here or by RLS.
+    supabase.from("ai_private_messages").select("*").order("created_at", { ascending: false }),
+  ]);
   return {
     members: (members.data ?? []) as Member[],
     sections: (sections.data ?? []) as Section[],
@@ -65,6 +91,7 @@ async function fetchAll(): Promise<Snapshot> {
     choreCompletions: (choreCompletions.data ?? []) as ChoreCompletion[],
     attachments: (attachments.data ?? []) as Attachment[],
     activityLog: (activityLog.data ?? []) as ActivityLog[],
+    activityLogReactions: (activityLogReactions.data ?? []) as ActivityLogReaction[],
     familyEvents: (familyEvents.data ?? []) as FamilyEvent[],
     aiSuggestions: (aiSuggestions.data ?? []) as AiSuggestion[],
     aiPrivateMessages: (aiPrivateMessages.data ?? []) as AiPrivateMessage[],
@@ -182,6 +209,7 @@ export function useRealtimeSync() {
         activityLog: Object.values(state.activityLog)
           .sort((a, b) => b.seq - a.seq)
           .slice(0, 200),
+        activityLogReactions: Object.values(state.activityLogReactions),
         familyEvents: Object.values(state.familyEvents),
         aiSuggestions: Object.values(state.aiSuggestions),
         aiPrivateMessages: Object.values(state.aiPrivateMessages),

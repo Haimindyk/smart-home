@@ -8,6 +8,7 @@ import { useAppStore } from "@/lib/store/app-store";
 import { useLocaleStore, useT } from "@/lib/i18n/store";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MemberAvatar } from "@/components/identity/member-avatar";
+import { ActivityReactions } from "@/components/history/activity-reactions";
 import type { MessageKey } from "@/lib/i18n/messages";
 
 const ACTION_KEYS: Record<string, MessageKey> = {
@@ -75,6 +76,14 @@ export function HistoryDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                         locale: locale === "he" ? he : enUS,
                       })}
                     </span>
+                    {/* Reactions only make sense on broadcasts — a "seen this?"
+                        signal for a deliberate message, not routine create/complete
+                        noise that would otherwise clutter every list entry. */}
+                    {entry.action === "message" && (
+                      <div className="mt-1">
+                        <ActivityReactions entryId={entry.id} />
+                      </div>
+                    )}
                   </div>
                 </li>
               );

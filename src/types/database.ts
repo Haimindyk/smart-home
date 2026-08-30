@@ -55,6 +55,45 @@ export type Database = {
           },
         ]
       }
+      activity_log_reactions: {
+        Row: {
+          activity_log_id: string
+          created_at: string
+          emoji: string
+          id: string
+          member_id: string
+        }
+        Insert: {
+          activity_log_id: string
+          created_at?: string
+          emoji: string
+          id?: string
+          member_id: string
+        }
+        Update: {
+          activity_log_id?: string
+          created_at?: string
+          emoji?: string
+          id?: string
+          member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_reactions_activity_log_id_fkey"
+            columns: ["activity_log_id"]
+            isOneToOne: false
+            referencedRelation: "activity_log"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_log_reactions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_private_messages: {
         Row: {
           created_at: string

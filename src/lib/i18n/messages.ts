@@ -205,6 +205,7 @@ export const messages = {
     moveToConnector: "אל",
     theNewSection: "הקטגוריה החדשה",
     dismiss: "התעלמות",
+    addReaction: "הוספת תגובה",
   },
   en: {
     appName: "K&H",
@@ -412,6 +413,7 @@ export const messages = {
     moveToConnector: "to",
     theNewSection: "the new section",
     dismiss: "Dismiss",
+    addReaction: "Add reaction",
   },
 } as const;
 
