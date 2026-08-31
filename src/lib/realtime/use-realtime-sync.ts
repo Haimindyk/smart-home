@@ -85,7 +85,7 @@ async function fetchAll(): Promise<Snapshot> {
     supabase.from("chores").select("*").order("position"),
     supabase.from("chore_completions").select("*"),
     supabase.from("attachments").select("*"),
-    supabase.from("activity_log").select("*").order("seq", { ascending: false }).limit(200),
+    supabase.from("activity_log").select("*").order("seq", { ascending: false }).limit(30),
     supabase.from("activity_log_reactions").select("*"),
     // Also RLS-filtered to boards this device's member can see — see
     // migration 0034's "board members can view their boards" policy, the
@@ -225,11 +225,11 @@ export function useRealtimeSync() {
         chores: Object.values(state.chores),
         choreCompletions: Object.values(state.choreCompletions),
         attachments: Object.values(state.attachments),
-        // Cap what's persisted to the newest ~200 (matches the initial fetch limit)
+        // Cap what's persisted to the newest 30 (matches the initial fetch limit)
         // so a cold start's IndexedDB payload stays bounded.
         activityLog: Object.values(state.activityLog)
           .sort((a, b) => b.seq - a.seq)
-          .slice(0, 200),
+          .slice(0, 30),
         activityLogReactions: Object.values(state.activityLogReactions),
         boards: Object.values(state.boards),
         boardMembers: Object.values(state.boardMembers),
