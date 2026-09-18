@@ -7,43 +7,27 @@
 // src/lib/assistant/apply-actions.ts, the one place on the client that
 // actually applies a confirmed action, through the same useAppStore
 // mutations a human action would use, so attribution, the offline queue,
-// and realtime sync all behave identically. A few exceptions, all
-// low-stakes/reversible rather than household-data mutations a human needs
-// to confirm:
-//   - "insights" mode inserts rows straight into ai_suggestions — those are
-//     already just a proposal sitting in an inbox, applied the same way as
-//     a chat action once a human taps it. It also now fires a push
-//     notification (see migration 0024) so a new suggestion isn't silent.
-//   - "digest" mode writes a broadcast message straight to activity_log once
-//     a week — a pure FYI with nothing to "apply", riding the existing
-//     broadcast -> push pipeline — summarizing the week ahead (upcoming
-//     events/due tasks, chores coming due).
-//   - "shabbat_greeting" mode does the same every Friday at 18:00 Israel
-//     time, a warm Shabbat Shalom message for the whole household.
-//   - "personal_checkin" mode writes a one-on-one note straight to
-//     ai_private_messages for one specific member at a time — Jessica's own
-//     individual relationship with each person (noticing when someone's
-//     been quiet, an inside joke), never shown to the rest of the
-//     household (see migration 0026). Excludes Louis (a placeholder member
-//     row for the family dog) and Jessica's own row.
-//   - remember_family_fact (a tool available in every intent) lets the model
-//     grow its own free-text memory of family relationships/preferences
-//     directly, since it's the assistant's own background knowledge, not
-//     household state a human manages.
+// and realtime sync all behave identically. One exception:
+//   - remember_family_fact lets the model grow its own free-text memory of
+//     family relationships/preferences directly, since it's the assistant's
+//     own background knowledge, not household state a human manages.
+//
+// Jessica only ever speaks when spoken to. She used to also run on a
+// schedule — insight cards, a weekly digest, a Shabbat greeting, one-on-one
+// check-ins — but the household asked for notifications to come from people
+// only, so migration 0031 unscheduled those jobs and this function no
+// longer accepts their intents. Chat is all that's left.
 //
 // This is a Deno module (Supabase Edge Runtime), not part of the Next.js
 // app's TypeScript project — see tsconfig.json / eslint.config.mjs, both of
 // which exclude supabase/functions/**.
 //
 // Deployed with verify_jwt disabled: chat has no auth by design (same anon
-// reach as the rest of this app), and the scheduled intents use their
-// own shared-secret check (verify_assistant_trigger_secret) rather than a
-// Supabase-issued JWT — the pg_cron jobs' net.http_post calls send a random
-// Vault secret as the bearer token, not a JWT, so gateway-level verify_jwt
-// would reject them before this code ever ran.
+// reach as the rest of this app), so a gateway-level JWT check would reject
+// every real caller. The daily call cap below is what bounds abuse.
 //
-// Everything this assistant writes (chat replies, insight notes, digests) is
-// Hebrew-only by design — this household's whole app is Hebrew-first.
+// Everything this assistant writes is Hebrew-only by design — this
+// household's whole app is Hebrew-first.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -364,59 +348,6 @@ function buildActivitySummary(rows: { action: string; summary: string | null; cr
     .join("\n");
 }
 
-/** "2026-07-10" -> Israel-local date string N days later, same shape. */
-function addDaysStr(dateStr: string, days: number): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const next = new Date(Date.UTC(y, m - 1, d + days));
-  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
-}
-
-function toIsraelDateStr(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
-}
-
-/** Rolls a yearly-recurring event's month/day forward to its next
- * occurrence on/after `todayStr` — a light JS mirror of the
- * family_event_next_occurrence SQL function (see migration 0010), close
- * enough for "is this in the next 7 days" filtering. */
-function nextYearlyOccurrence(eventDateStr: string, todayStr: string): string {
-  const [, m, d] = eventDateStr.split("-");
-  const [todayYear] = todayStr.split("-");
-  let candidate = `${todayYear}-${m}-${d}`;
-  if (candidate < todayStr) candidate = `${Number(todayYear) + 1}-${m}-${d}`;
-  return candidate;
-}
-
-/** Hour-of-day (0-23) in Israel local time, DST-aware — used to keep the
- * assistant's own unsolicited notifications (digest/insights) inside
- * reasonable hours, regardless of what UTC time the cron happens to fire at
- * (pg_cron schedules are fixed UTC and don't track Israel's DST shifts). */
-function israelHour(now: Date): number {
-  const hourPart = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Jerusalem",
-    hour: "2-digit",
-    hourCycle: "h23",
-  })
-    .formatToParts(now)
-    .find((p) => p.type === "hour");
-  return hourPart ? Number(hourPart.value) : 0;
-}
-
-/** The household only wants proactive AI notifications (never human ones)
- * between 9am and midnight Israel time — nothing overnight. */
-function isWithinNotificationWindow(now: Date): boolean {
-  return israelHour(now) >= 9;
-}
-
-/** Friday, 18:00 Israel local time — the cron fires every 15 minutes across
- * a window that safely covers 18:00 Israel time under both DST offsets
- * (see the cron.schedule call in migration 0027), and this does the exact
- * match so the greeting only actually sends once, right at 18:00. */
-function isShabbatGreetingTime(now: Date): boolean {
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Jerusalem", weekday: "short" }).format(now);
-  return weekday === "Fri" && israelHour(now) === 18;
-}
-
 /** Hebrew conjugates second-person verbs/pronouns by the *listener's*
  * gender (את/אתה, חושבת/חושב) — Jessica's own feminine self-reference
  * (JESSICA_PERSONA) says nothing about who she's addressing, so without this
@@ -426,19 +357,6 @@ function addresseeGenderLine(displayName: string, gender: string | null | undefi
   if (gender !== "male" && gender !== "female") return null;
   const forms = gender === "male" ? "masculine (e.g. 'אתה', 'חושב', 'מרגיש')" : "feminine (e.g. 'את', 'חושבת', 'מרגישה')";
   return `You're speaking directly with ${displayName}. When addressing them in second person, use ${forms} Hebrew grammar for THEM — completely independent of your own (Jessica's) feminine self-reference.`;
-}
-
-/** Whole days between `iso` and now, or null if `iso` is null (never happened yet). */
-function daysSince(iso: string | null): number | null {
-  if (!iso) return null;
-  return Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60 * 1000));
-}
-
-function getBearerToken(req: Request): string | null {
-  const header = req.headers.get("Authorization") ?? req.headers.get("authorization");
-  if (!header?.startsWith("Bearer ")) return null;
-  const token = header.slice("Bearer ".length).trim();
-  return token.length > 0 ? token : null;
 }
 
 function normalizeFact(fact: string): string {
@@ -470,7 +388,7 @@ Deno.serve(async (req) => {
   }
 
   let body: {
-    intent?: "chat" | "insights" | "digest" | "personal_checkin" | "shabbat_greeting";
+    intent?: "chat";
     message?: string;
     imageBase64?: string;
     imageMimeType?: string;
@@ -486,30 +404,13 @@ Deno.serve(async (req) => {
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-  // The insights sweep and the weekly digest write straight into
-  // everyone's dashboard/feed (unlike chat, which only a human can act
-  // on) — gate them with a shared secret so an open endpoint can't be
-  // used to spam the household. Chat stays open to anyone with the link,
-  // same as the rest of the app.
-  if (
-    body.intent === "insights" ||
-    body.intent === "digest" ||
-    body.intent === "personal_checkin" ||
-    body.intent === "shabbat_greeting"
-  ) {
-    const secret = getBearerToken(req);
-    const { data: valid } = secret
-      ? await supabase.rpc("verify_assistant_trigger_secret", { p_secret: secret })
-      : { data: false };
-    if (!valid) return json({ error: "unauthorized" }, 401);
-
-    // These are all Jessica's own unsolicited notifications (unlike chat, which
-    // only ever responds to a human) — keep them to daytime/evening hours
-    // regardless of which cron slot happened to trigger this call. Bail
-    // before spending a Gemini call or counting against the daily cap.
-    if (!isWithinNotificationWindow(new Date())) {
-      return json({ sent: false, reason: "outside_notification_window" });
-    }
+  // The scheduled intents (insights/digest/personal_checkin/shabbat_greeting)
+  // were removed in migration 0031 — their cron jobs are gone, so a caller
+  // asking for one is either a stale database or someone poking at the
+  // endpoint. Either way, say so rather than silently falling through to a
+  // chat reply.
+  if (body.intent && body.intent !== "chat") {
+    return json({ error: "unsupported_intent" }, 400);
   }
 
   const { data: callsToday, error: usageError } = await supabase.rpc("increment_ai_usage");
@@ -521,10 +422,8 @@ Deno.serve(async (req) => {
     return json({ error: "rate_limited" }, 429);
   }
 
-  // Full household context, shared by chat and insights (the two "general
-  // knowledge" intents) — Jessica should know everything a human already sees
-  // in the app, not a narrowed-down subset. digest/personal_checkin
-  // each pull their own narrower, purpose-specific data instead of this.
+  // Full household context — Jessica should know everything a human already
+  // sees in the app, not a narrowed-down subset.
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const [{ data: sections }, { data: tasks }, { data: chores }, { data: familyFacts }, { data: members }, { data: events }, { data: activity }] =
     await Promise.all([
@@ -540,290 +439,6 @@ Deno.serve(async (req) => {
   const contextBlock = buildContextBlock(sections ?? [], tasks ?? [], chores ?? [], members ?? [], events ?? []);
   const familyFactsBlock = buildFamilyFactsBlock((familyFacts ?? []) as { fact: string }[]);
   const activitySummary = buildActivitySummary(activity ?? []);
-
-  if (body.intent === "digest") {
-    const { data: assistantMember } = await supabase
-      .from("members")
-      .select("id")
-      .eq("email", "assistant@kh.family")
-      .maybeSingle();
-    const assistantId = (assistantMember as { id: string } | null)?.id ?? null;
-
-    // A digest is once-a-week; guard against a double-fire with a
-    // week-wide lookback, and a marker prefix so another broadcast sent
-    // earlier the same week doesn't count as "already sent a digest".
-    if (assistantId) {
-      const sixDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
-      const { data: existing } = await supabase
-        .from("activity_log")
-        .select("id, summary")
-        .eq("actor_id", assistantId)
-        .eq("entity_type", "broadcast")
-        .gte("created_at", sixDaysAgo.toISOString())
-        .ilike("summary", "🗓️%")
-        .limit(1);
-      if (existing && existing.length > 0) {
-        return json({ sent: false, reason: "already_sent_this_week" });
-      }
-    }
-
-    const todayStr = toIsraelDateStr(new Date().toISOString());
-    const weekAheadStr = addDaysStr(todayStr, 7);
-
-    const [{ data: events }, { data: dueTasks }, { data: dueChores }] = await Promise.all([
-      supabase.from("family_events").select("title, emoji, event_date, recurrence").is("deleted_at", null),
-      supabase
-        .from("tasks")
-        .select("title, due_at")
-        .is("deleted_at", null)
-        .eq("is_note", false)
-        .eq("is_completed", false)
-        .not("due_at", "is", null),
-      supabase.from("chores").select("title, next_due_at").is("deleted_at", null),
-    ]);
-
-    const upcomingEventLines = (events ?? [])
-      .map((e: { title: string; emoji: string | null; event_date: string; recurrence: string }) => ({
-        ...e,
-        next: e.recurrence === "yearly" ? nextYearlyOccurrence(e.event_date, todayStr) : e.event_date,
-      }))
-      .filter((e) => e.next >= todayStr && e.next <= weekAheadStr)
-      .sort((a, b) => a.next.localeCompare(b.next))
-      .map((e) => `- ${e.next}: ${e.emoji ? e.emoji + " " : ""}${e.title}`);
-
-    const dueTaskLines = (dueTasks ?? [])
-      .map((t: { title: string; due_at: string }) => ({ title: t.title, date: toIsraelDateStr(t.due_at) }))
-      .filter((t) => t.date <= weekAheadStr)
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map((t) => `- ${t.date}: ${t.title}`);
-
-    const dueChoreLines = (dueChores ?? [])
-      .map((c: { title: string; next_due_at: string }) => ({ title: c.title, date: toIsraelDateStr(c.next_due_at) }))
-      .filter((c) => c.date <= weekAheadStr)
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map((c) => `- ${c.date}: ${c.title}`);
-
-    if (upcomingEventLines.length === 0 && dueTaskLines.length === 0 && dueChoreLines.length === 0) {
-      return json({ sent: false, reason: "nothing_this_week" });
-    }
-
-    const systemInstruction = [
-      JESSICA_PERSONA,
-      "Write a short, warm, genuinely funny weekly recap for the household — a few sentences covering what's coming up this week from the lists below (events, due tasks/appointments, chores coming due). Keep it playful and warm, not a dry status report.",
-      "Keep the whole recap under about 200 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence. If there's too much to fit, pick only the 1-2 most important things and skip the rest rather than listing everything.",
-      "Only mention things actually in the lists below — never invent dates or items. If a list is empty, just don't mention that category.",
-      "Do not call any tools. Reply with just the recap text — no preamble, no markdown, no bullet points; write it as natural prose a person would text to their family group chat.",
-      LANGUAGE_INSTRUCTION,
-      "",
-      "## Events this week",
-      upcomingEventLines.join("\n") || "(none)",
-      "",
-      "## Tasks/appointments due this week",
-      dueTaskLines.join("\n") || "(none)",
-      "",
-      "## Chores coming due this week",
-      dueChoreLines.join("\n") || "(none)",
-    ].join("\n");
-
-    const { reply, memoryFacts } = await callGemini(geminiKey, systemInstruction, [
-      { text: "תכתוב לי סיכום שבועי חם ומצחיק למשפחה, על סמך הרשימות." },
-    ]);
-    await saveFamilyFacts(supabase, memoryFacts, (familyFacts ?? []) as { fact: string }[]);
-
-    const digestText = reply.trim();
-    if (!digestText) return json({ sent: false, reason: "empty" });
-
-    await supabase.from("activity_log").insert({
-      entity_type: "broadcast",
-      entity_id: crypto.randomUUID(),
-      action: "message",
-      actor_id: assistantId,
-      summary: `🗓️ ${digestText}`,
-    });
-
-    return json({ sent: true });
-  }
-
-  if (body.intent === "shabbat_greeting") {
-    if (!isShabbatGreetingTime(new Date())) {
-      return json({ sent: false, reason: "not_shabbat_greeting_time" });
-    }
-
-    const { data: assistantMember } = await supabase
-      .from("members")
-      .select("id")
-      .eq("email", "assistant@kh.family")
-      .maybeSingle();
-    const assistantId = (assistantMember as { id: string } | null)?.id ?? null;
-
-    // The cron checks every 15 minutes across a multi-hour window (see
-    // migration 0027) so it can only actually send once per Friday — a
-    // 20-hour lookback comfortably covers "today" without reaching into
-    // the following Friday.
-    if (assistantId) {
-      const twentyHoursAgo = new Date(Date.now() - 20 * 60 * 60 * 1000);
-      const { data: existing } = await supabase
-        .from("activity_log")
-        .select("id")
-        .eq("actor_id", assistantId)
-        .eq("entity_type", "broadcast")
-        .gte("created_at", twentyHoursAgo.toISOString())
-        .ilike("summary", "🕯️%")
-        .limit(1);
-      if (existing && existing.length > 0) {
-        return json({ sent: false, reason: "already_sent_today" });
-      }
-    }
-
-    const systemInstruction = [
-      JESSICA_PERSONA,
-      "Write one short, warm, cute Shabbat Shalom message for the whole household, wishing them a peaceful, restful Friday evening together — candles, family time, that kind of warmth.",
-      "Keep it under about 140 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence.",
-      "Do not call any tools. Reply with just the message text — no preamble, no quotation marks.",
-      LANGUAGE_INSTRUCTION,
-      "",
-      "## Family notes",
-      familyFactsBlock,
-    ].join("\n");
-
-    const { reply, memoryFacts } = await callGemini(geminiKey, systemInstruction, [
-      { text: "תכתבי לנו איחול שבת שלום חמוד וחם." },
-    ]);
-    await saveFamilyFacts(supabase, memoryFacts, (familyFacts ?? []) as { fact: string }[]);
-
-    const greetingText = reply.trim();
-    if (!greetingText) return json({ sent: false, reason: "empty" });
-
-    await supabase.from("activity_log").insert({
-      entity_type: "broadcast",
-      entity_id: crypto.randomUUID(),
-      action: "message",
-      actor_id: assistantId,
-      summary: `🕯️ ${greetingText}`,
-    });
-
-    return json({ sent: true });
-  }
-
-  if (body.intent === "personal_checkin") {
-    const { data: members } = await supabase
-      .from("members")
-      .select("id, display_name, last_chat_at, gender")
-      .eq("is_ai_companion_target", true);
-
-    let sent = 0;
-    for (const member of (members ?? []) as {
-      id: string;
-      display_name: string;
-      last_chat_at: string | null;
-      gender: string | null;
-    }[]) {
-      // At most one personal note every couple of days per member — the
-      // cron fires daily, but this keeps the actual cadence to "every few
-      // days, if there's something worth saying" per the household's ask.
-      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-      const { data: recentToThem } = await supabase
-        .from("ai_private_messages")
-        .select("id")
-        .eq("member_id", member.id)
-        .gte("created_at", twoDaysAgo.toISOString())
-        .limit(1);
-      if (recentToThem && recentToThem.length > 0) continue;
-
-      const { data: pastMessages } = await supabase
-        .from("ai_private_messages")
-        .select("summary, created_at")
-        .eq("member_id", member.id)
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      const { data: theirActivity } = await supabase
-        .from("activity_log")
-        .select("action, summary, created_at")
-        .eq("actor_id", member.id)
-        .order("seq", { ascending: false })
-        .limit(20);
-
-      const daysSinceChat = daysSince(member.last_chat_at);
-      const lastChatLine =
-        daysSinceChat === null
-          ? `${member.display_name} has never chatted with you directly yet.`
-          : daysSinceChat >= 1
-            ? `${member.display_name} last chatted with you directly ${daysSinceChat} day(s) ago.`
-            : `${member.display_name} chatted with you directly earlier today.`;
-
-      const genderLine = addresseeGenderLine(member.display_name, member.gender);
-      const systemInstruction = [
-        JESSICA_PERSONA,
-        ...(genderLine ? [genderLine] : []),
-        `You're checking in personally, one-on-one, with ${member.display_name} — this is private, only they will ever see or hear it, never the rest of the household.`,
-        lastChatLine,
-        "If it's genuinely been a while since they talked to you directly, you can gently note that — warm, never guilt-tripping. If one of your past notes to them (below) set up an inside joke or an open thread, feel free to build on it naturally.",
-        "If you don't genuinely have anything warm or meaningful to say to this specific person right now, reply with just an empty string — never force a check-in just to have said something.",
-        "Keep it under about 140 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence.",
-        "Do not call any tools. Reply with just the message text — no preamble, no quotation marks.",
-        LANGUAGE_INSTRUCTION,
-        "",
-        "## Your past private notes to them (most recent first)",
-        buildActivitySummary((pastMessages ?? []).map((m) => ({ action: "note", summary: m.summary, created_at: m.created_at }))),
-        "",
-        "## Their recent activity in the app",
-        buildActivitySummary(theirActivity ?? []),
-        "",
-        "## Family notes",
-        familyFactsBlock,
-      ].join("\n");
-
-      const { reply, memoryFacts } = await callGemini(geminiKey, systemInstruction, [
-        { text: `תכתבי הודעה אישית וחמה ל${member.display_name}, רק אם באמת יש לך משהו לומר.` },
-      ]);
-      await saveFamilyFacts(supabase, memoryFacts, (familyFacts ?? []) as { fact: string }[]);
-
-      const noteText = reply.trim();
-      if (!noteText) continue;
-
-      await supabase.from("ai_private_messages").insert({ member_id: member.id, summary: noteText });
-      sent++;
-    }
-
-    return json({ sent });
-  }
-
-  if (body.intent === "insights") {
-    const systemInstruction = [
-      JESSICA_PERSONA,
-      "Look at the recent activity log and the current open tasks/chores below, and see if there's a genuinely useful, gentle observation worth surfacing as a dashboard suggestion — e.g. a chore nobody's done in a while, or a shopping item that keeps coming back.",
-      "Propose AT MOST ONE suggestion. If nothing is clearly worth surfacing, propose nothing and just reply with an empty string.",
-      "Phrase the suggestion with a warm, genuinely funny personality — a light pun or a playful nudge — instead of a dry notification. Never nag about something already handled; the humor should serve the message, not replace it, and it must still be tied to a real, specific observation.",
-      "Keep it under about 140 characters — it's delivered as a phone push notification, and longer text gets visually cut off mid-sentence.",
-      "If you notice a new, durable fact about the family that isn't already listed in the family notes below, call remember_family_fact to save it.",
-      LANGUAGE_INSTRUCTION,
-      "",
-      contextBlock,
-      "",
-      "## Family notes",
-      familyFactsBlock,
-      "",
-      "## Activity in the last 7 days",
-      activitySummary,
-    ].join("\n");
-
-    const { reply, proposedActions, memoryFacts } = await callGemini(geminiKey, systemInstruction, [
-      { text: "Look at the household's recent activity and suggest at most one useful action, if any." },
-    ]);
-    await saveFamilyFacts(supabase, memoryFacts, (familyFacts ?? []) as { fact: string }[]);
-
-    if (proposedActions.length > 0 && reply) {
-      const action = proposedActions[0];
-      await supabase.from("ai_suggestions").insert({
-        summary: reply,
-        emoji: "💡",
-        action,
-      });
-    }
-
-    return json({ inserted: proposedActions.length > 0 });
-  }
 
   // Default: chat mode.
   const addressee = body.memberId ? (members ?? []).find((m: { id: string }) => m.id === body.memberId) : null;
@@ -860,11 +475,6 @@ Deno.serve(async (req) => {
   try {
     const { reply, proposedActions, memoryFacts } = await callGemini(geminiKey, systemInstruction, userParts);
     await saveFamilyFacts(supabase, memoryFacts, (familyFacts ?? []) as { fact: string }[]);
-    // Lets a later personal_checkin honestly notice "it's been a while"
-    // instead of that being a canned line — see migration 0026.
-    if (body.memberId) {
-      await supabase.from("members").update({ last_chat_at: new Date().toISOString() }).eq("id", body.memberId);
-    }
     return json({ reply, proposedActions });
   } catch (err) {
     console.error("assistant: Gemini call failed", err);

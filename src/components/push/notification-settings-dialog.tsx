@@ -17,7 +17,7 @@ type PrefsState = {
   on_complete: boolean;
   on_assigned_me: boolean;
   on_shopping: boolean;
-  on_due: boolean;
+  on_delete: boolean;
   on_broadcast: boolean;
   muted: boolean;
 };
@@ -27,17 +27,20 @@ const DEFAULT_PREFS: PrefsState = {
   on_complete: true,
   on_assigned_me: true,
   on_shopping: true,
-  on_due: true,
+  on_delete: true,
   on_broadcast: true,
   muted: false,
 };
 
+// Every switch here is a thing a *person* did. Scheduled reminders and the
+// assistant's own messages were removed in migration 0031, so there's
+// nothing left to toggle for them.
 const CATEGORY_ROWS: { key: keyof Omit<PrefsState, "muted">; label: MessageKey }[] = [
   { key: "on_create", label: "notifyOnCreate" },
   { key: "on_complete", label: "notifyOnComplete" },
   { key: "on_assigned_me", label: "notifyOnAssignedMe" },
   { key: "on_shopping", label: "notifyOnShopping" },
-  { key: "on_due", label: "notifyOnDue" },
+  { key: "on_delete", label: "notifyOnDelete" },
   { key: "on_broadcast", label: "notifyOnBroadcast" },
 ];
 
@@ -69,7 +72,7 @@ export function NotificationSettingsDialog({
     const supabase = createClient();
     supabase
       .from("notification_prefs")
-      .select("on_create, on_complete, on_assigned_me, on_shopping, on_due, on_broadcast, muted")
+      .select("on_create, on_complete, on_assigned_me, on_shopping, on_delete, on_broadcast, muted")
       .eq("member_id", memberId)
       .maybeSingle()
       .then(({ data }) => {

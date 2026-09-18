@@ -3,6 +3,12 @@
 // insert. Fans a single activity_log row out to every subscribed device via
 // Web Push, respecting each member's notification_prefs.
 //
+// Only *human* activity is pushed: someone adding, completing or deleting an
+// item, or deliberately sending a broadcast. Scheduled reminders and the
+// assistant's own unsolicited messages were removed in migration 0031 — the
+// trigger already filters those out, and the guards below repeat the check so
+// a stale database can't get anything through.
+//
 // This function has zero manually-configured secrets: SUPABASE_URL and
 // SUPABASE_ANON_KEY are auto-injected by the Edge Runtime, and the VAPID
 // keypair is fetched at request time via get_push_config(), re-presenting
@@ -26,10 +32,6 @@ type ActivityLogRow = {
   summary: string | null;
   created_at: string;
   seq?: number;
-  // Only set for action === "personal" (Jessica's one-on-one notes, see
-  // migration 0026) — targets exactly this one member instead of the usual
-  // "everyone but the actor" household fan-out.
-  target_member_id?: string;
 };
 
 type PushSubscriptionRow = {
@@ -46,14 +48,14 @@ type NotificationPrefsRow = {
   on_complete: boolean;
   on_assigned_me: boolean;
   on_shopping: boolean;
-  on_due: boolean;
+  on_delete: boolean;
   on_broadcast: boolean;
-  on_ai_personal: boolean;
   muted: boolean;
 };
 
 type MemberRow = {
   id: string;
+  email: string | null;
   display_name: string;
   avatar_emoji: string | null;
   avatar_photo_url: string | null;
@@ -65,9 +67,8 @@ const DEFAULT_PREFS: Omit<NotificationPrefsRow, "member_id"> = {
   on_complete: true,
   on_assigned_me: true,
   on_shopping: true,
-  on_due: true,
+  on_delete: true,
   on_broadcast: true,
-  on_ai_personal: true,
   muted: false,
 };
 
@@ -83,7 +84,6 @@ const VERBS: Record<string, { he: string; en: string }> = {
   uncompleted: { he: "בוטל סימון בוצע", en: "marked not done" },
   deleted: { he: "נמחק/ה", en: "deleted" },
   restored: { he: "שוחזר/ה", en: "restored" },
-  due: { he: "הגיע מועד היעד", en: "is due" },
 };
 
 function verbFor(action: string, locale: string | null): string {
@@ -95,8 +95,7 @@ function verbFor(action: string, locale: string | null): string {
 // Web push bodies get visually truncated by the OS/browser notification UI
 // somewhere around 3-4 lines with no ellipsis of its own — a mid-word cutoff
 // reads as broken. This is a defensive cap applied uniformly to every
-// notification body (regardless of source: a human broadcast, the AI's
-// weekly digest, an insight card, a due reminder), truncating at the
+// notification body (a per-item change or a human broadcast), truncating at the
 // last word boundary and adding our own "…" so a long body still reads as a
 // complete-looking sentence instead of getting chopped by the platform.
 const MAX_PUSH_BODY_LENGTH = 200;
@@ -150,46 +149,14 @@ Deno.serve(async (req) => {
     return json({ error: "invalid body" }, 400);
   }
 
-  const { entity_type: entityType, entity_id: entityId, action, actor_id: actorId, summary, target_member_id: targetMemberId } = activity;
+  const { entity_type: entityType, entity_id: entityId, action, actor_id: actorId, summary } = activity;
 
-  // Jessica's one-on-one notes (see migration 0026) — targets ONLY that one
-  // member's own subscriptions, never the household-wide "everyone but the
-  // actor" fan-out the rest of this function uses. Handled as an entirely
-  // separate path since its targeting/gating/title logic doesn't overlap
-  // with the generic case at all.
-  if (action === "personal" && targetMemberId) {
-    const [{ data: personalSubs }, { data: personalPrefsRows }] = await Promise.all([
-      supabase.from("push_subscriptions").select("id, member_id, endpoint, p256dh, auth").eq("member_id", targetMemberId),
-      supabase.from("notification_prefs").select("*").eq("member_id", targetMemberId).maybeSingle(),
-    ]);
-
-    const prefs = (personalPrefsRows as NotificationPrefsRow | null) ?? { member_id: targetMemberId, ...DEFAULT_PREFS };
-    if (prefs.muted || !prefs.on_ai_personal) {
-      return json({ sent: 0, skipped: (personalSubs ?? []).length });
-    }
-
-    let sent = 0;
-    let skipped = 0;
-    const payload = { title: "💜 מיקה", body: truncateForPush(summary ?? ""), url: "/", tag: `${entityType}-${entityId}` };
-
-    await Promise.all(
-      ((personalSubs ?? []) as PushSubscriptionRow[]).map(async (sub) => {
-        try {
-          await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, JSON.stringify(payload));
-          sent++;
-        } catch (err) {
-          const statusCode = (err as { statusCode?: number; status?: number })?.statusCode ??
-            (err as { statusCode?: number; status?: number })?.status;
-          if (statusCode === 410 || statusCode === 404) {
-            await supabase.from("push_subscriptions").delete().eq("id", sub.id);
-          }
-          console.error(`send-push: personal notification failed for subscription ${sub.id}`, statusCode, err);
-          skipped++;
-        }
-      })
-    );
-
-    return json({ sent, skipped });
+  // Notification kinds that no longer exist (migration 0031): scheduled
+  // due-date/event reminders and the assistant's one-on-one notes. The
+  // trigger stopped emitting them, so anything still arriving here is a
+  // stale database — drop it rather than push it.
+  if (action === "due" || action === "personal") {
+    return json({ sent: 0, skipped: 0, reason: "non_human_notification" });
   }
 
   // Assignee targeting only applies to tasks/chores — sections have no
@@ -225,7 +192,7 @@ Deno.serve(async (req) => {
   const [{ data: subscriptions }, { data: prefsRows }, { data: members }] = await Promise.all([
     supabase.from("push_subscriptions").select("id, member_id, endpoint, p256dh, auth"),
     supabase.from("notification_prefs").select("*"),
-    supabase.from("members").select("id, display_name, avatar_emoji, avatar_photo_url, locale"),
+    supabase.from("members").select("id, email, display_name, avatar_emoji, avatar_photo_url, locale"),
   ]);
 
   const prefsByMember = new Map<string, NotificationPrefsRow>();
@@ -240,6 +207,14 @@ Deno.serve(async (req) => {
 
   const actor = actorId ? membersById.get(actorId) : undefined;
   const actorName = actor ? [actor.avatar_emoji, actor.display_name].filter(Boolean).join(" ") : null;
+
+  // Only people trigger notifications (migration 0031). The assistant still
+  // writes to activity_log when a human applies one of her proposals — but
+  // those are attributed to the person who tapped Apply, not to her, so
+  // anything actually authored by her row is something she decided to send.
+  if (actor?.email === "assistant@kh.family") {
+    return json({ sent: 0, skipped: (subscriptions ?? []).length, reason: "non_human_notification" });
+  }
 
   let sent = 0;
   let skipped = 0;
@@ -270,18 +245,15 @@ Deno.serve(async (req) => {
       //    for on_create/on_complete for that category (so someone can mute
       //    "created"/"completed" noise in general but keep shopping pings,
       //    or vice versa).
-      // 3. Everything else falls back to the action-specific pref.
+      // 3. Everything else falls back to the action-specific pref. Actions
+      //    with no pref of their own (renamed/moved/updated/uncompleted)
+      //    stay silent — they're edits to something you already heard
+      //    about, not a new thing to look at.
       let notify: boolean;
       if (action === "message") {
         // A deliberate broadcast from a member — gated purely by on_broadcast,
         // never by mute-by-assignee/shopping/etc. logic below.
         notify = prefs.on_broadcast;
-      } else if (action === "due") {
-        // Due-date reminders are their own signal, distinct from
-        // "assigned to me" — gated purely by on_due. If the task has
-        // specific assignees, only they get pinged; unassigned tasks
-        // notify everyone with reminders on.
-        notify = (assigneeIds.length === 0 || isAssignee) && prefs.on_due;
       } else if (isAssignee && prefs.on_assigned_me) {
         notify = true;
       } else if (isShopping) {
@@ -290,6 +262,8 @@ Deno.serve(async (req) => {
         notify = prefs.on_create;
       } else if (action === "completed") {
         notify = prefs.on_complete;
+      } else if (action === "deleted" || action === "restored") {
+        notify = prefs.on_delete;
       } else {
         notify = false;
       }
@@ -304,9 +278,6 @@ Deno.serve(async (req) => {
       let body: string;
       if (action === "message") {
         title = actorName ? `📣 ${actorName}` : "📣 K&H";
-        body = summary ?? "";
-      } else if (action === "due") {
-        title = recipient?.locale === "he" ? "⏰ תזכורת" : "⏰ Reminder";
         body = summary ?? "";
       } else {
         const verb = verbFor(action, recipient?.locale ?? null);

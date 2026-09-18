@@ -530,6 +530,7 @@ export type Database = {
           on_broadcast: boolean
           on_complete: boolean
           on_create: boolean
+          on_delete: boolean
           on_due: boolean
           on_shopping: boolean
           updated_at: string
@@ -542,6 +543,7 @@ export type Database = {
           on_broadcast?: boolean
           on_complete?: boolean
           on_create?: boolean
+          on_delete?: boolean
           on_due?: boolean
           on_shopping?: boolean
           updated_at?: string
@@ -554,6 +556,7 @@ export type Database = {
           on_broadcast?: boolean
           on_complete?: boolean
           on_create?: boolean
+          on_delete?: boolean
           on_due?: boolean
           on_shopping?: boolean
           updated_at?: string
@@ -819,11 +822,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_ai_insights: { Args: never; Returns: undefined }
-      check_ai_personal_checkin: { Args: never; Returns: undefined }
-      check_ai_weekly_digest: { Args: never; Returns: undefined }
-      check_due_tasks: { Args: never; Returns: undefined }
-      check_family_events: { Args: never; Returns: undefined }
       complete_chore: {
         Args: { p_chore_id: string; p_completed_by: string }
         Returns: undefined
@@ -876,10 +874,6 @@ export type Database = {
             Args: { p_actor_id?: string; p_task_id: string }
             Returns: undefined
           }
-      verify_assistant_trigger_secret: {
-        Args: { p_secret: string }
-        Returns: boolean
-      }
     }
     Enums: {
       [_ in never]: never
