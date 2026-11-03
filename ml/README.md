@@ -164,8 +164,12 @@ base licenses and Nutrition5k attribution with redistributed artifacts. Uploadin
 an adapter is a model deployment and must occur through an approved merge-triggered
 release, with the exact weight hash referenced in Git. This PR does not upload any
 adapter: none has passed training and evaluation yet. Add that artifact release
-step alongside the first approved candidate; do not manually deploy a notebook's
-latest checkpoint. Existing code releases still happen only after merging main.
+step in a candidate-release PR after training and offline evaluation. Merge that
+PR to upload the immutable candidate without serving it, run the matching probe,
+then open a follow-up PR with the approved registry entry and runtime proof. This
+avoids requiring a runtime proof before the first candidate upload. Never manually
+deploy a notebook's latest checkpoint. Existing code releases still happen only
+after merging main.
 
 The backend imports `wellness-owned-models.json`. It is empty until an approved
 candidate is reviewed and committed. `WELLNESS_MODEL_SOURCE=owned` and the three
