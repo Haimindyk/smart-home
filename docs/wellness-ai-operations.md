@@ -47,7 +47,7 @@ No new Vercel client secrets are needed.
    `WELLNESS_AI_ENABLED=false`. Only set the latter to `true` after the synthetic
    model checks and product evaluation in `wellness-product-research.md` pass.
 4. In the GitHub `production` environment set secrets `SUPABASE_DB_URL` (SSL
-   session/direct PostgreSQL URL) and `SUPABASE_ACCESS_TOKEN`; set variable
+   session/direct PostgreSQL URL) and `SUPABASE_ACCESS_TOKEN`; set variable (or environment secret)
    `SUPABASE_PROJECT_REF` to the existing project. Restrict that environment to main
    if repository settings allow it. Never put a database password in the workflow.
 5. Review and merge the PR. The release workflow checks out exactly
