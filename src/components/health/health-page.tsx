@@ -171,9 +171,9 @@ export function HealthPage() {
               aria-labelledby={`health-tab-${active}`}
             >
               {active === "settings" && <HealthSettings key={state.owner} />}
-              {active === "nutrition" && <Nutrition date={date} onWorkout={()=>setTab(profile?.workoutsEnabled ? "workouts" : "settings")} />}{" "}
+              {active === "nutrition" && <Nutrition key={state.owner} date={date} onWorkout={()=>setTab(profile?.workoutsEnabled ? "workouts" : "settings")} />}{" "}
               {active === "workouts" && (
-                <Workouts date={date} onFocusChange={setWorkoutFocus} />
+                <Workouts key={state.owner} date={date} onFocusChange={setWorkoutFocus} />
               )}{" "}
               {active === "progress" && <HealthProgress date={date} />}
             </div>

@@ -4,12 +4,14 @@ import { z } from "zod";
 export async function healthFunction<T>(
   name: string,
   body: Record<string, unknown>,
+  expectedOwner?: string,
 ): Promise<T> {
   const c = createClient();
   const {
     data: { session },
   } = await c.auth.getSession();
   if (!session) throw new Error("session_required");
+  if (expectedOwner && session.user.id !== expectedOwner) throw new Error("session_mismatch");
   const { data, error } = await c.functions.invoke(name, {
     body,
     headers: { Authorization: `Bearer ${session.access_token}` },

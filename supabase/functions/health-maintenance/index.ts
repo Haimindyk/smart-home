@@ -127,6 +127,12 @@ Deno.serve(async (req) => {
       .from("nutrition_analyses")
       .delete()
       .lt("created_at", new Date(Date.now() - 30 * 86400000).toISOString());
+    const expiry=new Date(Date.now()-30*86400000).toISOString();
+    const {error:cleanupError}=await admin.from("wellness_ai_jobs").delete().lt("created_at",expiry);
+    if(cleanupError)throw new Error("failed");
+    // Operational counters contain no meal/plan content.
+    const {error:usageError}=await admin.rpc("wellness_prune_usage");
+    if(usageError)throw new Error("failed");
     return json({ ok: true, removed });
   } catch (e) {
     return failure(e);

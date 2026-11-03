@@ -116,3 +116,15 @@ own pass rather than being rushed into this one):
 The real family note (Hebrew, previously a shared Apple Note) was parsed into structured sections,
 tasks, subtasks, completed items, and house chores in `supabase/migrations/0003_seed_kh_data.sql`.
 It runs automatically the first time migrations are applied to an empty project.
+
+## Wellness AI (feature gated)
+
+Meal photo/text estimates and personalized Full Body/AB/ABC/custom training proposals
+use a free-only Workers AI adapter behind Supabase. Review and approve drafts before
+saving. Provider setup and model-quality evaluation are required before enabling it.
+
+- [Product research](docs/wellness-product-research.md)
+- [AI user journeys and design decisions](docs/wellness-ai-user-journeys.md)
+- [Configuration, quotas, privacy and merge-only releases](docs/wellness-ai-operations.md)
+- Local checks: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`;
+  after building, `pnpm test:wellness:ui` checks synthetic browser flows.

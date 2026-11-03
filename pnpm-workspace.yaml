@@ -1,8 +1,11 @@
 allowBuilds:
   '@parcel/watcher': false
   '@swc/core': false
+  esbuild: true
   sharp: false
   unrs-resolver: false
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+minimumReleaseAgeExclude:
+  - '@electric-sql/pglite@0.5.15'

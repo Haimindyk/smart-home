@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { AiTrainer } from "./ai-trainer";
+import { isPlanScheduled } from "../../../supabase/functions/_shared/wellness-core";
 import { Button } from "@/components/ui/button";
 import { useHealthStore } from "@/lib/health/store";
 import demos from "@/lib/health/exercise-demos.json";
@@ -49,7 +51,6 @@ export function Workouts({
   const plans = data.workout_plans.filter((p) => !p.data.archived).sort((a,b)=>planDayNumber(a.data.name)-planDayNumber(b.data.name)||a.data.name.localeCompare(b.data.name,undefined,{numeric:true}));
   const selectedPlan=plans.find(p=>p.id===selectedPlanId)??null;
   const sessions = data.workout_sessions.filter((s) => s.data.date === date && s.data.status!=="cancelled");
-  const weekday = new Date(`${date}T12:00:00`).getDay();
   async function start(plan: HealthRow<"workout_plans">, quick = false) {
     try {
       const now = new Date().toISOString();
@@ -91,6 +92,7 @@ export function Workouts({
   return (
     <div className="grid gap-5">
       <ErrorText error={error} />
+      <AiTrainer date={date}/>
       <Panel
         title={h("התכניות שלי", "My plans")}
         action={
@@ -122,7 +124,7 @@ export function Workouts({
                   <strong>{Number.isFinite(planDayNumber(p.data.name))?h(`יום ${planDayNumber(p.data.name)}`,`Day ${planDayNumber(p.data.name)}`):p.data.name}</strong>
                   <span>{planTitle(p.data.name)}</span>
                 </span>
-                  {p.data.days.includes(weekday) && (
+                  {isPlanScheduled(p.data,date) && (
                     <span className="rounded-full bg-primary/10 px-2 py-1 text-xs">
                       {h("בתכנון היום", "Scheduled today")}
                     </span>
@@ -292,7 +294,7 @@ function PlanEditor({
   const [error, setError] = useState<string | null>(null),
     [busy, setBusy] = useState(false);
   function add(c?: (typeof exerciseCatalog)[number]) {
-    const exercise=exerciseSchema.parse({id:crypto.randomUUID(),name:c?h(c.he,c.en):h("תרגיל אישי","Custom exercise"),demoId:c&&"demoId" in c?c.demoId:undefined,muscle:c?.muscle??"",equipment:c?.equipment??"",kind:c?.kind??"strength",...(c&&"demoId" in c&&c.demoId==="Plank"?{reps:1,holdSeconds:30,holdSecondsMax:45}:{})});
+    const exercise=exerciseSchema.parse({id:crypto.randomUUID(),name:c?h(c.he,c.en):h("תרגיל אישי","Custom exercise"),catalogId:c?.catalogId,demoId:c&&"demoId" in c?c.demoId:undefined,muscle:c?.muscle??"",equipment:c?.equipment??"",kind:c?.kind??"strength",...(c&&"demoId" in c&&c.demoId==="Plank"?{reps:1,holdSeconds:30,holdSecondsMax:45}:{})});
     setPlan(p=>({...p,exercises:[...p.exercises,exercise]}));
     setActivePlanExercise(exercise.id);
   }
@@ -431,7 +433,7 @@ function PlanEditor({
             <Field
               label={h("שם התרגיל", "Exercise name")}
               value={e.name}
-              onChange={(x) => patch(e.id, { name: x.target.value, demoId: undefined })}
+              onChange={(x) => patch(e.id, { name: x.target.value, demoId: undefined, catalogId: undefined })}
             />
             <div className="grid grid-cols-2 gap-3">
               <Field
@@ -627,6 +629,7 @@ function SessionEditor({
     const e = exerciseSchema.parse({
       id: crypto.randomUUID(),
       name: c?h(c.he,c.en):h("תרגיל נוסף", "Additional exercise"),
+      catalogId:c?.catalogId,
       demoId:c&&"demoId" in c?c.demoId:undefined,
       kind:c?.kind??"strength",sets:1,
       ...(c&&"demoId" in c&&c.demoId==="Plank"?{reps:1,holdSeconds:30,holdSecondsMax:45}:{}),
@@ -705,7 +708,7 @@ function SessionEditor({
                 label={h("תרגיל", "Exercise")}
                 value={e.name}
                 onChange={(x) =>
-                  patchExercise(e.id, (v) => ({ ...v, name: x.target.value, demoId: undefined }))
+                  patchExercise(e.id, (v) => ({ ...v, name: x.target.value, demoId: undefined, catalogId: undefined }))
                 }
               />
               <Button variant="destructive" size="sm" onClick={()=>{setSession(s=>({...s,exercises:s.exercises.filter(v=>v.id!==e.id)}));setActiveExercise(null)}}>{h("הסרת התרגיל מהאימון", "Remove exercise from workout")}</Button>
@@ -839,6 +842,11 @@ function SessionEditor({
           </Button>
         )}
         {addingExercise&&<div className="workout-add-picker"><Field label={h("חיפוש תרגיל", "Find exercise")} value={exerciseQuery} onChange={event=>setExerciseQuery(event.target.value)}/><div className="mt-3 grid max-h-64 gap-2 overflow-y-auto">{exerciseCatalog.filter(c=>`${c.he} ${c.en}`.toLowerCase().includes(exerciseQuery.toLowerCase())).map(c=><button key={c.en} className="rounded-xl border p-3 text-start text-sm" onClick={()=>addExercise(c)}>{h(c.he,c.en)} <span className="float-end">＋</span></button>)}</div><Button variant="ghost" onClick={()=>addExercise()}>{h("תרגיל מותאם אישית", "Custom exercise")}</Button></div>}
+        <fieldset className="grid gap-3 rounded-xl border p-4"><legend className="px-1 text-sm font-semibold">{h("איך היה האימון? (לשיפור ההמלצות)","How was your workout? (improves recommendations)")}</legend>
+          <SelectField label={h("אנרגיה והתאוששות","Energy and readiness")} value={session.feedback?.energy??3} onChange={e=>setSession(s=>({...s,feedback:{energy:Number(e.target.value),rir:s.feedback?.rir??null,pain:s.feedback?.pain??false}}))}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n} / 5</option>)}</SelectField>
+          <SelectField label={h("כמה חזרות עוד יכולת לבצע בסטים האחרונים?","Reps you could still do in the last sets (RIR)")} value={session.feedback?.rir??""} onChange={e=>setSession(s=>({...s,feedback:{energy:s.feedback?.energy??3,rir:e.target.value===""?null:Number(e.target.value),pain:s.feedback?.pain??false}}))}><option value="">{h("לא בטוח/ה","Not sure")}</option>{[0,1,2,3,4,5].map(n=><option key={n} value={n}>{n===5?"5+":n}</option>)}</SelectField>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={session.feedback?.pain??false} onChange={e=>setSession(s=>({...s,feedback:{energy:s.feedback?.energy??3,rir:s.feedback?.rir??null,pain:e.target.checked}}))}/>{h("היה כאב באימון — לא להציע העלאת עומס","I experienced pain — do not suggest increasing load")}</label>
+        </fieldset>
         <details className="workout-personal-note"><summary>{h("הערות ואפשרויות שמירה", "Notes & save options")}</summary>
         <Field
           label={h("הערות לאימון", "Workout notes")}
