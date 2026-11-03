@@ -5,7 +5,7 @@
 // snapshot + mutation queue, not by this worker — network requests to
 // Supabase are deliberately left untouched (network-only) below.
 
-const CACHE_NAME = "kh-shell-v2";
+const CACHE_NAME = "kh-shell-v3";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -29,6 +29,9 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // never intercept Supabase/API calls
+
+  // Personal pages are never written into the shared app-shell cache.
+  if (url.pathname.startsWith("/health") || url.pathname.startsWith("/api/")) return;
 
   if (request.mode === "navigate") {
     event.respondWith(

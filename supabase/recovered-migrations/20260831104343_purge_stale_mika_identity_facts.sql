@@ -1,0 +1,1 @@
+delete from public.family_facts where fact ilike '%מיקה%';

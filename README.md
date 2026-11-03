@@ -8,26 +8,19 @@ view with recurring schedules all live in one Supabase project and sync instantl
 device via Supabase Realtime. It works offline (cached reads + a queued-write sync-on-reconnect),
 installs as a PWA on iPhone/Android/desktop, and supports Hebrew (RTL, default) and English.
 
-## Access model — read this first
+## Current source and access model
 
-**There is no login.** By explicit request, this app has zero auth friction: anyone with the
-deployed URL can open it and use it immediately, the same way the Apple Note it replaces worked.
-A lightweight "who's here?" picker just sets an attribution name (Haim / Koren / Guest) in
-`localStorage` — it is **not** a security boundary.
+This repository includes the deployed Wellness area at `/health` for personal
+nutrition, workouts, and progress tracking. The current application uses a
+four-digit PIN through the `pin-login` Edge Function to establish a Supabase Auth
+session; the identity picker alone is not authorization. Wellness records are
+scoped to the signed-in user.
 
-Practical implications:
-
-- Supabase Row Level Security is enabled on every table, but `is_member()` currently returns
-  `true` unconditionally — the database is reachable by anyone holding the (public, client-side)
-  Supabase anon key, which is unavoidable for a browser app anyway.
-- The real access control is **possessing the app URL**. Treat it like a shared Google Doc link:
-  - Don't post the URL somewhere public or indexable.
-  - Add a `robots.txt` disallow / `noindex` header before deploying if you want to be extra safe.
-  - If you ever want a real gate, Supabase Anonymous Sign-In is a one-line upgrade: flip
-    "Enable anonymous sign-ins" on in the Supabase dashboard, call `supabase.auth.signInAnonymously()`
-    once on load, and tighten `is_member()` (see `supabase/migrations/0002_open_access.sql`) back to
-    `select auth.uid() is not null`. Every table's RLS policy already routes through that single
-    function, so this is a one-line change, not a rewrite.
+The deployed source was recovered into Git on 2026-11-03. See
+[deployment recovery and development workflow](docs/deployment-recovery.md) for
+source provenance, validation, and migration-history limitations. The remaining
+architecture notes below describe the original household application and may
+predate Wellness and boards.
 
 ## Stack
 
@@ -54,8 +47,11 @@ real data (see "Initial data" below) the first time you point this at a fresh Su
 ### Setting up Supabase
 
 1. Create a free Supabase project.
-2. Apply the migrations in `supabase/migrations/` in order (via the Supabase SQL editor, the
-   Supabase CLI, or the Supabase MCP tools). `0003_seed_kh_data.sql` is idempotent — it only
+2. For a fresh database, first reconcile the migration history described in
+   [the recovery guide](docs/deployment-recovery.md). The historical migrations
+   in `supabase/migrations/` alone do not include the current Wellness schema.
+   The original setup used the Supabase SQL editor, the
+   Supabase CLI, or the Supabase MCP tools. `0003_seed_kh_data.sql` is idempotent — it only
    seeds if `sections` is empty, so it's safe to run against a fresh project and a no-op
    afterwards.
 3. Copy your project URL and anon/publishable key into `.env.local` (see `.env.example`).

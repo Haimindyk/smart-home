@@ -49,24 +49,24 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
+  --background: #fafafa;
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.64 0.15 45);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.97 0.01 45);
+  --primary: #171717;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f2f4;
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0.008 45);
-  --muted-foreground: oklch(0.53 0.02 45);
-  --accent: oklch(0.94 0.03 45);
-  --accent-foreground: oklch(0.32 0.08 45);
+  --muted: #f3f4f5;
+  --muted-foreground: #747780;
+  --accent: #fff4d7;
+  --accent-foreground: #785500;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.006 45);
-  --input: oklch(0.92 0.006 45);
-  --ring: oklch(0.64 0.15 45 / 50%);
+  --border: #e9eaed;
+  --input: #e1e3e6;
+  --ring: #ecae37;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -84,17 +84,17 @@
 }
 
 .dark {
-  --background: oklch(0.16 0.014 45);
+  --background: oklch(0.16 0 0);
   --foreground: oklch(0.97 0.005 45);
-  --card: oklch(0.21 0.018 45);
+  --card: oklch(0.21 0 0);
   --card-foreground: oklch(0.97 0.005 45);
-  --popover: oklch(0.21 0.018 45);
+  --popover: oklch(0.21 0 0);
   --popover-foreground: oklch(0.97 0.005 45);
-  --primary: oklch(0.72 0.14 45);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.27 0.018 45);
+  --primary: oklch(0.82 0.15 80);
+  --primary-foreground: #171717;
+  --secondary: oklch(0.27 0 0);
   --secondary-foreground: oklch(0.97 0.005 45);
-  --muted: oklch(0.27 0.018 45);
+  --muted: oklch(0.27 0 0);
   --muted-foreground: oklch(0.72 0.02 45);
   --accent: oklch(0.3 0.05 45);
   --accent-foreground: oklch(0.9 0.04 45);
@@ -107,11 +107,11 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.21 0.018 45);
+  --sidebar: oklch(0.21 0 0);
   --sidebar-foreground: oklch(0.97 0.005 45);
-  --sidebar-primary: oklch(0.72 0.14 45);
+  --sidebar-primary: oklch(0.82 0.15 80);
   --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.27 0.018 45);
+  --sidebar-accent: oklch(0.27 0 0);
   --sidebar-accent-foreground: oklch(0.97 0.005 45);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.72 0.14 45 / 50%);
@@ -123,21 +123,11 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    /* A single-hue ambient wash plus a fixed grain layer — one considered
-       accent and a bit of texture, instead of a multi-color gradient mesh. */
-    background-image:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
-      radial-gradient(ellipse 65% 45% at 12% -8%, oklch(0.64 0.15 45 / 16%), transparent);
-    background-repeat: repeat, no-repeat;
-    background-attachment: fixed, fixed;
+    background-image: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  .dark body {
-    background-image:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E"),
-      radial-gradient(ellipse 65% 45% at 12% -8%, oklch(0.72 0.14 45 / 18%), transparent);
-  }
+  .dark body { background-image: none; }
   html {
     @apply font-sans;
     font-size: 112.5%;
@@ -190,3 +180,12 @@
     transform: translateX(6px);
   }
 }
+/* Shared surfaces keep household tools and the wellness space visually coherent. */
+[data-slot="dialog-content"] { border-radius: 26px; padding: 24px; max-height: 88svh; overflow-y: auto; box-shadow: 0 20px 80px #0000001a; }
+[data-slot="dialog-title"] { font-size: 1.2rem; line-height: 1.4; font-weight: 700; letter-spacing: -.03em; }
+[data-slot="dialog-description"] { line-height: 1.8; }
+[data-slot="input"], [data-slot="textarea"] { border-radius: 13px; min-height: 42px; }
+[data-slot="dropdown-menu-content"], [data-slot="popover-content"] { border-radius: 18px; box-shadow: 0 12px 40px #00000012; }
+[data-slot="tabs-list"] { padding: 5px; border-radius: 20px; }
+[data-slot="tabs-trigger"] { border-radius: 15px; }
+@media(prefers-reduced-motion: reduce) { .animate-shake { animation: none; } }

@@ -1,11 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
+import {
+  startBarcodeCamera,
+  type IScannerControls,
+} from "@/lib/camera/barcode";
 import { useAppStore } from "@/lib/store/app-store";
 import { useT } from "@/lib/i18n/store";
 import { createClient } from "@/lib/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +31,9 @@ import { toast } from "sonner";
  * before any external lookup, so once anyone identifies a product (most
  * commonly Israeli-local ones Open Food Facts doesn't know), every family
  * member gets automatic recognition on every future scan of that barcode. */
-async function lookupTaughtProductName(barcode: string): Promise<string | null> {
+async function lookupTaughtProductName(
+  barcode: string,
+): Promise<string | null> {
   const supabase = createClient();
   const { data } = await supabase
     .from("barcode_products")
@@ -33,9 +43,15 @@ async function lookupTaughtProductName(barcode: string): Promise<string | null> 
   return data?.product_name ?? null;
 }
 
-async function rememberProductName(barcode: string, productName: string, createdBy: string | null) {
+async function rememberProductName(
+  barcode: string,
+  productName: string,
+  createdBy: string | null,
+) {
   const supabase = createClient();
-  await supabase.from("barcode_products").upsert({ barcode, product_name: productName, created_by: createdBy });
+  await supabase
+    .from("barcode_products")
+    .upsert({ barcode, product_name: productName, created_by: createdBy });
 }
 
 /**
@@ -46,11 +62,14 @@ async function rememberProductName(barcode: string, productName: string, created
  * Best-effort only: any failure (offline, unknown barcode, rate limit) just
  * moves on to the next source.
  */
-async function lookupFromOpenFactsSite(host: string, barcode: string): Promise<string | null> {
+async function lookupFromOpenFactsSite(
+  host: string,
+  barcode: string,
+): Promise<string | null> {
   try {
     const res = await fetch(
       `https://${host}/api/v2/product/${barcode}.json?fields=product_name,product_name_he`,
-      { signal: AbortSignal.timeout(5000) }
+      { signal: AbortSignal.timeout(5000) },
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -64,7 +83,10 @@ async function lookupFromOpenFactsSite(host: string, barcode: string): Promise<s
 async function lookupProductName(barcode: string): Promise<string | null> {
   const taught = await lookupTaughtProductName(barcode);
   if (taught) return taught;
-  const food = await lookupFromOpenFactsSite("world.openfoodfacts.org", barcode);
+  const food = await lookupFromOpenFactsSite(
+    "world.openfoodfacts.org",
+    barcode,
+  );
   if (food) return food;
   return lookupFromOpenFactsSite("world.openproductsfacts.org", barcode);
 }
@@ -88,12 +110,18 @@ export function BarcodeScannerDialog({
   const t = useT();
 
   const shoppingSections = useMemo(
-    () => sortByPosition(Object.values(sections).filter((s) => s.kind === "shopping" && !s.deleted_at)),
-    [sections]
+    () =>
+      sortByPosition(
+        Object.values(sections).filter(
+          (s) => s.kind === "shopping" && !s.deleted_at,
+        ),
+      ),
+    [sections],
   );
 
   const [pickedSectionId, setPickedSectionId] = useState<string | null>(null);
-  const targetSectionId = sectionId ?? pickedSectionId ?? shoppingSections[0]?.id ?? null;
+  const targetSectionId =
+    sectionId ?? pickedSectionId ?? shoppingSections[0]?.id ?? null;
 
   // A plain useRef read inside an effect keyed on `open` is unreliable here:
   // Base UI's Dialog.Popup (like Radix/MUI dialogs) doesn't mount its
@@ -104,7 +132,9 @@ export function BarcodeScannerDialog({
   // the callback ref actually fires and re-runs at the right time.
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoMounted, setVideoMounted] = useState(false);
-  const [status, setStatus] = useState<"scanning" | "looking-up" | "naming" | "error">("scanning");
+  const [status, setStatus] = useState<
+    "scanning" | "looking-up" | "naming" | "error"
+  >("scanning");
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const [manualName, setManualName] = useState("");
   // Scan-loop bookkeeping lives in refs (not effect-local `let`s) so the
@@ -168,7 +198,6 @@ export function BarcodeScannerDialog({
 
     let cancelled = false;
     let controls: IScannerControls | null = null;
-    const reader = new BrowserMultiFormatReader();
 
     async function handleScanned(code: string) {
       busyRef.current = true;
@@ -196,18 +225,12 @@ export function BarcodeScannerDialog({
     video.muted = true;
     video.defaultMuted = true;
 
-    reader
-      .decodeFromConstraints(
-        { video: { facingMode: { ideal: "environment" } } },
-        video,
-        (result) => {
-          if (cancelled || busyRef.current || !result) return;
-          const code = result.getText();
-          if (code === lastCodeRef.current) return;
-          lastCodeRef.current = code;
-          void handleScanned(code);
-        }
-      )
+    startBarcodeCamera(video, (code) => {
+      if (cancelled || busyRef.current) return;
+      if (code === lastCodeRef.current) return;
+      lastCodeRef.current = code;
+      void handleScanned(code);
+    })
       .then((c) => {
         if (cancelled) {
           c.stop();
@@ -246,7 +269,13 @@ export function BarcodeScannerDialog({
               onValueChange={(v) => v && setPickedSectionId(v)}
             >
               <SelectTrigger>
-                <SelectValue>{(v: string) => sections[v] ? `${sections[v].emoji ?? ""} ${sections[v].name}` : v}</SelectValue>
+                <SelectValue>
+                  {(v: string) =>
+                    sections[v]
+                      ? `${sections[v].emoji ?? ""} ${sections[v].name}`
+                      : v
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {shoppingSections.map((s) => (
@@ -260,7 +289,9 @@ export function BarcodeScannerDialog({
         )}
 
         {!targetSectionId ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">{t("noShoppingListYet")}</p>
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            {t("noShoppingListYet")}
+          </p>
         ) : (
           <>
             <div className="relative overflow-hidden rounded-xl bg-black">
@@ -283,7 +314,12 @@ export function BarcodeScannerDialog({
               {status === "error" && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 p-4 text-center text-sm text-white">
                   {t("cameraUnavailable")}
-                  <Button variant="outline" size="sm" onClick={retryCamera} className="border-white/40 text-white hover:bg-white/10 hover:text-white">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={retryCamera}
+                    className="border-white/40 text-white hover:bg-white/10 hover:text-white"
+                  >
                     {t("tryAgain")}
                   </Button>
                 </div>
@@ -297,7 +333,9 @@ export function BarcodeScannerDialog({
                   confirmManualName();
                 }}
               >
-                <p className="text-center text-xs text-muted-foreground">{t("productNotRecognized")}</p>
+                <p className="text-center text-xs text-muted-foreground">
+                  {t("productNotRecognized")}
+                </p>
                 <Input
                   autoFocus
                   dir="auto"
@@ -306,16 +344,27 @@ export function BarcodeScannerDialog({
                   placeholder={t("productNamePlaceholder")}
                 />
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" className="flex-1" onClick={() => confirmManualName()}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => confirmManualName()}
+                  >
                     {t("addWithoutName")}
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={!manualName.trim()}>
+                  <Button
+                    type="submit"
+                    className="flex-1"
+                    disabled={!manualName.trim()}
+                  >
                     {t("add")}
                   </Button>
                 </div>
               </form>
             ) : (
-              <p className="text-center text-xs text-muted-foreground">{t("scanBarcodeHint")}</p>
+              <p className="text-center text-xs text-muted-foreground">
+                {t("scanBarcodeHint")}
+              </p>
             )}
           </>
         )}

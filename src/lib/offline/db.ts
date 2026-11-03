@@ -1,7 +1,7 @@
 import { openDB, type IDBPDatabase } from "idb";
 
 const DB_NAME = "kh-offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const SNAPSHOT_STORE = "snapshot";
 const QUEUE_STORE = "mutation-queue";
 
@@ -9,12 +9,19 @@ let dbPromise: Promise<IDBPDatabase> | undefined;
 
 function getDb() {
   dbPromise ??= openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
+    upgrade(db, oldVersion, _newVersion, tx) {
+      if (oldVersion === 1) {
+        tx.objectStore(SNAPSHOT_STORE).clear();
+        tx.objectStore(QUEUE_STORE).clear();
+      }
       if (!db.objectStoreNames.contains(SNAPSHOT_STORE)) {
         db.createObjectStore(SNAPSHOT_STORE);
       }
       if (!db.objectStoreNames.contains(QUEUE_STORE)) {
-        db.createObjectStore(QUEUE_STORE, { keyPath: "seq", autoIncrement: true });
+        db.createObjectStore(QUEUE_STORE, {
+          keyPath: "seq",
+          autoIncrement: true,
+        });
       }
     },
   });
@@ -24,7 +31,14 @@ function getDb() {
 /** The full hydrated dataset, cached so the app opens instantly offline. */
 export async function saveSnapshot(data: unknown) {
   const db = await getDb();
-  await db.put(SNAPSHOT_STORE, data, "all");
+  const snapshot = data as { members?: Record<string, unknown>[] };
+  const safe = snapshot?.members
+    ? {
+        ...snapshot,
+        members: snapshot.members.map((member) => ({ ...member, pin: null })),
+      }
+    : data;
+  await db.put(SNAPSHOT_STORE, safe, "all");
 }
 
 export async function loadSnapshot<T>(): Promise<T | undefined> {

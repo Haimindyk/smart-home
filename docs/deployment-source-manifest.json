@@ -1,0 +1,916 @@
+{
+  "recoveredAt": "2026-11-03",
+  "vercel": {
+    "team": "kh-home",
+    "project": "smart-home",
+    "deploymentId": "dpl_Ca1pyhNkbN46fY2d2AyDfhxvBHZc",
+    "files": [
+      {
+        "path": "components.json",
+        "sha": "467cfb3e6eda7ae67909dd2905b777b621d17bf4"
+      },
+      {
+        "path": "eslint.config.mjs",
+        "sha": "b546d952558ec9548a24a1ef8ed898aeafe31159"
+      },
+      {
+        "path": "next.config.ts",
+        "sha": "6bb6b7eebd2d26b008d9a6054ecf62c289adac8a"
+      },
+      {
+        "path": "package.json",
+        "sha": "9b3c0e6598e843e7605d4cdce6c78c2a3eac78e8"
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "sha": "be282d11d2efd0637790cce2100d7e0c012bee4c"
+      },
+      {
+        "path": "pnpm-workspace.yaml",
+        "sha": "afda154fe64451d3231972584c1bf2fb0761b7aa"
+      },
+      {
+        "path": "postcss.config.mjs",
+        "sha": "8f8be689e9af58f80351df6e6b551146822f42a4"
+      },
+      {
+        "path": "public/exercises/Barbell_Curl-0.jpg",
+        "sha": "57fb51826f857386de46ab79312d8dcc5754441c"
+      },
+      {
+        "path": "public/exercises/Barbell_Curl-1.jpg",
+        "sha": "d522fc2112912173bdc31ef294a9f259e3c468d9"
+      },
+      {
+        "path": "public/exercises/Barbell_Hip_Thrust-0.jpg",
+        "sha": "ef377573acd830af014193165542cb5832d77148"
+      },
+      {
+        "path": "public/exercises/Barbell_Hip_Thrust-1.jpg",
+        "sha": "1dbecda67071f3f610623fc0dfedf8bac5e487a6"
+      },
+      {
+        "path": "public/exercises/Cable_Crossover-0.jpg",
+        "sha": "6e7d4da61c5f25d80db7715b6f66904cd627603f"
+      },
+      {
+        "path": "public/exercises/Cable_Crossover-1.jpg",
+        "sha": "9a608a938c12327f8bbc2c47c834fbb88156d1a0"
+      },
+      {
+        "path": "public/exercises/Cable_Crunch-0.jpg",
+        "sha": "1806296da29972c89d8c857e3f1cabf9faff335f"
+      },
+      {
+        "path": "public/exercises/Cable_Crunch-1.jpg",
+        "sha": "8f032362256ef74fddaad6bdeb1070ba75cafd42"
+      },
+      {
+        "path": "public/exercises/Dumbbell_Bench_Press-0.jpg",
+        "sha": "96a985aa7bc9a2bfff5f814a239aa58028bc66b6"
+      },
+      {
+        "path": "public/exercises/Dumbbell_Bench_Press-1.jpg",
+        "sha": "288bceebed8df44b03c3b014877c851e8dc0ab55"
+      },
+      {
+        "path": "public/exercises/Goblet_Squat-0.jpg",
+        "sha": "cae936b51751b8a85b60ef30c0ce5e20a62f9283"
+      },
+      {
+        "path": "public/exercises/Goblet_Squat-1.jpg",
+        "sha": "a4ce9e88ea9992318d23c6ea107eca0520e34d3d"
+      },
+      {
+        "path": "public/exercises/Hack_Squat-0.jpg",
+        "sha": "341d0dae40bd9c7172b28dbcb294ff8bcb17c6eb"
+      },
+      {
+        "path": "public/exercises/Hack_Squat-1.jpg",
+        "sha": "675af1cbd7f453cec487602ea0751e6badeaf1bb"
+      },
+      {
+        "path": "public/exercises/Incline_Dumbbell_Press-0.jpg",
+        "sha": "c53e091705b1d4cebd41139a808bb0681583f5e8"
+      },
+      {
+        "path": "public/exercises/Incline_Dumbbell_Press-1.jpg",
+        "sha": "57318dcb9b6feeed888c67f6d2a622e47e06f846"
+      },
+      {
+        "path": "public/exercises/LICENSE.txt",
+        "sha": "6d842099530d126dea37db858a755e444f4de3f7"
+      },
+      {
+        "path": "public/exercises/Leg_Extensions-0.jpg",
+        "sha": "9cdfa455ef1ab712e2a70a644824777f1e248252"
+      },
+      {
+        "path": "public/exercises/Leg_Extensions-1.jpg",
+        "sha": "c5633584ee8348bdb90b3cb8e93bd331efeb371b"
+      },
+      {
+        "path": "public/exercises/Leg_Press-0.jpg",
+        "sha": "0326807b09a36c4b0993a27dbddcb0e798cc08eb"
+      },
+      {
+        "path": "public/exercises/Leg_Press-1.jpg",
+        "sha": "e86e9d41dd0aaaec9aeaf2f0cc522c8cf87d78ea"
+      },
+      {
+        "path": "public/exercises/Leverage_Incline_Chest_Press-0.jpg",
+        "sha": "82e2a83aee2a45eea426e9f70410552471ffeb93"
+      },
+      {
+        "path": "public/exercises/Leverage_Incline_Chest_Press-1.jpg",
+        "sha": "df17b286efca912d74a85513508746bb82bfca0c"
+      },
+      {
+        "path": "public/exercises/Low_Cable_Crossover-0.jpg",
+        "sha": "f8bf5b42424a3982a55cc4a71ce37b5f6682680a"
+      },
+      {
+        "path": "public/exercises/Low_Cable_Crossover-1.jpg",
+        "sha": "b37e1e326a690377f2b58efab65cf0268bdeb770"
+      },
+      {
+        "path": "public/exercises/Lying_Leg_Curls-0.jpg",
+        "sha": "618fa3ad2c4bfa73763e967ba79e39b80048a4bc"
+      },
+      {
+        "path": "public/exercises/Lying_Leg_Curls-1.jpg",
+        "sha": "3b8128a7d7899a8c7883f428cab08db8c42906ab"
+      },
+      {
+        "path": "public/exercises/Lying_T-Bar_Row-0.jpg",
+        "sha": "1cada46df010b53d151fceede32a9fcdd740e574"
+      },
+      {
+        "path": "public/exercises/Lying_T-Bar_Row-1.jpg",
+        "sha": "11206c0476331d7eec94f1d8ce63cfec4785c9b5"
+      },
+      {
+        "path": "public/exercises/Machine_Bench_Press-0.jpg",
+        "sha": "ebf718358892dd0e3357d0803390c7098a9a1a0b"
+      },
+      {
+        "path": "public/exercises/Machine_Bench_Press-1.jpg",
+        "sha": "3f7d106163b85b1341737c57be0a0908394a83fa"
+      },
+      {
+        "path": "public/exercises/Plank-0.jpg",
+        "sha": "bf2cca8c449b860a3598befd91f9259992874c5b"
+      },
+      {
+        "path": "public/exercises/Plank-1.jpg",
+        "sha": "b7f0def6f0e6dacda3af8d4be73d267aa8fb9adf"
+      },
+      {
+        "path": "public/exercises/SOURCE.txt",
+        "sha": "39cc32b4c48b9b336bff1f6a0b152a6cfefb37e0"
+      },
+      {
+        "path": "public/exercises/Seated_Cable_Rows-0.jpg",
+        "sha": "e076f40c34d27262025bff287fd4a3e12ec4fcac"
+      },
+      {
+        "path": "public/exercises/Seated_Cable_Rows-1.jpg",
+        "sha": "56ee6d40d8a3195f12d39fd4f4a71da5e15066f6"
+      },
+      {
+        "path": "public/exercises/Seated_Calf_Raise-0.jpg",
+        "sha": "95e5f7204e23f0e39015accff4d2c486924605df"
+      },
+      {
+        "path": "public/exercises/Seated_Calf_Raise-1.jpg",
+        "sha": "2ab36f9cb4833e651ac9c4753927f134ca8003ab"
+      },
+      {
+        "path": "public/exercises/Seated_Leg_Curl-0.jpg",
+        "sha": "bed42710d7b9441f4ff6113d2104ba51b6357a0f"
+      },
+      {
+        "path": "public/exercises/Seated_Leg_Curl-1.jpg",
+        "sha": "d3a05f9f700570bf3b0b6059be1fefc6ccf36cfa"
+      },
+      {
+        "path": "public/exercises/Side_Lateral_Raise-0.jpg",
+        "sha": "1709bf4d32f78b3ef71cba71343cf0c74951115c"
+      },
+      {
+        "path": "public/exercises/Side_Lateral_Raise-1.jpg",
+        "sha": "a9477416a3ede25a2f2fc56f7fa685d88ce756e6"
+      },
+      {
+        "path": "public/exercises/Standing_Calf_Raises-0.jpg",
+        "sha": "cd80da04fa4a02a08eafaaf605b618b29d1613f3"
+      },
+      {
+        "path": "public/exercises/Standing_Calf_Raises-1.jpg",
+        "sha": "8f5cc066ccb74216a63b304d8da2a43393495bb4"
+      },
+      {
+        "path": "public/exercises/Triceps_Pushdown-0.jpg",
+        "sha": "dda88d5ca818003cc2664cedfdf275387ec0f987"
+      },
+      {
+        "path": "public/exercises/Triceps_Pushdown-1.jpg",
+        "sha": "1589eb7972781e763f0d2db2cba34db3943b846e"
+      },
+      {
+        "path": "public/exercises/V-Bar_Pulldown-0.jpg",
+        "sha": "3f13cb08c28cbdec0dfbe8e508ea5532de2d59af"
+      },
+      {
+        "path": "public/exercises/V-Bar_Pulldown-1.jpg",
+        "sha": "0591bce4e2c2ce89deb4bd41a9d950a9e298af95"
+      },
+      {
+        "path": "public/exercises/Wide-Grip_Lat_Pulldown-0.jpg",
+        "sha": "0770ad628041ac3e552b4ff7e7425a386a1dd47e"
+      },
+      {
+        "path": "public/exercises/Wide-Grip_Lat_Pulldown-1.jpg",
+        "sha": "f042ee3938f745fdd1a333fb3ad22531fc91968a"
+      },
+      {
+        "path": "public/icons/icon-180.png",
+        "sha": "5a62bc961fce1594420eb93ee6879700bc96e4ff"
+      },
+      {
+        "path": "public/icons/icon-192.png",
+        "sha": "3c40cf0093e1cd0aab6533e4bd4b45bbd455cb51"
+      },
+      {
+        "path": "public/icons/icon-32.png",
+        "sha": "686912eadc5fad7f61075264e2a5ea28fe4d2797"
+      },
+      {
+        "path": "public/icons/icon-512.png",
+        "sha": "8aa512ee92178c1fa3cee2e3a5f0aa2d00b9e04f"
+      },
+      {
+        "path": "public/manifest.webmanifest",
+        "sha": "d4d3f2be9bab379abaecc3a80a4581ef253ad292"
+      },
+      {
+        "path": "public/robots.txt",
+        "sha": "63657cbb7d7086c56b0cd4e5c6999bb683664868"
+      },
+      {
+        "path": "public/sw.js",
+        "sha": "3b85c06c06794f9deec10915904f59231c775160"
+      },
+      {
+        "path": "src/app/calendar/page.tsx",
+        "sha": "7ec32ecc9a34f783a657034b1936b3387923b309"
+      },
+      {
+        "path": "src/app/favicon.ico",
+        "sha": "fdc259ffcb484fcbc74e23843ef5864b97b27191"
+      },
+      {
+        "path": "src/app/globals.css",
+        "sha": "f211dcec95f442b34b63ee1fb3a58ef6cb31bc52"
+      },
+      {
+        "path": "src/app/health/page.tsx",
+        "sha": "f48da4c1e2805d4fa3f95b982921ee919f02258b"
+      },
+      {
+        "path": "src/app/layout.tsx",
+        "sha": "43fe0841dec9ed6d24c3388fc28b0e2343ab1151"
+      },
+      {
+        "path": "src/app/page.tsx",
+        "sha": "bd84133ba2085ca88b5523affef6012e88da6659"
+      },
+      {
+        "path": "src/components/assistant/assistant-dialog.tsx",
+        "sha": "ac742468ade32835a48a710ecc891d7b7c731150"
+      },
+      {
+        "path": "src/components/assistant/insight-card.tsx",
+        "sha": "a0d8c2f3822517e1b527cad9488e4a5ecebc2a8c"
+      },
+      {
+        "path": "src/components/assistant/personal-note-card.tsx",
+        "sha": "be593bd5f9439fdcf6b48c299fdfc14a89f8d18f"
+      },
+      {
+        "path": "src/components/attachments/attachment-row.tsx",
+        "sha": "905cdab5ac1681f9e55e0816181b611abb639409"
+      },
+      {
+        "path": "src/components/calendar/calendar-view.tsx",
+        "sha": "13af220a2fd4af6f3c73d8e95a7b6d870acc9e22"
+      },
+      {
+        "path": "src/components/calendar/event-dialog.tsx",
+        "sha": "365d4f56becc92eea738a185599baa8a9836ee25"
+      },
+      {
+        "path": "src/components/calendar/subscribe-calendar-dialog.tsx",
+        "sha": "0034451358b1c022f907344ba714bad2ad12f3af"
+      },
+      {
+        "path": "src/components/chores/chore-editor-sheet.tsx",
+        "sha": "a704879908569d6fc8624d03c65ef4c36c395dbd"
+      },
+      {
+        "path": "src/components/chores/chore-quick-add.tsx",
+        "sha": "cc5d1028ab4171859b21f283fa59bf0eb278ceb6"
+      },
+      {
+        "path": "src/components/chores/chore-row.tsx",
+        "sha": "f6fc5366e6a9b01df4ebf2a6a3171e9bafa42da4"
+      },
+      {
+        "path": "src/components/common/bidi-text.tsx",
+        "sha": "8afe05fcd6821481ce649fe616643631ea495658"
+      },
+      {
+        "path": "src/components/common/offline-banner.tsx",
+        "sha": "72e0f8a39dca55eb43f9a4fbf79e3686328dd5b8"
+      },
+      {
+        "path": "src/components/dashboard/category-tabs.tsx",
+        "sha": "96aff481b88cad855583904cd31a7ffe1b8b61f9"
+      },
+      {
+        "path": "src/components/dashboard/new-section-dialog.tsx",
+        "sha": "5e138926f259dbbe04223c372ab8c814128ed8ee"
+      },
+      {
+        "path": "src/components/dashboard/section-panel.tsx",
+        "sha": "af4dc131a204d98660004e7b24e853e1ee5bbd6d"
+      },
+      {
+        "path": "src/components/dashboard/section-panels.tsx",
+        "sha": "c3e5d9088ca98c91c2eb0fa2a94fd2c29120069f"
+      },
+      {
+        "path": "src/components/health/barcode-camera.tsx",
+        "sha": "0b575a5493d53378b942caebb656e3be5fdae7e2"
+      },
+      {
+        "path": "src/components/health/exercise-demo.tsx",
+        "sha": "e69aca4b94b7b184f3edcced280dfe40381ddb45"
+      },
+      {
+        "path": "src/components/health/food-library.tsx",
+        "sha": "668ddad3b2544c167eee69013f3489ef8c2d98aa"
+      },
+      {
+        "path": "src/components/health/food-picker.tsx",
+        "sha": "ab3c7418da650224e998270f19fb2db288707371"
+      },
+      {
+        "path": "src/components/health/health-page.tsx",
+        "sha": "93e7575f2fd6d76c8b5a578c98254c3083bf987c"
+      },
+      {
+        "path": "src/components/health/health.css",
+        "sha": "83a81aa709589b419db26ce1cc3f0fa0f847f51a"
+      },
+      {
+        "path": "src/components/health/nutrient-ring.tsx",
+        "sha": "4fa2f7c7d05ecaf3e91ecce2443ba8b742692afe"
+      },
+      {
+        "path": "src/components/health/nutrition.tsx",
+        "sha": "d792df8260290a647b7235d3b910cee40e35ba5d"
+      },
+      {
+        "path": "src/components/health/profile-journey.tsx",
+        "sha": "b76349f348721f7e62eedfee30a6e5130825a9fa"
+      },
+      {
+        "path": "src/components/health/progress.tsx",
+        "sha": "06f160fb8cda94e46b70447cd01c54ecf4c5afe2"
+      },
+      {
+        "path": "src/components/health/settings.tsx",
+        "sha": "298c7944173c7095119742fac7b6ac16bdc2b2ea"
+      },
+      {
+        "path": "src/components/health/shared.tsx",
+        "sha": "4c00bdc4b78e123334c37e33d1c73b3d0464352f"
+      },
+      {
+        "path": "src/components/health/week-picker.tsx",
+        "sha": "7302411158b8941b7cf45273d20d079999cd8c14"
+      },
+      {
+        "path": "src/components/health/workouts.tsx",
+        "sha": "6e28872f97e2cf10589a8d4102e3f12271da85d6"
+      },
+      {
+        "path": "src/components/history/history-dialog.tsx",
+        "sha": "0ca5cacb82a778c666c5d3b041b8d5727957a754"
+      },
+      {
+        "path": "src/components/identity/avatar-cropper-dialog.tsx",
+        "sha": "fbcd785a9387cc89446eebc73c350b2209e3db90"
+      },
+      {
+        "path": "src/components/identity/avatar-options.ts",
+        "sha": "2c9971c01ce39e4f82aa3d8eb5a32427e94ddfd4"
+      },
+      {
+        "path": "src/components/identity/identity-gate.tsx",
+        "sha": "7e5f3db3db420060e7da51256740246b8bb91ae4"
+      },
+      {
+        "path": "src/components/identity/member-avatar.tsx",
+        "sha": "c845696ecf6d62e5d222904f11993fd24b68e5d3"
+      },
+      {
+        "path": "src/components/identity/members-dialog.tsx",
+        "sha": "96129c6d54433079df542d8ae8f50437720db59a"
+      },
+      {
+        "path": "src/components/identity/profile-edit-dialog.tsx",
+        "sha": "76bf08d61e2b10a31b440bed8aae7d070e2b6f8a"
+      },
+      {
+        "path": "src/components/nav/app-header.tsx",
+        "sha": "e2da8146155d1173293923294cbaafaa7960f726"
+      },
+      {
+        "path": "src/components/providers/app-providers.tsx",
+        "sha": "75dc1188a2fa35e0c473f364a83d8be8ba354fed"
+      },
+      {
+        "path": "src/components/push/broadcast-message-dialog.tsx",
+        "sha": "fa89392f51a522f14a5a89964563f4f45d02e909"
+      },
+      {
+        "path": "src/components/push/notification-settings-dialog.tsx",
+        "sha": "ab09bf25781934e87d1f34f0b0a3b50bc1fafbf2"
+      },
+      {
+        "path": "src/components/pwa/install-banner.tsx",
+        "sha": "2be18e9aaab6245e9f402723e1ee184011dbd503"
+      },
+      {
+        "path": "src/components/pwa/register-sw.tsx",
+        "sha": "fd21f8d05cd17ebd28a4f3cca8ee2ad4fba33926"
+      },
+      {
+        "path": "src/components/search/global-search.tsx",
+        "sha": "db1f1586ba940cd362a1631d4540f4ad0bbcfba6"
+      },
+      {
+        "path": "src/components/shopping/barcode-scanner-dialog.tsx",
+        "sha": "749e2ef938160a7bebd899ba3edf03834d5f8d71"
+      },
+      {
+        "path": "src/components/shopping/price-comparison-button.tsx",
+        "sha": "ea5a2eae02ace230661ea4ebfc055ea089afbdf0"
+      },
+      {
+        "path": "src/components/shopping/price-comparison-sheet.tsx",
+        "sha": "4935467c81f72ded6646645620e3ccb22336ed9b"
+      },
+      {
+        "path": "src/components/shopping/share-whatsapp-button.tsx",
+        "sha": "0e5a5e330a341532b5e34a654590f4d732f6016f"
+      },
+      {
+        "path": "src/components/tasks/assignee-badge.tsx",
+        "sha": "ae6ba13fcf6f03cb805856e17a4a7094e4fbf571"
+      },
+      {
+        "path": "src/components/tasks/assignee-multi-select.tsx",
+        "sha": "6cc750addd476d832c57d70c87fd3a0cbb674015"
+      },
+      {
+        "path": "src/components/tasks/quick-add-input.tsx",
+        "sha": "bdcec3c45c4a86adc1c330ad3ddb276c69133e3c"
+      },
+      {
+        "path": "src/components/tasks/task-editor-sheet.tsx",
+        "sha": "f2299161872738f50986051ecf92aefdfdaae25b"
+      },
+      {
+        "path": "src/components/tasks/task-list.tsx",
+        "sha": "c022bc6a75680d74a776d6bc45c12e2ec73aa6d3"
+      },
+      {
+        "path": "src/components/tasks/task-row.tsx",
+        "sha": "fbaad591c4e5a23cb042e12f8bbee96463dfece4"
+      },
+      {
+        "path": "src/components/ui/avatar.tsx",
+        "sha": "ad25e06dac84ebd2a2d6c88273745810e8219693"
+      },
+      {
+        "path": "src/components/ui/badge.tsx",
+        "sha": "d3103915586b913d67019638e3bdab4b65a2ae8f"
+      },
+      {
+        "path": "src/components/ui/button.tsx",
+        "sha": "e7e24ef3e49e4e204cc070f715a8c6181806c70a"
+      },
+      {
+        "path": "src/components/ui/calendar.tsx",
+        "sha": "3cdb2db73250edce71b7120698e96392047011b7"
+      },
+      {
+        "path": "src/components/ui/card.tsx",
+        "sha": "7f8cbb5216ee440b0ace1325964bef9044403eae"
+      },
+      {
+        "path": "src/components/ui/checkbox.tsx",
+        "sha": "b524ae9c122cbae51e4ea8b08ce55a9906d85b38"
+      },
+      {
+        "path": "src/components/ui/command.tsx",
+        "sha": "4c7fc6b41db5efc4bfbd39f1ea7e6cbcb1aaf042"
+      },
+      {
+        "path": "src/components/ui/dialog.tsx",
+        "sha": "510596257970513020e70d8b5bc1cf729dc596e3"
+      },
+      {
+        "path": "src/components/ui/dropdown-menu.tsx",
+        "sha": "614d54fab86624ae2dfffd59463915bdca4b701d"
+      },
+      {
+        "path": "src/components/ui/input-group.tsx",
+        "sha": "3bf274d8aa94b4f08b4abbf2662e98ba3ac241bf"
+      },
+      {
+        "path": "src/components/ui/input.tsx",
+        "sha": "87551a90f4a47b5626c154ee3abb77b93dad99f8"
+      },
+      {
+        "path": "src/components/ui/label.tsx",
+        "sha": "364a3dd6c6477c59fff7f97e7473b964efb73f9e"
+      },
+      {
+        "path": "src/components/ui/popover.tsx",
+        "sha": "24bc8cb54a727a7371c67b1e41c463d010d00d99"
+      },
+      {
+        "path": "src/components/ui/progress.tsx",
+        "sha": "31a2c98759471c4193afc696e1b688f97db61341"
+      },
+      {
+        "path": "src/components/ui/scroll-area.tsx",
+        "sha": "e803197e656ad89212dcecbbd0121cbc9fe403cf"
+      },
+      {
+        "path": "src/components/ui/select.tsx",
+        "sha": "18eabbcedbbce6754e04df78ea4ae4830eba649a"
+      },
+      {
+        "path": "src/components/ui/separator.tsx",
+        "sha": "dd758111c6a9b05d5f58e5a7318c94d01e630f47"
+      },
+      {
+        "path": "src/components/ui/sheet.tsx",
+        "sha": "a560e8260ff93eb0feffe2fd768dd891dec95885"
+      },
+      {
+        "path": "src/components/ui/skeleton.tsx",
+        "sha": "28cc7796cace3cd0a8f9bc02d5c4b00a15804a58"
+      },
+      {
+        "path": "src/components/ui/sonner.tsx",
+        "sha": "858cae072ff9df6d527735dca30856a7cd96f27b"
+      },
+      {
+        "path": "src/components/ui/switch.tsx",
+        "sha": "83035b310a1531cb4898045f45c760cf9532f9c2"
+      },
+      {
+        "path": "src/components/ui/tabs.tsx",
+        "sha": "54a2564921873e4d9540aec0655c45fd7536dae8"
+      },
+      {
+        "path": "src/components/ui/textarea.tsx",
+        "sha": "aea59c9d214c617e6e748a13dc80c5f0d068d45d"
+      },
+      {
+        "path": "src/components/ui/tooltip.tsx",
+        "sha": "7297d82657076c9f81219db4acd2a9ff6c6d5db4"
+      },
+      {
+        "path": "src/lib/assistant-ui-state.ts",
+        "sha": "d9b9acde068467e5ae687fa8ce8e87abe8f3836f"
+      },
+      {
+        "path": "src/lib/assistant/apply-actions.ts",
+        "sha": "5ad701dcf04b69539dd3e9c98318793bd80de271"
+      },
+      {
+        "path": "src/lib/assistant/client.ts",
+        "sha": "765e801381ab93f0c20d4690057b33f40a103b77"
+      },
+      {
+        "path": "src/lib/assistant/types.ts",
+        "sha": "8619642d6349b5e542ef77264fdce20f5016573d"
+      },
+      {
+        "path": "src/lib/calendar/feed-url.ts",
+        "sha": "0dcab48ff2f33cd7f4727c397abad0f9afe5f0aa"
+      },
+      {
+        "path": "src/lib/calendar/ics-event.ts",
+        "sha": "11e090f69afc62c36f10ec4797f07a131d175e90"
+      },
+      {
+        "path": "src/lib/calendar/occurrences.ts",
+        "sha": "fac89eb4d8840072f3e97140cd177ed708771c0a"
+      },
+      {
+        "path": "src/lib/camera/barcode.ts",
+        "sha": "7b2f165b582f00cdd3bb6a79f2a26abd448de130"
+      },
+      {
+        "path": "src/lib/health/api.ts",
+        "sha": "415130e69bb3d906e09e59e4a99d3b5c8a610a89"
+      },
+      {
+        "path": "src/lib/health/calculations.ts",
+        "sha": "3d0945eba2b1c35245943bbe7a9b827eec1f4112"
+      },
+      {
+        "path": "src/lib/health/database.ts",
+        "sha": "7ef1e80f2ebdccbf8e6f75fc83a46515c2173f67"
+      },
+      {
+        "path": "src/lib/health/exercise-demos.json",
+        "sha": "70e981fa3da60fad8ba4d069bfe4fd6f7ba7d5f3"
+      },
+      {
+        "path": "src/lib/health/exercises.ts",
+        "sha": "5e1a45e199fdb4d387d41391adb2f17ee0c76bb6"
+      },
+      {
+        "path": "src/lib/health/i18n.ts",
+        "sha": "652cb9064c4f7b9b192027d8e158a414db1f190f"
+      },
+      {
+        "path": "src/lib/health/model.ts",
+        "sha": "f3df69fa5ef4df999921b99b8f3a56b350478b2a"
+      },
+      {
+        "path": "src/lib/health/offline.ts",
+        "sha": "af0b5a9ed93005537b305b0f9469b437d9d73f1c"
+      },
+      {
+        "path": "src/lib/health/starter-foods.json",
+        "sha": "8a869320b81e5d32a6b26bb3818d441e456fd019"
+      },
+      {
+        "path": "src/lib/health/store.ts",
+        "sha": "bd4fcbbe9758c3479f8df46fba14d4db97260a76"
+      },
+      {
+        "path": "src/lib/hooks/use-now.ts",
+        "sha": "13b7b4efa8f582856c374cdca3561909b020c84d"
+      },
+      {
+        "path": "src/lib/hooks/use-product-search.ts",
+        "sha": "7a18cd74e53d5e1d9f9f9700d0d71bd45b17e604"
+      },
+      {
+        "path": "src/lib/hooks/use-section-stats.ts",
+        "sha": "d68f921dee6f5101460602e81f7b8180ec581b60"
+      },
+      {
+        "path": "src/lib/i18n/messages.ts",
+        "sha": "f99c786386e7d0b877fbfc528449336e02b8c724"
+      },
+      {
+        "path": "src/lib/i18n/store.ts",
+        "sha": "099b8533dfd7e5b51db6a92afb7b9d6748acb899"
+      },
+      {
+        "path": "src/lib/identity.ts",
+        "sha": "85a40a56fee083a79d13935d3ea87956efce3463"
+      },
+      {
+        "path": "src/lib/nlp/product-synonyms.ts",
+        "sha": "2f8f3c2116dd9caeff916bce8a619a13f08491b9"
+      },
+      {
+        "path": "src/lib/nlp/quick-add-parse.ts",
+        "sha": "87aadc83cb569a340a624bef69c5bbe38d2b2311"
+      },
+      {
+        "path": "src/lib/nlp/strip-shopping-filler.ts",
+        "sha": "c4c9f9ca0e21459fb67802d499f7e033758f7189"
+      },
+      {
+        "path": "src/lib/offline/db.ts",
+        "sha": "fc45196d43b4e6de2a915f8e5c0b9b13fb22ae9d"
+      },
+      {
+        "path": "src/lib/offline/queue.ts",
+        "sha": "a1cec2a69f25e68af2b0bbcca7dc2bbb91e14ac6"
+      },
+      {
+        "path": "src/lib/ordering/rank.ts",
+        "sha": "d0f8d5432482983177ae9289aa0fc3931a01fcf0"
+      },
+      {
+        "path": "src/lib/price-comparison/chains.ts",
+        "sha": "b349876c64e600ec40ebeb529f3c74b6b222b9f2"
+      },
+      {
+        "path": "src/lib/price-comparison/compare.ts",
+        "sha": "df86320356f82f9fdd101539e838221903aba130"
+      },
+      {
+        "path": "src/lib/price-comparison/match.ts",
+        "sha": "f6955e343151a94071de167963063023bd46d7dd"
+      },
+      {
+        "path": "src/lib/price-comparison/types.ts",
+        "sha": "6f3b969300bbdbdfa917495fede7e7b091303819"
+      },
+      {
+        "path": "src/lib/push/use-push.ts",
+        "sha": "868e7dc2114c878879448e561017af6b4a2d552a"
+      },
+      {
+        "path": "src/lib/pwa/use-install-prompt.ts",
+        "sha": "293e8133e86e0a7176910c826520f487cabda542"
+      },
+      {
+        "path": "src/lib/pwa/use-standalone.ts",
+        "sha": "b98c5d5b498834d5e3028186ff3344ea7b7b7459"
+      },
+      {
+        "path": "src/lib/realtime/use-realtime-sync.ts",
+        "sha": "0227e6bd9780344416b3ad320dfcfd8cdfd3fee8"
+      },
+      {
+        "path": "src/lib/search-ui-state.ts",
+        "sha": "05e1cfb91af340138eabdc8b866ea6cd6620c321"
+      },
+      {
+        "path": "src/lib/store/app-store.ts",
+        "sha": "2a8a7f7df2c90c03cba7a9b7e5a3345af623307a"
+      },
+      {
+        "path": "src/lib/supabase/client.ts",
+        "sha": "30c648434fdc70184d09a34a1edd6e6e7d43c22b"
+      },
+      {
+        "path": "src/lib/supabase/env.ts",
+        "sha": "391f7982a464165532fc2d7a2d71c265b5e9a146"
+      },
+      {
+        "path": "src/lib/supabase/generic-write.ts",
+        "sha": "d2f28b948a7f681f6273ed19204a44e960868240"
+      },
+      {
+        "path": "src/lib/supabase/server.ts",
+        "sha": "4e9c32ae440fe7f5c5d506ef570a1415eab8f03f"
+      },
+      {
+        "path": "src/lib/utils.ts",
+        "sha": "03edf7b44c7cf1d3f48be4f72866007dbb63b8c6"
+      },
+      {
+        "path": "src/types/database.ts",
+        "sha": "3d98ac4dea53cdac78642babb17094f8a006ccbb"
+      },
+      {
+        "path": "src/types/domain.ts",
+        "sha": "e5880647f0cba0d03a2ae54bbd157c880ff01648"
+      },
+      {
+        "path": "src/types/health-database.generated.ts",
+        "sha": "92a0eb11db85f011d71c6402de150990d9fefc11"
+      },
+      {
+        "path": "tsconfig.json",
+        "sha": "93aa90c20db4526d6903a9d8a33c4c6c53f10d24"
+      }
+    ]
+  },
+  "supabase": {
+    "project": "smart-home-kh",
+    "functions": [
+      {
+        "slug": "pin-login",
+        "version": 2,
+        "verify_jwt": false
+      },
+      {
+        "slug": "food-lookup",
+        "version": 3,
+        "verify_jwt": false
+      },
+      {
+        "slug": "nutrition-analyze",
+        "version": 3,
+        "verify_jwt": false
+      },
+      {
+        "slug": "health-maintenance",
+        "version": 4,
+        "verify_jwt": false
+      },
+      {
+        "slug": "health-account",
+        "version": 3,
+        "verify_jwt": false
+      }
+    ],
+    "files": [
+      {
+        "path": "supabase/functions/pin-login/index.ts",
+        "contentLength": 3673,
+        "sha256": "1be58ff5da77d143961a40c9e3ee4fd8f943dd25d5cb084babbb0762c7b6627e"
+      },
+      {
+        "path": "supabase/functions/_shared/health-http.ts",
+        "contentLength": 3109,
+        "sha256": "7fc37b060124f101994c771e6245828d9308bd1027f84136b3bddf1c62d49d3c"
+      },
+      {
+        "path": "supabase/functions/food-lookup/index.ts",
+        "contentLength": 4673,
+        "sha256": "e89c96b6bef6b5869d0dfd4485fd2883919bc5df9bef0308321f1c888e9189d6"
+      },
+      {
+        "path": "supabase/functions/nutrition-analyze/index.ts",
+        "contentLength": 4601,
+        "sha256": "bc6e5a4c69953d86b5abd00acd65ff6699a3fd3bd18322ad53911c5717644ba7"
+      },
+      {
+        "path": "supabase/functions/_shared/health-gemini.ts",
+        "contentLength": 5301,
+        "sha256": "72c6cb56d7301247d870ae264fb8542110bacc62167b14dc1844f3c2e8a25a21"
+      },
+      {
+        "path": "supabase/functions/health-maintenance/index.ts",
+        "contentLength": 5110,
+        "sha256": "f517e8111c5f60a9b102daa5a81612310cebf6859f3786bbea34d263b5fdfca0"
+      },
+      {
+        "path": "supabase/functions/_shared/probe-label.ts",
+        "contentLength": 30150,
+        "sha256": "e8f3a910c7e30a3c77d8260ae2ee04d7163bd44f51697a05240a9dd20a85f5d7"
+      },
+      {
+        "path": "supabase/functions/health-account/index.ts",
+        "contentLength": 3044,
+        "sha256": "08178288cfaa7015c76129b5efef2570c628a16129011a5153911d121eed7f5c"
+      }
+    ],
+    "migrationVersions": [
+      {
+        "version": "20260831104343",
+        "name": "purge_stale_mika_identity_facts"
+      },
+      {
+        "version": "20260831105103",
+        "name": "activity_log_reactions"
+      },
+      {
+        "version": "20260831105112",
+        "name": "restore_member_auth"
+      },
+      {
+        "version": "20260831105136",
+        "name": "boards"
+      },
+      {
+        "version": "20260831133849",
+        "name": "trim_activity_log"
+      },
+      {
+        "version": "20261102193842",
+        "name": "personal_health"
+      },
+      {
+        "version": "20261102194318",
+        "name": "health_maintenance_timeout"
+      },
+      {
+        "version": "20261102195016",
+        "name": "health_maintenance_queue_privacy"
+      },
+      {
+        "version": "20261102195218",
+        "name": "health_maintenance_once"
+      },
+      {
+        "version": "20261102195641",
+        "name": "health_release_gate"
+      },
+      {
+        "version": "20261102201630",
+        "name": "personal_identity"
+      }
+    ]
+  }
+}
