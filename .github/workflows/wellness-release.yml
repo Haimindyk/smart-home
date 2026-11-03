@@ -41,7 +41,7 @@ jobs:
         env:
           PGDATABASE: ${{ secrets.SUPABASE_DB_URL }}
           PGSSLMODE: require
-        run: psql -X --set=ON_ERROR_STOP=1 --single-transaction --file=scripts/release-wellness.sql
+        run: psql --dbname="$PGDATABASE" -X --set=ON_ERROR_STOP=1 --single-transaction --file=scripts/release-wellness.sql
       - name: Release only the functions from the merge commit
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
