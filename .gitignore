@@ -36,7 +36,19 @@ yarn-error.log*
 
 # vercel
 .vercel
+supabase/.temp/
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Private ML datasets, snapshots, training logs and model weights
+/ml/data/
+/ml/runs/
+/ml/exports/
+/ml/.venv/
+**/__pycache__/
+*.safetensors
+*.pt
+*.pth
+*.onnx

@@ -1,88 +1,19 @@
-import demos from "./exercise-demos.json";
+import { wellnessExercises } from "../../../supabase/functions/_shared/exercise-catalog";
 export const exerciseCatalog = [
-  {
-    he: "סקוואט",
-    en: "Squat",
-    muscle: "legs",
-    equipment: "barbell",
-    kind: "strength",
-  },
-  {
-    he: "לחיצת חזה",
-    en: "Bench press",
-    muscle: "chest",
-    equipment: "barbell",
-    kind: "strength",
-  },
-  {
-    he: "דדליפט",
-    en: "Deadlift",
-    muscle: "back / legs",
-    equipment: "barbell",
-    kind: "strength",
-  },
-  {
-    he: "חתירה",
-    en: "Row",
-    muscle: "back",
-    equipment: "dumbbell",
-    kind: "strength",
-  },
-  {
-    he: "לחיצת כתפיים",
-    en: "Shoulder press",
-    muscle: "shoulders",
-    equipment: "dumbbell",
-    kind: "strength",
-  },
-  {
-    he: "מתח",
-    en: "Pull-up",
-    muscle: "back",
-    equipment: "bodyweight",
-    kind: "strength",
-  },
-  {
-    he: "שכיבות סמיכה",
-    en: "Push-up",
-    muscle: "chest",
-    equipment: "bodyweight",
-    kind: "strength",
-  },
-  {
-    he: "כפיפת מרפקים",
-    en: "Biceps curl",
-    muscle: "arms",
-    equipment: "dumbbell",
-    kind: "strength",
-  },
-  {
-    he: "מכרעים",
-    en: "Lunge",
-    muscle: "legs",
-    equipment: "bodyweight",
-    kind: "strength",
-  },
-  {
-    he: "הליכה",
-    en: "Walking",
+  ...wellnessExercises.map((e) => ({
+    ...e,
+    catalogId: e.id,
+    kind: "strength" as const,
+  })),
+  ...[
+    { id: "Walking", he: "הליכה", en: "Walking", equipment: "none" },
+    { id: "Running", he: "ריצה", en: "Running", equipment: "none" },
+    { id: "Cycling", he: "רכיבה", en: "Cycling", equipment: "bike" },
+  ].map((e) => ({
+    ...e,
+    catalogId: undefined,
+    demoId: undefined,
     muscle: "cardio",
-    equipment: "none",
-    kind: "cardio",
-  },
-  {
-    he: "ריצה",
-    en: "Running",
-    muscle: "cardio",
-    equipment: "none",
-    kind: "cardio",
-  },
-  {
-    he: "רכיבה",
-    en: "Cycling",
-    muscle: "cardio",
-    equipment: "bike",
-    kind: "cardio",
-  },
-  ...demos.map(d=>({he:d.he,en:d.en,muscle:"",equipment:"",kind:"strength" as const,demoId:d.id})),
-] as const;
+    kind: "cardio" as const,
+  })),
+];

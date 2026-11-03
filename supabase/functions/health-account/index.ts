@@ -66,20 +66,16 @@ Deno.serve(async (req) => {
         p_module: input.module,
       });
       if (error) throw new Error("failed");
-      // Daily maintenance removes storage orphans as well if a delete is interrupted.
-      if (input.module !== "workouts") {
-        for (let pass = 0; pass < 100; pass++) {
-          const { data: files, error } = await admin.storage
-            .from("health-images")
-            .list(user.id, { limit: 100 });
-          if (error) throw new Error("failed");
-          if (!files?.length) break;
-          const { error: removeError } = await admin.storage
-            .from("health-images")
-            .remove(files.map((f) => `${user.id}/${f.name}`));
-          if (removeError) throw new Error("failed");
-        }
+      // Delete only orphans: nutrition deletion must preserve workout illustrations,
+      // and workout deletion must preserve saved meal photos. List before removing.
+      const used=await referencedImages(admin,user.id),stale:string[]=[];
+      for(let offset=0;;offset+=100){
+        const {data:files,error}=await admin.storage.from("health-images").list(user.id,{limit:100,offset});
+        if(error)throw new Error("failed");
+        for(const f of files??[])if(!used.has(`${user.id}/${f.name}`))stale.push(`${user.id}/${f.name}`);
+        if(!files||files.length<100)break;
       }
+      for(let i=0;i<stale.length;i+=100){const {error}=await admin.storage.from("health-images").remove(stale.slice(i,i+100));if(error)throw new Error("failed");}
       return json({ ok: true });
     }
     throw new Error("invalid_input");

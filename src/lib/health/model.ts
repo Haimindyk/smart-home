@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parsePreferences, type TrainingPreferences } from "../../../supabase/functions/_shared/wellness-core";
 
 export const nutrientsSchema = z.object({
   kcal: z.number().finite().min(0).max(10000),
@@ -31,11 +32,13 @@ export const mealItemSchema = z.object({
   food: foodSchema,
   quantity: z.number().finite().positive().max(10000),
   assumption: z.string().max(1000).optional(),
+  quantityRange: z.object({low:z.number().positive(),high:z.number().positive()}).optional(),
 });
 export type MealItem = z.infer<typeof mealItemSchema>;
 export const exerciseSchema = z.object({
   id: z.string().uuid(),
   name: z.string().trim().min(1).max(150),
+  catalogId: z.string().regex(/^[A-Za-z0-9_-]+$/).max(100).optional(),
   alternativeDemoId: z.string().regex(/^[A-Za-z0-9_-]+$/).max(100).optional(),
   demoId: z.string().regex(/^[A-Za-z0-9_-]+$/).max(100).optional(),
   repMax: z.number().int().min(1).max(500).optional(),
@@ -102,6 +105,8 @@ export const profileSchema = z.object({
   objective: z.enum(["lose", "maintain", "gain"]).default("maintain"),
   waterTarget: z.number().int().min(250).max(10000).default(2000),
   aiConsent: z.boolean().default(false),
+  aiProviderConsent: z.boolean().default(false),
+  trainingPreferences: z.custom<TrainingPreferences>((value)=>{try{parsePreferences(value);return true;}catch{return false;}}).optional(),
 });
 export type HealthProfile = z.infer<typeof profileSchema>;
 export const payloadSchemas = {
@@ -136,6 +141,12 @@ export const payloadSchemas = {
     weight: z.number().min(20).max(400),
   }),
   workout_plans: z.object({
+    programId:z.string().uuid().optional(),
+    split:z.string().max(20).optional(),
+    cycleIndex:z.number().int().min(0).max(5).optional(),
+    cycleLength:z.number().int().min(1).max(6).optional(),
+    startDate:dateSchema.optional(),
+    trainingDays:z.array(z.number().int().min(0).max(6)).max(6).optional(),
     notes: z.string().max(8000).optional(),
     durationWeeks: z.number().int().min(1).max(104).optional(),
     name: z.string().trim().min(1).max(150),
@@ -144,6 +155,7 @@ export const payloadSchemas = {
     archived: z.boolean().default(false),
   }),
   workout_sessions: z.object({
+    feedback:z.object({energy:z.number().int().min(1).max(5),rir:z.number().int().min(0).max(5).nullable(),pain:z.boolean()}).optional(),
     programNotes: z.string().max(8000).optional(),
     date: dateSchema,
     planId: z.string().uuid().nullable(),

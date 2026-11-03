@@ -6,6 +6,7 @@ import { profileSchema, type Payload } from "@/lib/health/model";
 import { csvEscape } from "@/lib/health/calculations";
 import { useHealthText } from "@/lib/health/i18n";
 import { healthFunction } from "@/lib/health/api";
+import { TrainingData } from "./training-data";
 import { ProfileJourney } from "./profile-journey";
 import { Field, Panel, SelectField, ErrorText } from "./shared";
 export function HealthSettings() {
@@ -130,6 +131,13 @@ export function HealthSettings() {
           </Button>
         </div>
       </Panel>
+      <Panel title={h("המאמן והערכות המזון ב־AI", "AI coach and food estimates")}>
+        <label className="flex items-start gap-3 text-sm leading-7">
+          <input type="checkbox" className="mt-2" checked={profile.aiProviderConsent} onChange={e=>patch("aiProviderConsent",e.target.checked)}/>
+          <span>{h("אני מסכים/ה לעיבוד תוכן הבקשות הדרוש ב־Cloudflare לצורך הערכת מזון והצעות אימון. שם, PIN ופרופיל גוף מלא אינם נשלחים אוטומטית. אין שימוש בתוכן לאימון המודלים. כל הערכה ניתנת לתיקון וכל שינוי בתוכנית דורש אישור. ביטול ההסכמה עוצר בקשות חדשות לאחר שמירת ההגדרות; תוכן שכבר נשלח לא ניתן להחזיר.", "I agree to Cloudflare processing the request content needed for food estimates and training proposals. Name, PIN and full body profile are not sent automatically. Content is not used to train models. Estimates are editable and plan changes require approval. Revoking consent stops new requests after saving; already sent content cannot be recalled.")}</span>
+        </label>
+        <Button className="mt-3" disabled={busy} onClick={()=>void persist()}>{h("שמירת העדפת AI", "Save AI preference")}</Button>
+      </Panel>
       <ProfileJourney profile={profile} onChange={setProfile} goals={data.nutrition_goals.map(g=>g.data)} onSave={saveProfileAndGoal} busy={busy}/>
       <details className="rounded-3xl border bg-card p-5"><summary className="font-semibold">{h("העדפות נוספות", "More preferences")}</summary><div className="mt-5 grid gap-4">          <Field
             label={h("אזור זמן", "Time zone")}
@@ -144,6 +152,7 @@ export function HealthSettings() {
           </p>
 <Field label={h("יעד מים במ״ל", "Water target (ml)")} type="number" min={250} max={10000} value={profile.waterTarget} onChange={e=>patch("waterTarget",+e.target.value)}/><Button disabled={busy} onClick={()=>void persist()}>{h("שמירת העדפות", "Save preferences")}</Button></div></details>
       {data.nutrition_goals.length>0 && <details className="rounded-3xl border bg-card p-5"><summary className="font-semibold">{h("היסטוריית יעדים", "Goal history")}</summary>{[...data.nutrition_goals].sort((a,b)=>b.data.date.localeCompare(a.data.date)).map(g=><p className="mt-3 text-sm" key={g.id}>{g.data.date} · {g.data.kcal} kcal · P {g.data.protein} / C {g.data.carbs} / F {g.data.fat}</p>)}</details>}
+      <TrainingData/>
       <Panel title={h("הנתונים שלך", "Your data")}>
         <Button variant="outline" onClick={exportCsv}>
           {h("ייצוא CSV", "Export CSV")}
