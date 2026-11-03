@@ -33,13 +33,33 @@ redeploy Edge Functions, or change production traffic.
 1. Create a feature branch from the merged recovered source.
 2. Make changes locally and run the relevant checks.
 3. Push the branch and open a pull request.
-4. Build and verify a preview from that Git commit.
-5. Merge the reviewed change, then deploy that commit to production.
+4. Build and verify locally; branch and PR preview deployments are disabled.
+5. Merge the reviewed pull request into `main`. The merge is the only permitted
+   deployment trigger; the Git integration or a merge-triggered release workflow
+   deploys that exact commit.
+
+GitHub is the sole source of application and server code. Do not push directly
+to `main`, upload source files directly to Vercel or Supabase, manually redeploy,
+or promote an older build. These instructions also apply to automated agents
+and are recorded in `AGENTS.md`.
+
+`vercel.json` enables Git deployments for `main` and disables other branches.
+The Vercel project is linked to `Haimindyk/smart-home`; preview deployments were
+also disabled in the project settings. GitHub should require a pull request for
+`main` and disallow direct pushes. The connected GitHub integration cannot
+inspect or change branch protection, so that administrative setting still
+needs verification by the repository owner.
+
+Vercel's server-side deployment-source policy was unavailable on the current
+Hobby plan (`pro_plan_required`). As a result, the service-level ability for a
+privileged user to create a manual CLI/API deployment is not technically
+blocked by that policy. Such deployments are prohibited by this repository's
+workflow. No plan upgrade was performed.
 
 Do not deploy the older main branch before this recovery is merged: that would
 remove Wellness. Before enabling automatic deployments, verify that Vercel's
 project Git connection points to `Haimindyk/smart-home` and the intended
-production branch. This recovery does not change that connection.
+production branch (`main`). This recovery does not change that connection.
 
 ## Local development and validation
 
