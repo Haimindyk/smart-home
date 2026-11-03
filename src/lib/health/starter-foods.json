@@ -1,0 +1,128 @@
+[
+  {
+    "id": "usda:171287",
+    "name": "ביצה שלמה טרייה (נא)",
+    "nameEn": "Egg, whole, raw, fresh",
+    "per100": {
+      "kcal": 143,
+      "protein": 12.6,
+      "carbs": 0.72,
+      "fat": 9.51,
+      "fiber": 0.0,
+      "sugar": 0.37,
+      "saturatedFat": 3.13,
+      "sodium": 142
+    },
+    "basis": "g",
+    "source": "usda",
+    "sourceId": "https://fdc.nal.usda.gov/food-details/171287/nutrients"
+  },
+  {
+    "id": "usda:168878",
+    "name": "אורז לבן ארוך מבושל",
+    "nameEn": "Rice, white, long-grain, regular, enriched, cooked",
+    "per100": {
+      "kcal": 130,
+      "protein": 2.69,
+      "carbs": 28.2,
+      "fat": 0.28,
+      "fiber": 0.4,
+      "sugar": 0.05,
+      "saturatedFat": 0.077,
+      "sodium": 1.0
+    },
+    "basis": "g",
+    "source": "usda",
+    "sourceId": "https://fdc.nal.usda.gov/food-details/168878/nutrients"
+  },
+  {
+    "id": "usda:171477",
+    "name": "חזה עוף צלוי ללא עור",
+    "nameEn": "Chicken, broilers or fryers, breast, meat only, cooked, roasted",
+    "per100": {
+      "kcal": 165,
+      "protein": 31.0,
+      "carbs": 0.0,
+      "fat": 3.57,
+      "fiber": 0.0,
+      "sugar": 0.0,
+      "saturatedFat": 1.01,
+      "sodium": 74.0
+    },
+    "basis": "g",
+    "source": "usda",
+    "sourceId": "https://fdc.nal.usda.gov/food-details/171477/nutrients"
+  },
+  {
+    "id": "usda:173944",
+    "name": "בננה טרייה",
+    "nameEn": "Bananas, raw",
+    "per100": {
+      "kcal": 89.0,
+      "protein": 1.09,
+      "carbs": 22.8,
+      "fat": 0.33,
+      "fiber": 2.6,
+      "sugar": 12.2,
+      "saturatedFat": 0.112,
+      "sodium": 1.0
+    },
+    "basis": "g",
+    "source": "usda",
+    "sourceId": "https://fdc.nal.usda.gov/food-details/173944/nutrients"
+  },
+  {
+    "id": "usda:171689",
+    "name": "תפוח טרי ללא קליפה",
+    "nameEn": "Apples, raw, without skin",
+    "per100": {
+      "kcal": 48.0,
+      "protein": 0.27,
+      "carbs": 12.8,
+      "fat": 0.13,
+      "fiber": 1.3,
+      "sugar": 10.1,
+      "saturatedFat": 0.021,
+      "sodium": 0.0
+    },
+    "basis": "g",
+    "source": "usda",
+    "sourceId": "https://fdc.nal.usda.gov/food-details/171689/nutrients"
+  },
+  {
+    "id": "usda:171413",
+    "name": "שמן זית",
+    "nameEn": "Oil, olive, salad or cooking",
+    "per100": {
+      "kcal": 884,
+      "protein": 0.0,
+      "carbs": 0.0,
+      "fat": 100,
+      "fiber": 0.0,
+      "sugar": 0.0,
+      "saturatedFat": 13.8,
+      "sodium": 2.0
+    },
+    "basis": "g",
+    "source": "usda",
+    "sourceId": "https://fdc.nal.usda.gov/food-details/171413/nutrients"
+  },
+  {
+    "id": "usda:171265",
+    "name": "חלב מלא 3.25% מועשר בוויטמין D",
+    "nameEn": "Milk, whole, 3.25% milkfat, with added vitamin D",
+    "per100": {
+      "kcal": 61.0,
+      "protein": 3.15,
+      "carbs": 4.8,
+      "fat": 3.25,
+      "fiber": 0.0,
+      "sugar": 5.05,
+      "saturatedFat": 1.86,
+      "sodium": 43.0
+    },
+    "basis": "g",
+    "source": "usda",
+    "sourceId": "https://fdc.nal.usda.gov/food-details/171265/nutrients"
+  }
+]

@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { useHealthText } from "@/lib/health/i18n";
+import { Leaf, ArrowUpLeft, Dumbbell } from "lucide-react";
 import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import { AppHeader } from "@/components/nav/app-header";
@@ -28,6 +31,7 @@ function useGreeting() {
 }
 
 export default function DashboardPage() {
+  const h = useHealthText();
   const t = useT();
   const greeting = useGreeting();
   const actingMemberId = useIdentity((s) => s.actingMemberId);
@@ -76,6 +80,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        <Link href="/health" className="group relative mb-6 flex min-h-40 items-center justify-between gap-5 overflow-hidden rounded-[28px] bg-[#151515] p-6 text-white shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:p-8">
+          <div className="relative z-10"><p className="mb-2 text-xs font-semibold tracking-[.2em] text-[#ffb623]">KH WELLNESS</p><h2 className="text-2xl font-bold sm:text-3xl">{h("זמן לעצמך", "Time for you")}</h2><p className="mt-2 text-sm text-white/65">{h("התזונה, האימונים וההתקדמות שלך", "Your nutrition, training & progress")}</p><span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#ffb623]">{h("כניסה למרחב האישי", "Open your wellness space")}<ArrowUpLeft size={16}/></span></div>
+          <div aria-hidden="true" className="relative flex size-24 shrink-0 items-center justify-center rounded-full border border-[#ffb623]/25 bg-[#ffb623]/10"><Leaf size={40} className="text-[#ffb623]"/><span className="absolute -bottom-1 -start-2 rounded-2xl bg-[#ffb623] p-2.5 text-[#151515]"><Dumbbell size={22}/></span></div>
+        </Link>
         <PersonalNoteCards />
         <InsightCards />
 

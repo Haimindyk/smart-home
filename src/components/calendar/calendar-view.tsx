@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CalendarPlus, Plus } from "lucide-react";
 import { useAppStore } from "@/lib/store/app-store";
+import { useHealthText } from "@/lib/health/i18n";
 import { useT, useLocaleStore } from "@/lib/i18n/store";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -28,6 +29,7 @@ export function CalendarView() {
   const tasks = useAppStore((s) => s.tasks);
   const locale = useLocaleStore((s) => s.locale);
   const t = useT();
+  const h = useHealthText();
 
   const [month, setMonth] = useState<Date>(() => new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
@@ -112,7 +114,8 @@ export function CalendarView() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
+      <div className="mb-2"><p className="eyebrow">K&H · CALENDAR</p><h1 className="mt-2 text-3xl font-bold tracking-tight">{h("מפנים מקום למה שחשוב", "Make time for what matters")}</h1><p className="mt-3 text-sm text-muted-foreground">{h("התכניות, האירועים והרגעים של הבית במקום אחד.", "Your household plans, events and moments in one place.")}</p></div>
       <div className="glass surface-shadow flex flex-col items-center gap-3 rounded-3xl p-4 ring-1 ring-border/40 sm:p-5">
         <Calendar
           mode="single"

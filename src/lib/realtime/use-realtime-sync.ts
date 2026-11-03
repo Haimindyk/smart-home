@@ -1,12 +1,26 @@
 "use client";
 
 import { useEffect } from "react";
-import { REALTIME_SUBSCRIBE_STATES, type RealtimeChannel } from "@supabase/supabase-js";
+import {
+  REALTIME_SUBSCRIBE_STATES,
+  type RealtimeChannel,
+} from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useAppStore } from "@/lib/store/app-store";
 import { loadSnapshot, saveSnapshot } from "@/lib/offline/db";
 import { flushMutationQueue } from "@/lib/offline/queue";
-import type { Member, Section, Task, Chore, ChoreCompletion, Attachment, ActivityLog, FamilyEvent, AiSuggestion, AiPrivateMessage } from "@/types/domain";
+import type {
+  Member,
+  Section,
+  Task,
+  Chore,
+  ChoreCompletion,
+  Attachment,
+  ActivityLog,
+  FamilyEvent,
+  AiSuggestion,
+  AiPrivateMessage,
+} from "@/types/domain";
 
 /** Delay before rejoining the realtime channel after an error/timeout/close, to avoid retry storms. */
 const REJOIN_DELAY_MS = 2000;
@@ -39,26 +53,51 @@ const TABLES = [
 
 async function fetchAll(): Promise<Snapshot> {
   const supabase = createClient();
-  const [members, sections, tasks, chores, choreCompletions, attachments, activityLog, familyEvents, aiSuggestions, aiPrivateMessages] =
-    await Promise.all([
-      supabase.from("members").select("*"),
-      supabase.from("sections").select("*").order("position"),
-      supabase.from("tasks").select("*").order("position"),
-      supabase.from("chores").select("*").order("position"),
-      supabase.from("chore_completions").select("*"),
-      supabase.from("attachments").select("*"),
-      supabase.from("activity_log").select("*").order("seq", { ascending: false }).limit(200),
-      supabase.from("family_events").select("*").order("event_date"),
-      supabase.from("ai_suggestions").select("*").eq("status", "open").order("created_at", { ascending: false }),
-      // Fetches every member's private messages, not just the current
-      // device's acting member — the same soft, UX-level privacy as the rest
-      // of this app (see migration 0026): the UI only ever *displays* a
-      // member their own rows (personal-note-card.tsx), it isn't enforced
-      // here or by RLS.
-      supabase.from("ai_private_messages").select("*").order("created_at", { ascending: false }),
-    ]);
+  const [
+    members,
+    sections,
+    tasks,
+    chores,
+    choreCompletions,
+    attachments,
+    activityLog,
+    familyEvents,
+    aiSuggestions,
+    aiPrivateMessages,
+  ] = await Promise.all([
+    supabase
+      .from("members")
+      .select(
+        "id,email,user_id,display_name,avatar_emoji,color,locale,created_at,updated_at,avatar_photo_url,is_ai_companion_target,last_chat_at,gender",
+      ),
+    supabase.from("sections").select("*").order("position"),
+    supabase.from("tasks").select("*").order("position"),
+    supabase.from("chores").select("*").order("position"),
+    supabase.from("chore_completions").select("*"),
+    supabase.from("attachments").select("*"),
+    supabase
+      .from("activity_log")
+      .select("*")
+      .order("seq", { ascending: false })
+      .limit(200),
+    supabase.from("family_events").select("*").order("event_date"),
+    supabase
+      .from("ai_suggestions")
+      .select("*")
+      .eq("status", "open")
+      .order("created_at", { ascending: false }),
+    // Fetches every member's private messages, not just the current
+    // device's acting member — the same soft, UX-level privacy as the rest
+    // of this app (see migration 0026): the UI only ever *displays* a
+    // member their own rows (personal-note-card.tsx), it isn't enforced
+    // here or by RLS.
+    supabase
+      .from("ai_private_messages")
+      .select("*")
+      .order("created_at", { ascending: false }),
+  ]);
   return {
-    members: (members.data ?? []) as Member[],
+    members: (members.data ?? []).map((m) => ({ ...m, pin: null })) as Member[],
     sections: (sections.data ?? []) as Section[],
     tasks: (tasks.data ?? []) as Task[],
     chores: (chores.data ?? []) as Chore[],
@@ -121,9 +160,18 @@ export function useRealtimeSync() {
         ch.on(
           "postgres_changes" as never,
           { event: "*", schema: "public", table },
-          (payload: { eventType: "INSERT" | "UPDATE" | "DELETE"; new: Record<string, unknown>; old: Record<string, unknown> }) => {
-            applyRemote(table, payload.eventType, payload.new ?? null, payload.old ?? null);
-          }
+          (payload: {
+            eventType: "INSERT" | "UPDATE" | "DELETE";
+            new: Record<string, unknown>;
+            old: Record<string, unknown>;
+          }) => {
+            applyRemote(
+              table,
+              payload.eventType,
+              payload.new ?? null,
+              payload.old ?? null,
+            );
+          },
         );
       }
       channel = ch;
