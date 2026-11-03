@@ -1,3 +1,4 @@
+import { ownModel, type OwnedTask } from "./wellness-owned-routing.ts";
 import { parseModelJson } from "./wellness-core.ts";
 export const MODELS = {
   vision: "@cf/meta/llama-3.2-11b-vision-instruct",
@@ -6,6 +7,18 @@ export const MODELS = {
 } as const;
 export type Environment = (key: string) => string | undefined;
 export function configured(env: Environment) {
+  if (env("WELLNESS_MODEL_SOURCE") === "owned") {
+    try {
+      for (const task of [
+        "nutrition_text",
+        "nutrition_photo",
+        "coach_program",
+      ] as const)
+        ownModel(task, env);
+    } catch {
+      return false;
+    }
+  }
   return (
     env("WELLNESS_AI_ENABLED") === "true" &&
     env("CLOUDFLARE_FREE_ONLY") === "true" &&
@@ -62,10 +75,31 @@ export function createProvider(
     return content;
   };
   return {
-    async structured(system: string, input: unknown, maxTokens = 2500) {
+    provenance(task: OwnedTask) {
+      const model = ownModel(task, env);
+      return model
+        ? {
+            source: "owned_adapter",
+            version: model.id,
+            weightsSha256: model.weightsSha256,
+            base: model.cloudflareModel,
+          }
+        : {
+            source: "hosted",
+            base: task === "nutrition_photo" ? MODELS.vision : MODELS.text,
+          };
+    },
+    async structured(
+      system: string,
+      input: unknown,
+      maxTokens = 2500,
+      task: OwnedTask = "nutrition_text",
+    ) {
       const user = JSON.stringify(input);
       if (user.length > 24000) throw new Error("invalid_input");
-      const result = await run(MODELS.text, {
+      const own = ownModel(task, env);
+      const result = await run(own?.cloudflareModel ?? MODELS.text, {
+        ...(own ? { lora: own.lora } : {}),
         messages: [
           {
             role: "system",
@@ -83,7 +117,9 @@ export function createProvider(
       let encoded = "";
       for (let i = 0; i < image.length; i += 8192)
         encoded += String.fromCharCode(...image.subarray(i, i + 8192));
-      const r = await run(MODELS.vision, {
+      const own = ownModel("nutrition_photo", env);
+      const r = await run(own?.cloudflareModel ?? MODELS.vision, {
+        ...(own ? { lora: own.lora } : {}),
         image: btoa(encoded),
         prompt,
         temperature: 0.1,

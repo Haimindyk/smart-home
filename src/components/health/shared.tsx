@@ -80,6 +80,8 @@ export function ErrorText({ error }: { error: string | null }) {
     unbalanced_program: h("ההצעה לא כיסתה את קבוצות התנועה והדגשים שבחרת. נסו שוב או ערכו ידנית.", "The proposal missed required movement patterns or priorities. Retry or edit manually."),
     program_too_long: h("ההצעה ארוכה מהזמן שבחרת. נסו שוב או התאימו את משך האימון.", "The proposal exceeds your time budget. Retry or adjust the workout duration."),
     unsafe_progression: h("אין מספיק ביצועים ומשוב שמצדיקים את העלאת העומס שהוצעה. לא נשמר שינוי.", "There is insufficient performance and feedback to justify this progression. No change was saved."),
+    training_consent_required:h("יש לאשר השתתפות נפרדת באימון המודלים.","Opt in separately to training our models."),
+    training_limit:h("ניתן לשתף עד 200 דוגמאות. אפשר לבטל את ההסכמה ולמחוק אותן.","You can contribute up to 200 examples. Revoke consent to delete them."),
     load_required: h("יש להזין את המשקל שבוצע לפני סימון הסט. אפשר להזין 0 אם בוצע ללא משקל חיצוני.", "Enter the load used before marking the set. Enter 0 for no external load."),
     invalid_birth_date: h("יש לבחור תאריך לידה תקין שאינו בעתיד.", "Choose a valid date of birth that is not in the future."),
     recipe_grams_required: h(

@@ -52,7 +52,7 @@ No new Vercel client secrets are needed.
    if repository settings allow it. Never put a database password in the workflow.
 5. Review and merge the PR. The release workflow checks out exactly
    `pull_request.merge_commit_sha`, validates, applies the additive migration in one
-   SQL transaction, then deploys only the three functions from that commit. It has
+   SQL transaction, then deploys only the four functions from that commit. It has
    no manual dispatch or preview deployment. Functions perform their own
    `auth.getUser` and membership checks (`--no-verify-jwt` only disables the gateway's
    legacy JWT check, not application authentication).
@@ -107,3 +107,11 @@ the actual components with synthetic services in Chromium (install with
 `pnpm exec playwright install chromium`, or set `CHROMIUM_PATH` to a system browser).
 It checks Hebrew/English mobile approval and meal confirmation flows. These do not establish live model accuracy or
 production provider connectivity. No private photos are used by automated tests.
+
+
+Owned adapter training and the separate opt-in contribution path are documented in
+[ml/README.md](../ml/README.md). The training registry is intentionally empty until
+real training, held-out evaluation and a matching runtime probe succeed. Inference
+consent does not authorize training; contributions are submitted individually and
+remain unreviewed until curated. Training submissions have separate retention until
+withdrawal/module deletion, rather than the inference jobs' 30-day retention.

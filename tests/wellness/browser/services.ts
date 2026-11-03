@@ -21,7 +21,31 @@ const data: Record<string, unknown[]> = {
   health_profiles: [profile],
   workout_plans: [],
   workout_sessions: [],
-  meals: [],
+  meals: [
+    {
+      id: "00000000-0000-4000-8000-000000000001",
+      version: 1,
+      data: {
+        date: "2026-11-03",
+        name: "Training fixture meal",
+        kind: "lunch",
+        items: [
+          {
+            id: crypto.randomUUID(),
+            quantity: 100,
+            food: {
+              id: "apple",
+              name: "Synthetic apple",
+              source: "manual",
+              basis: "g",
+              per100: { kcal: 50, protein: 0, carbs: 12, fat: 0 },
+            },
+          },
+        ],
+        imagePath: null,
+      },
+    },
+  ],
   water_logs: [],
   weight_logs: [],
   nutrition_goals: [],
@@ -51,11 +75,29 @@ export const createClient = () => ({
     }),
   },
 });
+let consent = false,
+  contributions = 0;
 export async function healthFunction(
   name: string,
   input: Record<string, unknown>,
 ) {
   calls.push({ action: String(input.action) });
+  if (name === "wellness-training") {
+    if (input.action === "status")
+      return { enabled: consent, count: contributions };
+    if (input.action === "consent") {
+      consent = Boolean(input.enabled);
+      if (!consent) contributions = 0;
+      return { ok: true };
+    }
+    if (input.action === "submit") {
+      if (!consent || input.confirmShare !== true)
+        throw new Error("training_consent_required");
+      contributions++;
+      return { id: "fixture", reviewed: false };
+    }
+    return { examples: [] };
+  }
   if (input.action === "capabilities")
     return { available: true, serviceReady: true };
   if (input.action === "program")

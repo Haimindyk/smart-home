@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "task": "coach_program",
+  "base_model": "mistralai/Mistral-7B-Instruct-v0.2",
+  "revision": "63a8b081895390a26e140280378bc85ec8bce07a",
+  "model_type": "mistral",
+  "license": "apache-2.0",
+  "rank": 8,
+  "alpha": 16,
+  "target_modules": [
+    "q_proj",
+    "v_proj"
+  ],
+  "epochs": 2,
+  "learning_rate": 0.0001,
+  "max_length": 2048,
+  "seed": 47,
+  "min_train": 100,
+  "min_validation": 20,
+  "min_test": 50,
+  "status": "recipe_only_not_trained"
+}

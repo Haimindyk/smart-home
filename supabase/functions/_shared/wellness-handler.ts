@@ -267,12 +267,17 @@ export async function handleWellness(req: Request, env: Environment) {
     )
       .map((x) => x.toString(16).padStart(2, "0"))
       .join("");
-    const claimResponse = await admin.rpc("wellness_claim_job", {
-      p_id: id,
-      p_owner: user.id,
-      p_kind: kind,
-      p_fingerprint: fingerprint,
-    });
+    const claimResponse = await admin.rpc(
+      env("WELLNESS_MODEL_SOURCE") === "owned"
+        ? "wellness_claim_owned_job"
+        : "wellness_claim_job",
+      {
+        p_id: id,
+        p_owner: user.id,
+        p_kind: kind,
+        p_fingerprint: fingerprint,
+      },
+    );
     if (claimResponse.error?.message.includes("request_conflict"))
       throw new Error("request_conflict");
     const claim = check(claimResponse);
@@ -378,12 +383,15 @@ export async function handleWellness(req: Request, env: Environment) {
         `You plan exercise for healthy adults. Return {message:Hebrew rationale,plans:[{name:Hebrew,notes:Hebrew,exercises:[{catalogId,sets,reps,rest}]}]}. EXACTLY ${templates} templates for ${split}. Use ONLY the supplied catalog. Cover push,pull,squat,hinge,core across the program. Emphasize requested muscles without neglecting others. 3-10 exercises per template, beginner 1-3 sets, otherwise 1-5; 3-30 reps, rest 30-240 seconds. Fit the user's time; never invent starting weights. Respect avoided exercises/equipment. No rehab, diagnoses or medical prescriptions.`,
         { preferences, catalog: available },
         3500,
+        "coach_program",
       );
       result = makeProgram(raw, preferences!, startDate) as unknown as Record<
         string,
         unknown
       >;
     } else if (input.action === "adjust") {
+      if (env("WELLNESS_MODEL_SOURCE") === "owned")
+        throw new Error("not_configured");
       const evidence = sessions.map((s) => {
         const d = s.data as SessionEvidence;
         return {
@@ -468,6 +476,20 @@ export async function handleWellness(req: Request, env: Environment) {
       );
       result = { image_path: path, status: "pending_review" };
     }
+    result = {
+      ...result,
+      ...(["program", "nutrition"].includes(String(input.action))
+        ? {
+            modelProvenance: provider.provenance(
+              input.action === "program"
+                ? "coach_program"
+                : mode === "text"
+                  ? "nutrition_text"
+                  : "nutrition_photo",
+            ),
+          }
+        : {}),
+    };
     check(
       await admin
         .from("wellness_ai_jobs")

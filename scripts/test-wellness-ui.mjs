@@ -148,6 +148,52 @@ try {
       (await actions(page)).filter((c) => c.table === "meals").length,
       1,
     );
+    const optin = page.getByRole("button", {
+      name: he
+        ? "מאשר/ת השתתפות באימון המודלים שלנו"
+        : "Opt in to training our models",
+    });
+    await optin.click();
+    await page
+      .getByLabel(he ? "בחירת רשומה מהיומן שלי" : "Choose a saved record")
+      .selectOption("00000000-0000-4000-8000-000000000001");
+    await page
+      .getByLabel(
+        he
+          ? "תיאור הבקשה המקורי, בלי מידע מזהה"
+          : "Original request without identifying information",
+      )
+      .fill("I ate an apple");
+    const contribute = page.getByRole("button", {
+      name: he ? "שיתוף הדוגמה שבחרתי" : "Contribute this example",
+    });
+    assert(
+      await contribute.isDisabled(),
+      "consent alone must not share a diary entry",
+    );
+    await page
+      .getByLabel(
+        he
+          ? "בדקתי את הרשומה ואני מאשר/ת לשתף את הדוגמה הזו לצורך אימון."
+          : "I reviewed this record and approve sharing this specific example for training.",
+      )
+      .check();
+    await contribute.click();
+    await page
+      .getByText(
+        he
+          ? "הדוגמה נשמרה לבדיקה. היא עדיין אינה נתון אימון מאומת."
+          : "Saved for review. This is not yet a verified training label.",
+      )
+      .waitFor();
+    await page
+      .getByRole("button", {
+        name: he
+          ? "ביטול הסכמה ומחיקת הדוגמאות"
+          : "Revoke consent and delete examples",
+      })
+      .click();
+    await optin.waitFor();
     assert.deepEqual(errors, []);
     await page.close();
   }
@@ -162,7 +208,7 @@ try {
   );
   await minor.close();
   console.log(
-    "PASS: Hebrew/English mobile proposal approval, food estimate confirmation, no automatic writes, adult gate. Synthetic services; live model not tested.",
+    "PASS: Hebrew/English mobile proposal approval, food estimate confirmation, separate training consent, per-example approval/revocation, no automatic writes, adult gate. Synthetic services; live model not tested.",
   );
 } finally {
   await browser?.close();

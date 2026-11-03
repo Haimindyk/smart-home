@@ -128,3 +128,11 @@ saving. Provider setup and model-quality evaluation are required before enabling
 - [Configuration, quotas, privacy and merge-only releases](docs/wellness-ai-operations.md)
 - Local checks: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`;
   after building, `pnpm test:wellness:ui` checks synthetic browser flows.
+
+### Owned model training
+
+The independently trained adapter/head pipeline is in [ml/README.md](ml/README.md):
+separate training consent, owner-approved examples, private export, grouped datasets,
+pinned LoRA recipes, CPU training smoke test, held-out evaluation and version gates.
+The model registry is intentionally empty until real training, quality evaluation
+and a matching runtime probe succeed. No production owned weights are claimed yet.

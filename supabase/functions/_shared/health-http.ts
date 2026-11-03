@@ -107,5 +107,12 @@ export async function referencedImages(
     for(const row of data??[])used.add(row.image_path);
     if(!data||data.length<500)break;
   }
+  for(let offset=0;;offset+=500){
+    let query=admin.from('wellness_training_examples').select('id,image_path').order('id').range(offset,offset+499);
+    if(owner)query=query.eq('owner_user_id',owner);
+    const {data,error}=await query;if(error)throw new Error('failed');
+    for(const row of data??[])if(row.image_path)used.add(row.image_path);
+    if(!data||data.length<500)break;
+  }
   return used;
 }

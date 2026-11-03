@@ -102,11 +102,20 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    readFileSync(
+      new URL(
+        "../../supabase/migrations/20261103203820_wellness_training_data.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 }, 30000);
 afterAll(async () => db?.close());
 beforeEach(async () => {
   await db.exec(
-    "reset role;truncate public.wellness_ai_jobs cascade;truncate private.wellness_ai_daily_usage,public.workout_plans,public.health_profiles,public.wellness_exercise_illustrations;",
+    "reset role;truncate public.wellness_training_examples,public.wellness_training_consents;truncate public.wellness_ai_jobs cascade;truncate private.wellness_ai_daily_usage,public.workout_plans,public.health_profiles,public.wellness_exercise_illustrations;",
   );
 });
 describe("real Postgres quota, authorization and transactional proposals", () => {
@@ -319,5 +328,94 @@ describe("real Postgres quota, authorization and transactional proposals", () =>
     expect(
       (await db.query("select * from wellness_exercise_illustrations")).rows,
     ).toHaveLength(0);
+  });
+  it("training consent is separate and revocation removes submitted examples", async () => {
+    const submit = () =>
+      db.query(
+        "select wellness_training_submit($1,'nutrition_text',$2,$3,null)",
+        [
+          owner,
+          crypto.randomUUID(),
+          JSON.stringify({
+            input: { description: "meal" },
+            target: { items: [] },
+          }),
+        ],
+      );
+    await expect(submit()).rejects.toThrow("training_consent_required");
+    await db.query("select wellness_training_consent($1,true)", [owner]);
+    await submit();
+    expect(
+      (await db.query("select * from wellness_training_examples")).rows,
+    ).toHaveLength(1);
+    await db.query("select wellness_training_consent($1,false)", [owner]);
+    expect(
+      (await db.query("select * from wellness_training_examples")).rows,
+    ).toHaveLength(0);
+    await expect(submit()).rejects.toThrow("training_consent_required");
+  });
+  it("training examples are isolated and clients cannot grant themselves consent by SQL", async () => {
+    await db.query("select wellness_training_consent($1,true)", [owner]);
+    await db.query(
+      "select wellness_training_submit($1,'coach_program',$2,'{}',null)",
+      [owner, crypto.randomUUID()],
+    );
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      other,
+    ]);
+    await db.exec("set role authenticated");
+    expect(
+      (await db.query("select * from wellness_training_examples")).rows,
+    ).toHaveLength(0);
+    await expect(
+      db.query("select wellness_training_consent($1,true)", [other]),
+    ).rejects.toThrow("permission denied");
+    await db.exec("reset role");
+  });
+  it("module deletion removes corresponding training snapshots and all deletion removes consent", async () => {
+    await db.query("select wellness_training_consent($1,true)", [owner]);
+    for (const task of ["coach_program", "nutrition_text"])
+      await db.query("select wellness_training_submit($1,$2,$3,'{}',null)", [
+        owner,
+        task,
+        crypto.randomUUID(),
+      ]);
+    await db.query("select health_delete_module($1,'workouts')", [owner]);
+    expect(
+      (await db.query("select task from wellness_training_examples")).rows,
+    ).toEqual([{ task: "nutrition_text" }]);
+    await db.query("select health_delete_module($1,'all')", [owner]);
+    expect(
+      (await db.query("select * from wellness_training_examples")).rows,
+    ).toHaveLength(0);
+    expect(
+      (await db.query("select * from wellness_training_consents")).rows,
+    ).toHaveLength(0);
+  });
+  it("own adapters reserve a conservative budget and completed retries are free", async () => {
+    const job = crypto.randomUUID();
+    await db.query(
+      "select wellness_claim_owned_job($1,$2,'nutrition_text',$3)",
+      [job, owner, fingerprint],
+    );
+    expect(
+      (
+        await db.query<{ reserved_neurons: number }>(
+          "select reserved_neurons from private.wellness_ai_daily_usage",
+        )
+      ).rows[0].reserved_neurons,
+    ).toBe(1600);
+    await complete(job);
+    await db.query(
+      "select wellness_claim_owned_job($1,$2,'nutrition_text',$3)",
+      [job, owner, fingerprint],
+    );
+    expect(
+      (
+        await db.query<{ reserved_neurons: number }>(
+          "select reserved_neurons from private.wellness_ai_daily_usage",
+        )
+      ).rows[0].reserved_neurons,
+    ).toBe(1600);
   });
 });

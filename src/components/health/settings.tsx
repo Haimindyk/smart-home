@@ -6,6 +6,7 @@ import { profileSchema, type Payload } from "@/lib/health/model";
 import { csvEscape } from "@/lib/health/calculations";
 import { useHealthText } from "@/lib/health/i18n";
 import { healthFunction } from "@/lib/health/api";
+import { TrainingData } from "./training-data";
 import { ProfileJourney } from "./profile-journey";
 import { Field, Panel, SelectField, ErrorText } from "./shared";
 export function HealthSettings() {
@@ -151,6 +152,7 @@ export function HealthSettings() {
           </p>
 <Field label={h("יעד מים במ״ל", "Water target (ml)")} type="number" min={250} max={10000} value={profile.waterTarget} onChange={e=>patch("waterTarget",+e.target.value)}/><Button disabled={busy} onClick={()=>void persist()}>{h("שמירת העדפות", "Save preferences")}</Button></div></details>
       {data.nutrition_goals.length>0 && <details className="rounded-3xl border bg-card p-5"><summary className="font-semibold">{h("היסטוריית יעדים", "Goal history")}</summary>{[...data.nutrition_goals].sort((a,b)=>b.data.date.localeCompare(a.data.date)).map(g=><p className="mt-3 text-sm" key={g.id}>{g.data.date} · {g.data.kcal} kcal · P {g.data.protein} / C {g.data.carbs} / F {g.data.fat}</p>)}</details>}
+      <TrainingData/>
       <Panel title={h("הנתונים שלך", "Your data")}>
         <Button variant="outline" onClick={exportCsv}>
           {h("ייצוא CSV", "Export CSV")}
