@@ -111,11 +111,20 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    readFileSync(
+      new URL(
+        "../../supabase/migrations/20261104071640_wellness_coach_chat.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 }, 30000);
 afterAll(async () => db?.close());
 beforeEach(async () => {
   await db.exec(
-    "reset role;truncate public.wellness_training_examples,public.wellness_training_consents;truncate public.wellness_ai_jobs cascade;truncate private.wellness_ai_daily_usage,public.workout_plans,public.health_profiles,public.wellness_exercise_illustrations;",
+    "reset role;truncate public.wellness_chat_threads;truncate public.wellness_training_examples,public.wellness_training_consents;truncate public.wellness_ai_jobs cascade;truncate private.wellness_ai_daily_usage,public.workout_plans,public.health_profiles,public.wellness_exercise_illustrations;",
   );
 });
 describe("real Postgres quota, authorization and transactional proposals", () => {
@@ -417,5 +426,168 @@ describe("real Postgres quota, authorization and transactional proposals", () =>
         )
       ).rows[0].reserved_neurons,
     ).toBe(1600);
+  });
+  it("publishes a chat turn once with a consistent revision and private usage", async () => {
+    const state = (
+        await db.query<{ s: { generation: string; version: number } }>(
+          "select wellness_chat_state($1) s",
+          [owner],
+        )
+      ).rows[0].s,
+      job = crypto.randomUUID();
+    const args = [job, owner, state.generation, 0, fingerprint];
+    await db.query("select wellness_chat_claim($1,$2,$3,$4,$5)", args);
+    const publish = () =>
+      db.query("select wellness_chat_publish($1,$2,$3,0,$4,$5,false)", [
+        job,
+        owner,
+        state.generation,
+        "How much protein?",
+        JSON.stringify({
+          reply: "Review the saved target",
+          exerciseIds: [],
+          followUps: [],
+          topic: "nutrition",
+        }),
+      ]);
+    await publish();
+    await publish();
+    await db.query("select wellness_chat_claim($1,$2,$3,$4,$5)", args);
+    expect(
+      (await db.query("select * from wellness_chat_turns")).rows,
+    ).toHaveLength(1);
+    expect(
+      (
+        await db.query<{ s: { version: number; used: number } }>(
+          "select wellness_chat_state($1) s",
+          [owner],
+        )
+      ).rows[0].s,
+    ).toMatchObject({ version: 1, used: 1 });
+  });
+  it("clearing chat invalidates in-flight replies and preserves charged daily usage", async () => {
+    const state = (
+        await db.query<{ s: { generation: string } }>(
+          "select wellness_chat_state($1) s",
+          [owner],
+        )
+      ).rows[0].s,
+      job = crypto.randomUUID();
+    await db.query("select wellness_chat_claim($1,$2,$3,0,$4)", [
+      job,
+      owner,
+      state.generation,
+      fingerprint,
+    ]);
+    await db.query("select wellness_chat_clear($1)", [owner]);
+    await expect(
+      db.query(
+        "select wellness_chat_publish($1,$2,$3,0,'question','{}',false)",
+        [job, owner, state.generation],
+      ),
+    ).rejects.toThrow("request_conflict");
+    expect(
+      (await db.query("select * from wellness_chat_turns")).rows,
+    ).toHaveLength(0);
+    expect(
+      (
+        await db.query<{ s: { used: number } }>(
+          "select wellness_chat_state($1) s",
+          [owner],
+        )
+      ).rows[0].s.used,
+    ).toBe(1);
+  });
+  it("chat reads are owner-isolated and direct client claims are forbidden", async () => {
+    const state = (
+        await db.query<{ s: { generation: string } }>(
+          "select wellness_chat_state($1) s",
+          [owner],
+        )
+      ).rows[0].s,
+      job = crypto.randomUUID();
+    await db.query("select wellness_chat_claim($1,$2,$3,0,$4)", [
+      job,
+      owner,
+      state.generation,
+      fingerprint,
+    ]);
+    await db.query(
+      "select wellness_chat_publish($1,$2,$3,0,'private message','{}',false)",
+      [job, owner, state.generation],
+    );
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      other,
+    ]);
+    await db.exec("set role authenticated");
+    expect(
+      (await db.query("select * from wellness_chat_turns")).rows,
+    ).toHaveLength(0);
+    await expect(
+      db.query("select wellness_chat_state($1)", [owner]),
+    ).rejects.toThrow("permission denied");
+    await db.exec("reset role");
+  });
+  it("a stale chat revision is rejected before a new reservation", async () => {
+    const state = (
+      await db.query<{ s: { generation: string } }>(
+        "select wellness_chat_state($1) s",
+        [owner],
+      )
+    ).rows[0].s;
+    await expect(
+      db.query("select wellness_chat_claim($1,$2,$3,99,$4)", [
+        crypto.randomUUID(),
+        owner,
+        state.generation,
+        fingerprint,
+      ]),
+    ).rejects.toThrow("version_conflict");
+    expect(
+      (await db.query("select * from private.wellness_ai_daily_usage")).rows,
+    ).toHaveLength(0);
+  });
+  it("deleting either module removes mixed-context conversation history", async () => {
+    const state = (
+        await db.query<{ s: { generation: string } }>(
+          "select wellness_chat_state($1) s",
+          [owner],
+        )
+      ).rows[0].s,
+      job = crypto.randomUUID();
+    await db.query("select wellness_chat_claim($1,$2,$3,0,$4)", [
+      job,
+      owner,
+      state.generation,
+      fingerprint,
+    ]);
+    await db.query(
+      "select wellness_chat_publish($1,$2,$3,0,'meal and workout','{}',true)",
+      [job, owner, state.generation],
+    );
+    await db.query("select health_delete_module($1,'nutrition')", [owner]);
+    expect(
+      (await db.query("select * from wellness_chat_turns")).rows,
+    ).toHaveLength(0);
+    expect(
+      (await db.query("select * from wellness_ai_jobs")).rows,
+    ).toHaveLength(0);
+  });
+  it("chat has its own free daily quota with the shared account budget intact", async () => {
+    for (let i = 0; i < 40; i++) {
+      const id = crypto.randomUUID();
+      expect((await claim(id, owner, "chat")).state).toBe("claimed");
+      await complete(id);
+    }
+    expect((await claim(crypto.randomUUID(), owner, "chat")).state).toBe(
+      "quota",
+    );
+    expect(
+      (
+        await db.query<{ reserved_neurons: number }>(
+          "select reserved_neurons from private.wellness_ai_daily_usage",
+        )
+      ).rows[0].reserved_neurons,
+    ).toBe(8000);
   });
 });

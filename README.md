@@ -136,3 +136,8 @@ separate training consent, owner-approved examples, private export, grouped data
 pinned LoRA recipes, CPU training smoke test, held-out evaluation and version gates.
 The model registry is intentionally empty until real training, quality evaluation
 and a matching runtime probe succeed. No production owned weights are claimed yet.
+
+The Coach tab supports private multi-turn fitness/nutrition conversation, optional
+logged-diary context, catalog technique references and explicit history deletion.
+It uses the same free-only budget and provider consent; live model activation and
+quality evaluation still require the server's Cloudflare configuration.

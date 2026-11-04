@@ -18,3 +18,12 @@ select exists(select 1 from supabase_migrations.schema_migrations where version=
 insert into supabase_migrations.schema_migrations(version,name,statements)
 values('20261103203820','wellness_training_data',array['Applied from reviewed Git merge; see repository migration 20261103203820_wellness_training_data.sql']);
 \endif
+
+select exists(select 1 from supabase_migrations.schema_migrations where version='20261104071640') as chat_applied \gset
+\if :chat_applied
+\echo 'Chat migration already applied.'
+\else
+\ir ../supabase/migrations/20261104071640_wellness_coach_chat.sql
+insert into supabase_migrations.schema_migrations(version,name,statements)
+values('20261104071640','wellness_coach_chat',array['Applied from reviewed Git merge; see repository migration 20261104071640_wellness_coach_chat.sql']);
+\endif

@@ -30,4 +30,4 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-public-placeholder
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:wellness:ui
-      - run: pnpm dlx deno@2.9.6 check supabase/functions/wellness-training/index.ts supabase/functions/wellness-ai/index.ts supabase/functions/health-account/index.ts supabase/functions/health-maintenance/index.ts
+      - run: pnpm dlx deno@2.9.6 check supabase/functions/wellness-chat/index.ts supabase/functions/wellness-training/index.ts supabase/functions/wellness-ai/index.ts supabase/functions/health-account/index.ts supabase/functions/health-maintenance/index.ts

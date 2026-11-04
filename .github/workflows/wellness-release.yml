@@ -26,7 +26,7 @@ jobs:
       - run: pnpm test
       - run: pnpm typecheck
       - run: pnpm lint
-      - run: pnpm dlx deno@2.9.6 check supabase/functions/wellness-training/index.ts supabase/functions/wellness-ai/index.ts supabase/functions/health-account/index.ts supabase/functions/health-maintenance/index.ts
+      - run: pnpm dlx deno@2.9.6 check supabase/functions/wellness-chat/index.ts supabase/functions/wellness-training/index.ts supabase/functions/wellness-ai/index.ts supabase/functions/health-account/index.ts supabase/functions/health-maintenance/index.ts
       - name: Check release configuration
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
@@ -46,4 +46,4 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || secrets.SUPABASE_PROJECT_REF }}
-        run: pnpm dlx supabase@3.0.0 functions deploy wellness-training wellness-ai health-account health-maintenance --remote="$PROJECT_REF" --use-api --no-verify-jwt --yes
+        run: pnpm dlx supabase@3.0.0 functions deploy wellness-chat wellness-training wellness-ai health-account health-maintenance --remote="$PROJECT_REF" --use-api --no-verify-jwt --yes

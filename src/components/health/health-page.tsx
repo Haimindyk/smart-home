@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Leaf, Dumbbell, ChartNoAxesCombined, Settings2, ChevronRight } from "lucide-react";
+import { Leaf, Dumbbell, ChartNoAxesCombined, Settings2, ChevronRight, MessageCircle } from "lucide-react";
 import "./health.css";
 import { Button } from "@/components/ui/button";
 import { useHealthStore } from "@/lib/health/store";
@@ -14,6 +14,7 @@ import { useIdentity } from "@/lib/identity";
 import { healthFunction } from "@/lib/health/api";
 import { ErrorText } from "./shared";
 const Nutrition = dynamic(() => import("./nutrition").then((m) => m.Nutrition));
+const CoachChat = dynamic(() => import("./coach-chat").then(m=>m.CoachChat));
 const Workouts = dynamic(() => import("./workouts").then((m) => m.Workouts));
 const HealthProgress = dynamic(() =>
   import("./progress").then((m) => m.HealthProgress),
@@ -88,9 +89,10 @@ export function HealthPage() {
     ...(profile?.nutritionEnabled || profile?.workoutsEnabled
       ? [["progress", h("התקדמות", "Progress")]]
       : []),
+    ...((profile?.nutritionEnabled||profile?.workoutsEnabled)?[["coach",h("המאמן","Coach")]]:[]),
     ["settings", h("הגדרות", "Settings")],
   ];
-  const icons = { nutrition: Leaf, workouts: Dumbbell, progress: ChartNoAxesCombined, settings: Settings2 };
+  const icons = { coach:MessageCircle, nutrition: Leaf, workouts: Dumbbell, progress: ChartNoAxesCombined, settings: Settings2 };
   const active = tabs.some(([key]) => key === tab) ? tab : profile?.nutritionEnabled && state.data.nutrition_goals.length ? "nutrition" : !profile?.nutritionEnabled && profile?.workoutsEnabled ? "workouts" : "settings";
   return (
     <div className="health-app flex min-h-screen flex-1 flex-col">
@@ -106,7 +108,7 @@ export function HealthPage() {
           <h1 aria-label={h("הבריאות שלי", "My health")} className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{memberName ? `${h("שלום", "Hello")}, ${memberName}` : h("שלום", "Hello")}<span aria-hidden="true" className="health-dot">.</span></h1></div>
         </div>
         </>}
-        {active !== "settings" && !workoutFocus && <WeekPicker date={date} today={localDate(profile?.timezone??"Asia/Jerusalem")} onChange={setDate}/>}
+        {active !== "settings" && active !== "coach" && !workoutFocus && <WeekPicker date={date} today={localDate(profile?.timezone??"Asia/Jerusalem")} onChange={setDate}/>}
         {state.pending > 0 && (
           <p
             role="status"
@@ -170,6 +172,7 @@ export function HealthPage() {
               role="tabpanel"
               aria-labelledby={`health-tab-${active}`}
             >
+              {active === "coach" && <CoachChat key={state.owner} onNavigate={key=>setTab(key==="nutrition"&&!profile?.nutritionEnabled||key==="workouts"&&!profile?.workoutsEnabled?"settings":key)}/>}
               {active === "settings" && <HealthSettings key={state.owner} />}
               {active === "nutrition" && <Nutrition key={state.owner} date={date} onWorkout={()=>setTab(profile?.workoutsEnabled ? "workouts" : "settings")} />}{" "}
               {active === "workouts" && (

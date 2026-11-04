@@ -101,8 +101,9 @@ An unknown starting load remains unknown until the user records it.
    later requests. Show what changed; keep undo and manual editing available.
 
 The first release implements this loop for meal drafts and saved-plan proposals.
-A multi-turn assistant, today's-session adaptation, validated recovery scoring and
-longitudinal calorie coaching are future work, not capabilities claimed by this PR.
+The follow-up chat change adds private multi-turn conversation, optional diary
+summaries and catalog technique references. Today's-session adaptation, validated
+recovery scoring and longitudinal automatic calorie coaching remain future work.
 
 ## Fitness Buddy, the originally requested reference
 

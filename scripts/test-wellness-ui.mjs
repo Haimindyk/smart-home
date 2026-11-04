@@ -15,6 +15,7 @@ try {
     outfile: join(temp, "fixture.js"),
     bundle: true,
     jsx: "automatic",
+    define: { "process.env": "{}" },
     plugins: [
       {
         name: "synthetic-services",
@@ -76,7 +77,10 @@ try {
     const he = language === "he",
       page = await browser.newPage({ viewport: { width: 390, height: 844 } }),
       errors = [];
-    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("pageerror", (e) => {
+      errors.push(e.message);
+      process.stderr.write("Browser error: " + e.message + "\n");
+    });
     await page.goto(base + "/?lang=" + language);
     await page
       .getByRole("button", {
@@ -194,6 +198,80 @@ try {
       })
       .click();
     await optin.waitFor();
+    const composer = page.getByLabel(
+      he ? "מה תרצו לשאול?" : "What would you like to ask?",
+    );
+    await composer.fill(
+      he
+        ? "איך לחלק חלבון במשך היום?"
+        : "How should I spread protein through the day?",
+    );
+    await page
+      .getByRole("button", { name: he ? "שליחה למאמן" : "Send to coach" })
+      .click();
+    const conversation = page.getByRole("log", {
+      name: he ? "השיחה עם המאמן" : "Conversation with your coach",
+    });
+    await conversation.getByText(/בדקו את הכמויות הרשומות/).waitFor();
+    assert.equal(
+      (await actions(page)).filter((c) => c.action === "send").length,
+      1,
+    );
+    assert.equal(
+      (await actions(page)).find((c) => c.action === "send").diary,
+      false,
+      "diary is opt-in",
+    );
+    assert.equal(
+      (await actions(page)).filter((c) => c.action === "illustration").length,
+      0,
+      "closed references never start illustration generation",
+    );
+    assert.equal(
+      await page.evaluate(() => window.chatInjected),
+      undefined,
+      "model text cannot execute HTML",
+    );
+    await conversation.getByRole("button", { name: "איך לחלק חלבון?" }).click();
+    assert.equal(
+      (await actions(page)).filter((c) => c.action === "send").length,
+      1,
+      "follow-up inserts a draft without sending",
+    );
+    await page
+      .getByLabel(
+        he
+          ? "לצרף סיכום מהיומן שלי: ערכים שנרשמו היום, היעד השמור ואימונים אחרונים. בלי תמונות, שם או הערות אישיות."
+          : "Include a diary summary: today’s logged nutrients, saved target and recent workouts. No photos, name or personal notes.",
+      )
+      .check();
+    await page
+      .getByRole("button", { name: he ? "שליחה למאמן" : "Send to coach" })
+      .click();
+    assert.equal(
+      (await actions(page)).filter((c) => c.action === "send").at(-1).diary,
+      true,
+    );
+    await conversation.locator("section").nth(1).waitFor();
+    await page.reload();
+    await page.getByRole("log").locator("section").nth(1).waitFor();
+    assert(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+      "chat fits mobile width",
+    );
+    page.once("dialog", (dialog) => dialog.accept());
+    await page
+      .getByRole("button", { name: he ? "מחיקת שיחה" : "Clear chat" })
+      .click();
+    await page
+      .getByText(
+        he
+          ? "אפשר להתחיל משאלה: איך לחלק חלבון לאורך היום, או מה ההבדל בין Full Body ל־AB?"
+          : "Start with a question: how should I spread protein through the day, or how does Full Body compare with AB?",
+      )
+      .waitFor();
     assert.deepEqual(errors, []);
     await page.close();
   }
@@ -208,7 +286,7 @@ try {
   );
   await minor.close();
   console.log(
-    "PASS: Hebrew/English mobile proposal approval, food estimate confirmation, separate training consent, per-example approval/revocation, no automatic writes, adult gate. Synthetic services; live model not tested.",
+    "PASS: Hebrew/English mobile proposal approval, food estimate confirmation, separate training consent, per-example approval/revocation, no automatic writes, adult gate, chat follow-ups/history/deletion, opt-in context and escaped model text. Synthetic services; live model not tested.",
   );
 } finally {
   await browser?.close();
