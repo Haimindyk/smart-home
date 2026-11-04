@@ -71,6 +71,7 @@ export function ErrorText({ error }: { error: string | null }) {
   const h = useHealthText();
   if (!error) return null;
   const messages: Record<string, string> = {
+    chat_changed:h("השיחה השתנתה במכשיר אחר. בדקו את ההיסטוריה לפני שליחה חוזרת; הטיוטה נשמרה.","The conversation changed on another device. Check the history before resending; your draft is preserved."),
     sync_required: h("יש להמתין לסנכרון השינויים לפני שימוש במאמן.", "Wait for changes to sync before using the coach."),
     online_required: h("השימוש ב־AI דורש חיבור לאינטרנט.", "AI requires an internet connection."),
     consent_required: h("יש לאשר עיבוד ב־AI בהגדרות.", "Enable AI processing in Settings."),
@@ -101,8 +102,8 @@ export function ErrorText({ error }: { error: string | null }) {
       "Account changed. Sign in again.",
     ),
     not_configured: h(
-      "ניתוח התמונות עדיין לא הוגדר או לא עבר בדיקת חיבור. אפשר להזין ידנית.",
-      "Image analysis is not configured or has not passed its connection check. Use manual entry.",
+      "שירות ה־AI עדיין לא הוגדר או אינו זמין. אפשר להמשיך להזין ולערוך ידנית.",
+      "The AI service is not configured or available. You can continue entering and editing manually.",
     ),
     rate_limited: h(
       "מכסת הספק נוצלה או נשלחו בקשות מהר מדי. אפשר להמשיך ידנית ולנסות שוב מאוחר יותר.",

@@ -4,7 +4,7 @@ import {
   makeProgram,
   parsePreferences,
 } from "../../../supabase/functions/_shared/wellness-core";
-const calls: { action: string; table?: string }[] = [];
+const calls: { action: string; table?: string; diary?: boolean }[] = [];
 const profile = {
   id: crypto.randomUUID(),
   version: 1,
@@ -75,13 +75,80 @@ export const createClient = () => ({
     }),
   },
 });
+const storedChat = JSON.parse(localStorage.getItem("synthetic-chat") ?? "null");
+let chatGeneration = storedChat?.generation ?? crypto.randomUUID(),
+  chatUsed = storedChat?.used ?? 0,
+  chatTurns: {
+    id: string;
+    user_text: string;
+    answer: unknown;
+    shared_diary: boolean;
+    created_at: string;
+  }[] = storedChat?.turns ?? [];
+function persistChat() {
+  localStorage.setItem(
+    "synthetic-chat",
+    JSON.stringify({
+      generation: chatGeneration,
+      used: chatUsed,
+      turns: chatTurns,
+    }),
+  );
+}
 let consent = false,
   contributions = 0;
 export async function healthFunction(
   name: string,
   input: Record<string, unknown>,
 ) {
-  calls.push({ action: String(input.action) });
+  calls.push({
+    action: String(input.action),
+    ...(name === "wellness-chat"
+      ? { diary: input.includeDiary as boolean }
+      : {}),
+  });
+  if (name === "wellness-chat") {
+    if (input.action === "state")
+      return {
+        generation: chatGeneration,
+        version: chatTurns.length,
+        used: chatUsed,
+        limit: 40,
+        available: true,
+        turns: chatTurns,
+        resetAt: new Date().toISOString(),
+      };
+    if (input.action === "clear") {
+      chatTurns = [];
+      chatGeneration = crypto.randomUUID();
+      persistChat();
+      return { ok: true };
+    }
+    if (input.action === "send") {
+      chatUsed++;
+      const answer = {
+        reply:
+          "בדקו את הכמויות הרשומות. <script>window.chatInjected=true</script>",
+        exerciseIds: ["Push_Up"],
+        followUps: ["איך לחלק חלבון?"],
+        topic: "nutrition",
+      };
+      chatTurns.push({
+        id: String(input.requestId),
+        user_text: String(input.message),
+        answer,
+        shared_diary: input.includeDiary === true,
+        created_at: new Date().toISOString(),
+      });
+      persistChat();
+      return {
+        id: input.requestId,
+        answer,
+        version: chatTurns.length,
+        generation: chatGeneration,
+      };
+    }
+  }
   if (name === "wellness-training") {
     if (input.action === "status")
       return { enabled: consent, count: contributions };

@@ -20,9 +20,9 @@ The free plan's refusal at exhaustion is the final no-spend boundary. Do not ena
 this service on a paid/shared account expecting the app counter to guarantee cost.
 
 The database atomically reserves up to 8,000 estimated neurons/day across all users.
-Conservative reservations: photo 350, text 150, coach 450, illustration 200.
+Conservative reservations: photo 350, text 150, coach 450, illustration 200; chat 200.
 Per adult user/day: 5 photo analyses, 20 text analyses, 10 coach requests (including
-restore proposals), 5 newly generated illustrations. One active job/user, two/account.
+restore proposals), 5 newly generated illustrations, plus 40 chat requests (also subject to the shared account budget). One active job/user, two/account.
 Reservations are estimates, not provider metering; failed/interrupted attempts retain
 reservations. There is no retry loop, paid fallback or automatic model substitution.
 
@@ -52,7 +52,7 @@ No new Vercel client secrets are needed.
    if repository settings allow it. Never put a database password in the workflow.
 5. Review and merge the PR. The release workflow checks out exactly
    `pull_request.merge_commit_sha`, validates, applies the additive migration in one
-   SQL transaction, then deploys only the four functions from that commit. It has
+   SQL transaction, then deploys only the five functions from that commit. It has
    no manual dispatch or preview deployment. Functions perform their own
    `auth.getUser` and membership checks (`--no-verify-jwt` only disables the gateway's
    legacy JWT check, not application authentication).
@@ -115,3 +115,38 @@ real training, held-out evaluation and a matching runtime probe succeed. Inferen
 consent does not authorize training; contributions are submitted individually and
 remain unreviewed until curated. Training submissions have separate retention until
 withdrawal/module deletion, rather than the inference jobs' 30-day retention.
+
+
+## Fitness and nutrition conversation
+
+The Coach tab adds private persistent multi-turn chat through `wellness-chat`.
+It handles nutrition, food questions, exercise choices and technique; it does not
+claim to be a licensed clinician or dietitian and cannot change a saved meal,
+goal or program. The client renders answers as text, with only catalog-validated
+exercise references. Follow-up buttons fill a draft and do not send automatically.
+
+Conversation context includes only recent bounded turns. Sharing today's logged
+nutrients/confirmed goal and a bounded recent workout summary is an explicit unchecked
+option. Missing diary entries are labelled as unknown completeness, never inferred
+as fasting or zero total intake. Names, PINs, photos and freeform diary notes are not
+added to the summary. The visible history shows up to 40 recent turns, retained up
+to 30 days via inference-job cleanup. It is not used automatically for training.
+
+Chat has a 40-request/user/day ceiling and reserves 200 estimated neurons/request
+within the same 8,000/day family budget as food and workout inference. Busy,
+provider-limited and quota-exhausted states keep the user's draft; there is no paid
+fallback. Reset is at 00:00 UTC. This is all-day access within free limits, not
+unlimited usage or a guarantee of provider capacity.
+
+Approvals and thread revisions are server-enforced. Retries are idempotent; stale
+multi-device sends fail before new budget reservations. Clearing a conversation
+changes its generation and removes its jobs/turns so late inference cannot recreate
+it. Usage counters are retained, preventing quota bypass through deletion. Deleting
+either health module also clears the mixed-context conversation for privacy.
+
+Chat is enabled only when the existing adult/profile consent and Cloudflare free-only
+configuration are ready. Hosted chat uses the existing Qwen adapter; owned-model mode
+fails closed because our meal/program training recipes do not qualify a chat model.
+No hosted or own-model answer quality is claimed by deterministic software tests.
+The GPU training and live provider-quality requirements documented in `ml/README.md`
+remain separate from implementing a conversation UI and history storage.
