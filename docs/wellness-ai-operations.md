@@ -8,7 +8,9 @@ are complete. Manual nutrition/workout logging continues to work.
 
 The app owns consent, data, validation, quotas and approval. Supabase Edge Functions
 call replaceable pretrained Workers AI models: Qwen3-30B-A3B-FP8 for structured text,
-Llama-3.2-11B-Vision for photo observations, and FLUX.1 Schnell for illustrations.
+Llama-3.2-11B-Vision for photo observations, Llama-3.3-70B for schema-constrained
+photo normalization, and FLUX.1 Schnell for illustrations. Packaged-product
+barcode/printed-label entry never uses generative AI; see [food data](wellness-food-data.md).
 This is not a newly trained proprietary model or an always-on GPU server.
 
 [Cloudflare pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/)
@@ -20,7 +22,7 @@ The free plan's refusal at exhaustion is the final no-spend boundary. Do not ena
 this service on a paid/shared account expecting the app counter to guarantee cost.
 
 The database atomically reserves up to 8,000 estimated neurons/day across all users.
-Conservative reservations: photo 350, text 150, coach 450, illustration 200; chat 200.
+Conservative reservations: photo 650, text 150, coach 450, illustration 200; chat 200.
 Per adult user/day: 5 photo analyses, 20 text analyses, 10 coach requests (including
 restore proposals), 5 newly generated illustrations, plus 40 chat requests (also subject to the shared account budget). One active job/user, two/account.
 Reservations are estimates, not provider metering; failed/interrupted attempts retain
@@ -52,7 +54,7 @@ No new Vercel client secrets are needed.
    if repository settings allow it. Never put a database password in the workflow.
 5. Review and merge the PR. The release workflow checks out exactly
    `pull_request.merge_commit_sha`, validates, applies the additive migration in one
-   SQL transaction, then deploys only the five functions from that commit. It has
+   SQL transaction, then deploys only the seven functions from that commit. It has
    no manual dispatch or preview deployment. Functions perform their own
    `auth.getUser` and membership checks (`--no-verify-jwt` only disables the gateway's
    legacy JWT check, not application authentication).
@@ -157,3 +159,7 @@ See [2026-11-04 live validation](wellness-live-validation.md). Connectivity and
 label extraction worked, but mixed-meal vision/normalization failed the quality
 gate. Keep inference disabled until the remaining evaluations and authenticated
 application path pass.
+
+The photo/label follow-up supersedes the initial failed normalization contract;
+see [food data and validation](wellness-food-data.md). It does not claim validated
+portion accuracy or change the global AI enablement flag.

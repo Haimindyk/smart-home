@@ -120,6 +120,15 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    readFileSync(
+      new URL(
+        "../../supabase/migrations/20261104200318_wellness_photo_budget.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 }, 30000);
 afterAll(async () => db?.close());
 beforeEach(async () => {
@@ -138,6 +147,15 @@ describe("real Postgres quota, authorization and transactional proposals", () =>
       "select calls from private.wellness_ai_daily_usage",
     );
     expect(usage.rows[0].calls.nutrition_text).toBe(1);
+  });
+  it("reserves the larger photo model cost without changing shared free limits", async () => {
+    expect(
+      (await claim(crypto.randomUUID(), owner, "nutrition_photo")).state,
+    ).toBe("claimed");
+    const result = await db.query<{ reserved_neurons: number }>(
+      "select reserved_neurons from private.wellness_ai_daily_usage",
+    );
+    expect(result.rows[0].reserved_neurons).toBe(650);
   });
   it("rejects reuse by another owner or with different content", async () => {
     const id = crypto.randomUUID();

@@ -141,3 +141,7 @@ The Coach tab supports private multi-turn fitness/nutrition conversation, option
 logged-diary context, catalog technique references and explicit history deletion.
 It uses the same free-only budget and provider consent; live model activation and
 quality evaluation still require the server's Cloudflare configuration.
+
+Packaged-food nutrition uses barcode lookup or confirmed printed label values,
+without AI estimates. Meal photos expose uncertain ingredients and require review;
+see [food data](docs/wellness-food-data.md).

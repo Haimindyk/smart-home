@@ -64,6 +64,7 @@ export function failure(e: unknown) {
     "not_found",
     "provider_failed",
     "invalid_output",
+    "label_lookup_required",
   ];
   return json(
     { error: known.includes(code) ? code : "failed" },

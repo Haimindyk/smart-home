@@ -82,17 +82,15 @@ export async function analyzeImage(
   model: string,
   bytes: Uint8Array,
   mime: string,
-  mode: "meal" | "label",
+  mode: "meal",
   description: string,
 ) {
   if (!/^[a-zA-Z0-9._-]+$/.test(model)) throw new Error("not_configured");
   let binary = "";
   for (let i = 0; i < bytes.length; i += 8192)
     binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-  const prompt =
-    mode === "label"
-      ? "Read the actual nutrition label. Do not infer product nutrition from brand, appearance or prior knowledge. Normalize label values to 100 g or 100 ml, explicitly noting the printed basis and conversion in assumption. quantity is the printed serving size if known, otherwise 100. kcal means kilocalories, sodium is milligrams (convert grams to mg and salt/2.5 to sodium only if needed). Missing kcal, protein, carbs, fat or ambiguous basis: return no items, needsClarification=true and ask for a clearer label. Missing optional nutrients must be null, never zero."
-      : "Identify visible edible components. Estimate an editable quantity in grams (or ml for liquids) and nutrition per 100 g/ml. Distinguish raw/cooked food. Explain assumptions for oil, sauces and hidden ingredients; don't claim to see them. When quantity or identity cannot reasonably be estimated, return needsClarification=true with a short question. Nutrient values are estimates, not laboratory measurements. Missing optional nutrients must be null.";
+  if (mode !== "meal") throw new Error("label_lookup_required");
+  const prompt = "Identify visible edible components. Estimate editable quantities in grams or ml for liquids. Values are estimates, not measurements. Distinguish raw/cooked food and explain uncertainty. Do not claim to see hidden oil or sauces. Return needsClarification=true if identity or quantity is ambiguous. Unknown optional nutrients must be null.";
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {

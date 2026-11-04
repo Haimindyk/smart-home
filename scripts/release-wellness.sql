@@ -27,3 +27,12 @@ select exists(select 1 from supabase_migrations.schema_migrations where version=
 insert into supabase_migrations.schema_migrations(version,name,statements)
 values('20261104071640','wellness_coach_chat',array['Applied from reviewed Git merge; see repository migration 20261104071640_wellness_coach_chat.sql']);
 \endif
+
+select exists(select 1 from supabase_migrations.schema_migrations where version='20261104200318') as photo_budget_applied \gset
+\if :photo_budget_applied
+\echo 'Photo budget migration already applied.'
+\else
+\ir ../supabase/migrations/20261104200318_wellness_photo_budget.sql
+insert into supabase_migrations.schema_migrations(version,name,statements)
+values('20261104200318','wellness_photo_budget',array['Applied from reviewed Git merge; see repository migration 20261104200318_wellness_photo_budget.sql']);
+\endif

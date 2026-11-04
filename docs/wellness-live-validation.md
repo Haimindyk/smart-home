@@ -69,3 +69,13 @@ https://images.unsplash.com/photo-1546069901-ba9599a7e63c
 The label image was synthetic: per 100 g, 250 kcal, protein 10 g, carbohydrate
 30 g, fat 10 g, sodium 400 mg; eaten portion 40 g. No personal images or diary
 records were sent to a model.
+
+## Follow-up implementation
+
+The same PR now adds [product data and meal normalization](wellness-food-data.md).
+Label values no longer come from AI, including in the legacy endpoint/probe.
+Photo normalization explicitly selects Llama 3.3 70B, fixes canonical units and
+known-name translations, and excludes ambiguous foods pending user correction.
+A regression of the failed meal photo now passes these contract checks. This
+does not complete the broad accuracy benchmark or authenticated application test;
+keep the global enablement flag false until those remaining gates pass.

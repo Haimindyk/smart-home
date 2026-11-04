@@ -5,6 +5,7 @@ import {
   json,
   requireUser,
 } from "../_shared/health-http.ts";
+import { openFoodFactsProduct } from "../_shared/food-product.ts";
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -40,26 +41,41 @@ Deno.serve(async (req) => {
         ).slice(0, 30),
       });
     }
-    const { data: personal } = await admin
+    const labelOnly = input.labelOnly === true;
+    let personalQuery = admin
       .from("personal_foods")
       .select("data")
       .eq("owner_user_id", user.id)
       .eq("data->>barcode", barcode)
       .is("deleted_at", null)
       .limit(1);
+    if (labelOnly)
+      personalQuery = personalQuery
+        .eq("data->>source", "label")
+        .eq("data->>sourceId", "label:printed-confirmed:v1");
+    const { data: personal, error: personalError } = await personalQuery;
+    if (personalError) throw new Error("failed");
     if (personal?.length) return json({ foods: personal.map((r) => r.data) });
-    const key = `off:${barcode}`;
+    const key = `off:v2:${barcode}`;
     const { data: cached } = await admin
       .from("food_catalog")
       .select("data,updated_at")
       .eq("source_key", key)
       .maybeSingle();
-    if (cached && Date.parse(cached.updated_at) > Date.now() - 30 * 86400000)
-      return json({ foods: [cached.data] });
+    const validCached =
+      cached?.data?.source === "openfoodfacts" &&
+      ["g", "ml"].includes(cached?.data?.basis)
+        ? cached
+        : null;
+    if (
+      validCached &&
+      Date.parse(validCached.updated_at) > Date.now() - 30 * 86400000
+    )
+      return json({ foods: [validCached.data] });
     let res: Response;
     try {
       res = await fetch(
-        `https://world.openfoodfacts.org/api/v2/product/${barcode}.json?fields=product_name,product_name_he,nutriments,nutrition_data_per,serving_quantity,product_quantity_unit`,
+        `https://world.openfoodfacts.org/api/v2/product/${barcode}.json?fields=product_name,product_name_he,nutriments,nutrition_data_per`,
         {
           headers: {
             "User-Agent":
@@ -69,27 +85,17 @@ Deno.serve(async (req) => {
         },
       );
     } catch {
-      if (cached) return json({ foods: [cached.data], stale: true });
+      if (validCached) return json({ foods: [validCached.data], stale: true });
       throw new Error("provider_failed");
     }
     if (!res.ok) {
-      if (cached) return json({ foods: [cached.data], stale: true });
+      if (validCached) return json({ foods: [validCached.data], stale: true });
       throw new Error(res.status === 429 ? "rate_limited" : "provider_failed");
     }
     const result = await res.json();
     const p = result.product;
-    const n = p?.nutriments;
-    const value = (key: string) =>
-      typeof n?.[key] === "number" && Number.isFinite(n[key]) && n[key] >= 0
-        ? n[key]
-        : null;
-    const required = [
-      "energy-kcal_100g",
-      "proteins_100g",
-      "carbohydrates_100g",
-      "fat_100g",
-    ];
-    if (result.status !== 1 || required.some((k) => value(k) === null)) {
+    const data = openFoodFactsProduct(result, barcode);
+    if (!data) {
       const { data: known } = await admin
         .from("barcode_products")
         .select("product_name")
@@ -102,28 +108,6 @@ Deno.serve(async (req) => {
         needsLabel: true,
       });
     }
-    const data = {
-      id: key,
-      name: p.product_name_he || p.product_name || barcode,
-      barcode,
-      basis:
-        p.nutrition_data_per === "100ml" || p.product_quantity_unit === "ml"
-          ? "ml"
-          : "g",
-      source: "openfoodfacts",
-      sourceId: `https://world.openfoodfacts.org/product/${barcode}`,
-      per100: {
-        kcal: value("energy-kcal_100g"),
-        protein: value("proteins_100g"),
-        carbs: value("carbohydrates_100g"),
-        fat: value("fat_100g"),
-        fiber: value("fiber_100g"),
-        sugar: value("sugars_100g"),
-        saturatedFat: value("saturated-fat_100g"),
-        sodium:
-          value("sodium_100g") === null ? null : value("sodium_100g")! * 1000,
-      },
-    };
     // OFF data stays a separately attributed source; user corrections never overwrite it.
     await admin.from("food_catalog").upsert({
       source_key: key,

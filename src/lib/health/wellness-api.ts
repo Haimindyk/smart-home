@@ -22,7 +22,7 @@ export async function wellnessRequest<T>(
 }
 export async function estimateMeal(input: {
   requestId: string;
-  mode: "text" | "meal" | "label";
+  mode: "text" | "meal";
   description: string;
   imagePath?: string;
 }) {

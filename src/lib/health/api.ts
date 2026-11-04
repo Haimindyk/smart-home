@@ -29,12 +29,12 @@ export async function healthFunction<T>(
   if (data?.error) throw new Error(data.error);
   return data as T;
 }
-export async function lookupFood(query: string, barcode?: string) {
+export async function lookupFood(query: string, barcode?: string, labelOnly = false, expectedOwner?: string) {
   const data = await healthFunction<{
     foods: unknown[];
     name?: string;
     needsLabel?: boolean;
-  }>("food-lookup", { query, barcode });
+  }>("food-lookup", { query, barcode, labelOnly }, expectedOwner);
   return { ...data, foods: z.array(foodSchema).parse(data.foods) };
 }
 export async function prepareImage(file: File): Promise<Blob> {
@@ -88,7 +88,7 @@ export async function uploadMealImage(file: File, owner: string) {
 export async function analyzeMeal(
   path: string,
   requestId: string,
-  mode: "meal" | "label",
+  mode: "meal",
   description: string,
 ): Promise<Analysis> {
   const raw = await healthFunction<{
@@ -112,7 +112,7 @@ export async function analyzeMeal(
         id: crypto.randomUUID(),
         name: i.name,
         basis: i.basis,
-        source: i.source ?? (mode === "label" ? "label" : "ai"),
+        source: i.source ?? "ai",
         sourceId: i.sourceId,
         per100: i.per100,
       },
