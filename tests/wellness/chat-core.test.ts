@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   parseChatAnswer,
+  symptomReply,
   chatMessage,
   chatVersion,
   historyForModel,
@@ -99,5 +100,24 @@ describe("chat data contract and privacy", () => {
       loggedMealCount: 0,
       dayLoggingCompleteness: "unknown",
     });
+  });
+});
+
+describe("symptom routing", () => {
+  it("never generates exercise adjustments for a painful movement", () => {
+    for (const message of ["כואבת לי הברך בסקוואט, להוסיף משקל?", "I have knee pain, should I push through?", "נפצעתי באימון"]) {
+      const answer = symptomReply(message);
+      expect(answer).not.toBeNull();
+      expect(answer!.exerciseIds).toEqual([]);
+      expect(answer!.reply).toMatch(/הפסק|stop/);
+      expect(() => parseChatAnswer(answer)).not.toThrow();
+    }
+  });
+  it("routes urgent symptoms to urgent help without a diagnosis", () => {
+    expect(symptomReply("יש כאב בחזה וקוצר נשימה")!.reply).toContain("101");
+    expect(symptomReply("chest pain while exercising")!.reply).toContain("urgent medical help");
+  });
+  it("leaves ordinary exercise and nutrition questions to the coach", () => {
+    expect(symptomReply("איך עושים סקוואט? ועצות לארוחת ערב" )).toBeNull();
   });
 });

@@ -71,6 +71,10 @@ export function ErrorText({ error }: { error: string | null }) {
   const h = useHealthText();
   if (!error) return null;
   const messages: Record<string, string> = {
+    photo_review_required: h("יש לבדוק ולתקן את כל המרכיבים והכמויות לפני שמירת הערכת תמונה.", "Review and correct all ingredients and portions before saving a photo estimate."),
+    label_lookup_required: h("ערכי תווית מתקבלים מברקוד או מהעתקת הנתונים המודפסים, ללא הערכת AI.", "Use a barcode or copy printed label values; AI label estimation is disabled."),
+    label_confirmation_required: h("יש לבדוק ולאשר שהנתונים תואמים לאריזה.", "Check and confirm that the values match the package."),
+    label_values_required: h("יש להזין קלוריות, חלבון, פחמימות ושומן מהתווית. אין להשלים ערכים חסרים בהערכה.", "Enter the printed calories, protein, carbohydrate and fat. Missing values must not be estimated."),
     chat_changed:h("השיחה השתנתה במכשיר אחר. בדקו את ההיסטוריה לפני שליחה חוזרת; הטיוטה נשמרה.","The conversation changed on another device. Check the history before resending; your draft is preserved."),
     sync_required: h("יש להמתין לסנכרון השינויים לפני שימוש במאמן.", "Wait for changes to sync before using the coach."),
     online_required: h("השימוש ב־AI דורש חיבור לאינטרנט.", "AI requires an internet connection."),

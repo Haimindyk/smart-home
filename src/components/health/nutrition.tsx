@@ -26,6 +26,7 @@ import { FoodLibrary } from "./food-library";
 import { estimateMeal, combineMealPhotos } from "@/lib/health/wellness-api";
 import { AiConsent, useWellnessAvailability } from "./ai-consent";
 import { NutrientRing } from "./nutrient-ring";
+import { ProductLabel } from "./product-label";
 const kinds = ["breakfast", "lunch", "dinner", "snack"] as const;
 function MealImage({ path }: { path: string }) {
   const [url, setUrl] = useState("");
@@ -424,10 +425,11 @@ function MealEditor({
   const [photo, setPhoto] = useState<File | null>(null),
     [requestId, setRequestId] = useState(() => crypto.randomUUID()),
     [question, setQuestion] = useState("");
+  const [photoReviewRequired, setPhotoReviewRequired] = useState(false), [photoReviewed, setPhotoReviewed] = useState(false);
   const [recipeName, setRecipeName] = useState(""),
     [servings, setServings] = useState(1);
   async function analyze() {
-    if (!owner || (mode!=="text"&&!photo)) return;
+    if (!owner || mode === "label" || (mode!=="text"&&!photo)) return;
     setBusy(true);
     setError(null);
     try {
@@ -443,6 +445,7 @@ function MealEditor({
       const result=await estimateMeal({requestId,mode,description,...(path?{imagePath:path}:{})});
       setMeal((m) => ({ ...m, items: result.items }));
       setQuestion(result.question);
+      setPhotoReviewRequired(mode === "meal"); setPhotoReviewed(false);
       if (!result.items.length && !result.question)
         setQuestion(
           h(
@@ -457,6 +460,7 @@ function MealEditor({
     }
   }
   async function persist() {
+    if (photoReviewRequired && !photoReviewed) { setError("photo_review_required"); return; }
     setBusy(true);
     setError(null);
     try {
@@ -541,21 +545,24 @@ function MealEditor({
         </details>
         {(capture||foodMode==="text")&&<section className="meal-photo-entry rounded-xl border p-4" aria-label={h("הערכת ארוחה עם AI","AI meal estimate")}>
           <h3 className="font-semibold">{h("ספרו מה אכלתם — בתמונה או במילים","Tell us what you ate — photos or words")}</h3>
-          <div className="mt-3 grid gap-3"><AiConsent/>
+          <div className="mt-3 grid gap-3">
             <SelectField label={h("איך להזין?","Input method")} value={mode} onChange={e=>{setMode(e.target.value as typeof mode);setMeal(m=>({...m,imagePath:null}));setSecondPhoto(null);setRequestId(crypto.randomUUID());}}>
-              <option value="meal">{h("צילום ארוחה","Meal photo")}</option><option value="label">{h("תווית תזונתית","Nutrition label")}</option><option value="text">{h("כתיבה חופשית","Free text")}</option>
+              <option value="meal">{h("צילום ארוחה","Meal photo")}</option><option value="label">{h("מוצר ארוז — ברקוד או תווית","Packaged product — barcode or label")}</option><option value="text">{h("כתיבה חופשית","Free text")}</option>
             </SelectField>
+            {mode === "label" ? <ProductLabel key={owner} onAdd={item => setMeal(m => ({ ...m, items: [...m.items, item] }))}/> : <>
+            <AiConsent/>
             {mode!=="text"&&<><Field label={h("צילום או העלאת תמונה","Take or upload a photo")} type="file" accept="image/*" onChange={e=>{setPhoto(e.target.files?.[0]??null);setMeal(m=>({...m,imagePath:null}));setRequestId(crypto.randomUUID());}}/>
               {mode==="meal"&&<Field label={h("תמונה שנייה של אותה מנה מהצד (אופציונלי)","Second side view of the same meal (optional)")} type="file" accept="image/*" onChange={e=>{setSecondPhoto(e.target.files?.[0]??null);setMeal(m=>({...m,imagePath:null}));setRequestId(crypto.randomUUID());}}/>}</>}
             <label className="grid gap-2 text-sm"><span>{mode==="text"?h("מה אכלתם וכמה?","What did you eat, and how much?"):h("הסבר על המרכיבים והכמות","Food and portion details")}</span><textarea className="min-h-24 rounded-xl border bg-background p-3 text-foreground" maxLength={2500} value={description} placeholder={h("למשל: שתי ביצים, חצי פיתה ושתי כפות קוטג׳","For example: two eggs, half a pita and two tablespoons of cottage cheese")} onChange={e=>{setDescription(e.target.value);setRequestId(crypto.randomUUID());}}/></label>
             <p className="text-xs leading-6 text-muted-foreground">{h("הכמויות והערכים הם אומדן. בדקו גם שמן, רטבים ואופן הכנה. הניתוח יחליף את פריטי הטיוטה; שום דבר לא יתווסף ליומן לפני אישור ושמירה.","Amounts and nutrition are estimates. Check oil, sauces and preparation. Analysis replaces draft items; nothing enters your diary until you approve and save.")}</p>
             <Button variant="outline" disabled={busy||!availability.ready||(mode==="text"?!description.trim():!photo)} onClick={()=>void analyze()}>{busy?h("מכין הערכה…","Estimating…"):h("הערכת הארוחה לבדיקה","Estimate meal for review")}</Button>
             {question&&<p role="status" className="rounded-xl bg-amber-500/10 p-3 text-sm">{question}</p>}
-            {meal.imagePath&&<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={keepPhoto} onChange={e=>setKeepPhoto(e.target.checked)}/>{h("שמירת התמונה ביומן (אחרת תימחק לאחר 24 שעות)","Keep the photo in my diary (otherwise removed after 24 hours)")}</label>}
+            </>}
+            {mode !== "label" && meal.imagePath&&<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={keepPhoto} onChange={e=>setKeepPhoto(e.target.checked)}/>{h("שמירת התמונה ביומן (אחרת תימחק לאחר 24 שעות)","Keep the photo in my diary (otherwise removed after 24 hours)")}</label>}
           </div>
         </section>}
         {capture && <Button variant="outline" onClick={onBrowse}>{h("חיפוש או הוספת מזון ידנית", "Search or add food manually")}</Button>}
-        {!capture && <div className="meal-search-section"><p className="mb-3 text-sm font-semibold">{h("חיפוש מזון או מוצר", "Find a food or product")}</p>
+        {(!capture || photoReviewRequired) && <div className="meal-search-section"><p className="mb-3 text-sm font-semibold">{h("חיפוש מזון או מוצר", "Find a food or product")}</p>
         <FoodPicker initialMode={foodMode==="text"?"search":foodMode}
           onAdd={(item) =>
             setMeal((m) => ({ ...m, items: [...m.items, item] }))
@@ -667,8 +674,10 @@ function MealEditor({
           {round(totals.kcal)} kcal · P {round(totals.protein)} / C{" "}
           {round(totals.carbs)} / F {round(totals.fat)}
         </strong>
+        {photoReviewRequired && !photoReviewed && <p className="text-sm text-amber-700">{h("הסכום כולל רק את הפריטים שברשימה. מרכיבים שלא זוהו בביטחון אינם נכללים; יש להוסיף ולתקן לפני אישור.", "The total includes listed items only. Uncertain ingredients are excluded; add missing foods and make corrections before confirming.")}</p>}
+        {photoReviewRequired && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={photoReviewed} onChange={e => setPhotoReviewed(e.target.checked)}/>{h("בדקתי את המרכיבים והכמויות, תיקנתי זיהויים והוספתי מרכיבים חסרים", "I checked ingredients and portions, corrected identities and added missing foods")}</label>}
         <Button
-          disabled={busy || !meal.items.length}
+          disabled={busy || !meal.items.length || (photoReviewRequired && !photoReviewed)}
           onClick={() => void persist()}
         >
           {h("אישור והוספה ליומן", "Confirm & save to diary")}

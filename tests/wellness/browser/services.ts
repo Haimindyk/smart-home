@@ -65,7 +65,10 @@ export const useHealthStore = create(() => ({
 }));
 export const useHealthText = () => (he: string, en: string) =>
   document.documentElement.lang === "he" ? he : en;
-export const lookupFood = async () => ({ foods: [] });
+export const lookupFood = async (_query: string, barcode?: string, labelOnly?: boolean) => {
+  calls.push({ action: labelOnly ? "label-lookup" : "food-lookup" });
+  return barcode === "12345678" ? { foods: [{ id: "off:12345678", name: "Synthetic packaged food", barcode, basis: "g", source: "openfoodfacts", per100: {kcal:250,protein:10,carbs:30,fat:10,fiber:null,sugar:null,saturatedFat:null,sodium:400} }] } : {foods:[], needsLabel:true, name:""};
+};
 export const uploadMealImage = async () =>
   `${useHealthStore.getState().owner}/test.jpg`;
 export const createClient = () => ({
@@ -166,7 +169,7 @@ export async function healthFunction(
     return { examples: [] };
   }
   if (input.action === "capabilities")
-    return { available: true, serviceReady: true };
+    return { available: !new URLSearchParams(location.search).has("ai-off"), serviceReady: true };
   if (input.action === "program")
     return {
       ...makeProgram(

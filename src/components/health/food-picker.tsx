@@ -171,8 +171,8 @@ export function FoodPicker({ onAdd, initialMode }: { onAdd: (item: MealItem) => 
         <p role="status" className="text-sm text-muted-foreground">
           {missing} —{" "}
           {h(
-            "אין ערכים מלאים. צלמו תווית או הזינו ידנית.",
-            "No complete nutrition data. Scan a label or enter manually.",
+            "אין ערכים מלאים. הזינו את הערכים המודפסים מהאריזה.",
+            "No complete nutrition data. Enter the printed package values.",
           )}
         </p>
       )}

@@ -143,6 +143,31 @@ try {
       !(await actions(page)).some((c) => c.table === "meals"),
       "food estimate never auto-saves",
     );
+    const nutritionCalls = (await actions(page)).filter(c => c.action === "nutrition").length;
+    await page.getByLabel(he ? "איך להזין?" : "Input method").selectOption("label");
+    const labelSection = page.getByRole("region", {name: he ? "ערכי מוצר מהאריזה" : "Product label values"});
+    await labelSection.getByLabel(he ? "ברקוד המוצר" : "Product barcode", {exact:true}).fill("12345678");
+    await labelSection.getByRole("button", {name: he ? "איתור מוצר" : "Find product", exact:true}).click();
+    await labelSection.getByText("Synthetic packaged food", {exact:true}).waitFor();
+    const addProduct = labelSection.getByRole("button", {name:he ? "הוספת המוצר לטיוטה" : "Add product to draft"});
+    assert(await addProduct.isDisabled(), "database values require package confirmation");
+    const labelConfirm = labelSection.getByLabel(he ? "בדקתי שהמוצר, היחידה והערכים תואמים לאריזה" : "I checked that the product, unit and values match the package");
+    await labelConfirm.check(); await addProduct.click();
+    await labelSection.getByLabel(he ? "ברקוד המוצר" : "Product barcode", {exact:true}).fill("87654321");
+    await labelSection.getByRole("button", {name:he ? "איתור מוצר" : "Find product", exact:true}).click();
+    const printedCalories = labelSection.getByLabel(he ? "קלוריות (קק״ל)" : "Calories (kcal)", {exact:true});
+    await printedCalories.waitFor();
+    assert.equal(await printedCalories.inputValue(), "", "missing calories must not become zero");
+    await labelSection.getByLabel(he ? "שם המוצר שעל האריזה" : "Product name on package").fill("Printed package test");
+    await labelSection.getByLabel(he ? "הערכים המודפסים הם לכמות" : "Printed values are per amount").fill("40");
+    await printedCalories.fill("100");
+    await labelSection.getByLabel(he ? "חלבון (גרם)" : "Protein (g)", {exact:true}).fill("4");
+    await labelSection.getByLabel(he ? "פחמימות (גרם)" : "Carbohydrate (g)", {exact:true}).fill("12");
+    await labelSection.getByLabel(he ? "שומן (גרם)" : "Fat (g)", {exact:true}).fill("4");
+    await labelConfirm.check(); await addProduct.click();
+    assert.equal((await actions(page)).filter(c => c.action === "nutrition").length, nutritionCalls, "label flow never calls nutrition AI");
+    assert(!(await actions(page)).some(c => c.table === "meals"), "label selection only edits the draft");
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "product label fits mobile width");
     await page
       .getByRole("button", {
         name: he ? "אישור והוספה ליומן" : "Confirm & save to diary",
@@ -285,8 +310,34 @@ try {
     "minor cannot request AI",
   );
   await minor.close();
+  const photo = await browser.newPage({viewport:{width:390,height:844}});
+  await photo.goto(base + "/?photo-test=1");
+  await photo.getByRole("button", {name:"Add meal",exact:true}).click();
+  await photo.getByRole("button", {name:"Photograph a meal",exact:true}).click();
+  await photo.getByLabel("Take or upload a photo",{exact:true}).setInputFiles({name:"synthetic.jpg",mimeType:"image/jpeg",buffer:Buffer.from([255,216,255,217])});
+  await photo.getByRole("button", {name:"Estimate meal for review",exact:true}).click();
+  const savePhoto = photo.getByRole("button", {name:"Confirm & save to diary",exact:true});
+  await photo.getByText("אורז לבן מבושל",{exact:true}).waitFor();
+  assert(await savePhoto.isDisabled(), "photo estimate cannot save before ingredient review");
+  await photo.getByLabel("I checked ingredients and portions, corrected identities and added missing foods",{exact:true}).check();
+  await savePhoto.click();
+  assert.equal((await actions(photo)).filter(c=>c.table==="meals").length,1);
+  await photo.close();
+  const noAI = await browser.newPage({viewport:{width:390,height:844}});
+  await noAI.goto(base + "/?ai-off=1");
+  await noAI.getByRole("button", {name:"Add meal", exact:true}).click();
+  await noAI.getByRole("button", {name:"Photograph a meal", exact:true}).click();
+  await noAI.getByLabel("Input method").selectOption("label");
+  await noAI.getByLabel("Product barcode", {exact:true}).fill("12345678");
+  const lookup = noAI.getByRole("button", {name:"Find product",exact:true});
+  assert(await lookup.isEnabled(), "barcode lookup works with AI disabled");
+  await lookup.click();
+  await noAI.getByText("Synthetic packaged food", {exact:true}).waitFor();
+  assert(!(await actions(noAI)).some(c => c.action === "nutrition"), "disabled AI is never used for labels");
+  await noAI.close();
+
   console.log(
-    "PASS: Hebrew/English mobile proposal approval, food estimate confirmation, separate training consent, per-example approval/revocation, no automatic writes, adult gate, chat follow-ups/history/deletion, opt-in context and escaped model text. Synthetic services; live model not tested.",
+    "PASS: Hebrew/English mobile proposal approval, food estimate confirmation, non-AI barcode/printed-label flow with AI disabled, separate training consent, per-example approval/revocation, no automatic writes, adult gate, chat follow-ups/history/deletion, opt-in context and escaped model text. Synthetic services; live model not tested.",
   );
 } finally {
   await browser?.close();

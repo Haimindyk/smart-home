@@ -43,6 +43,53 @@ describe("free-only provider adapter", () => {
     expect(payload.max_tokens).toBe(2500);
     expect(payload.response_format.type).toBe("json_object");
   });
+  it("passes the real JSON schema and accepts the provider's object response", async () => {
+    const request = vi.fn<typeof fetch>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            result: { response: { items: [] } },
+            success: true,
+          }),
+        ),
+    );
+    const schema = { type: "object", properties: { items: { type: "array" } } };
+    expect(
+      await createProvider(env, request).structured(
+        "Extract",
+        {},
+        100,
+        "nutrition_text",
+        schema,
+      ),
+    ).toEqual({ items: [] });
+    const payload = JSON.parse(String(request.mock.calls[0][1]!.body));
+    expect(payload.response_format).toEqual({
+      type: "json_schema",
+      json_schema: schema,
+    });
+  });
+  it("uses the explicitly selected photo normalizer only for photo requests", async () => {
+    const request = vi.fn<typeof fetch>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            result: { response: { foods: [] } },
+            success: true,
+          }),
+        ),
+    );
+    await createProvider(env, request).structured(
+      "Photo",
+      {},
+      1800,
+      "nutrition_text",
+      { type: "object" },
+      true,
+    );
+    expect(request.mock.calls[0][0]).toContain(MODELS.mealText);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
   it("stops on quota exhaustion with no paid fallback", async () => {
     const request = vi.fn<typeof fetch>(
       async () => new Response("", { status: 429 }),
