@@ -9,6 +9,7 @@ import {
   chatMessage,
   chatVersion,
   parseChatAnswer,
+  symptomReply,
   historyForModel,
   diarySummary,
   CHAT_SYSTEM,
@@ -166,7 +167,7 @@ export async function handleChat(req: Request, env: Environment) {
       (checked(await turns()) ?? []) as ChatTurn[],
     );
     const provider = createProvider(env);
-    const answer = parseChatAnswer(
+    const answer = symptomReply(message) ?? parseChatAnswer(
       await provider.structured(
         CHAT_SYSTEM,
         {

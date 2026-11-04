@@ -150,3 +150,10 @@ fails closed because our meal/program training recipes do not qualify a chat mod
 No hosted or own-model answer quality is claimed by deterministic software tests.
 The GPU training and live provider-quality requirements documented in `ml/README.md`
 remain separate from implementing a conversation UI and history storage.
+
+## Live validation status
+
+See [2026-11-04 live validation](wellness-live-validation.md). Connectivity and
+label extraction worked, but mixed-meal vision/normalization failed the quality
+gate. Keep inference disabled until the remaining evaluations and authenticated
+application path pass.
