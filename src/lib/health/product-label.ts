@@ -46,12 +46,13 @@ export function foodFromPrintedLabel(input: {
       return [key, value === null ? null : (value * 100) / amount];
     }),
   );
+  const id = crypto.randomUUID();
   return foodSchema.parse({
-    id: crypto.randomUUID(),
+    id,
     name: input.name,
     basis: input.basis,
     source: "label",
-    sourceId: "label:printed-confirmed:v1",
+    sourceId: `label:printed-confirmed:v1:${id}`,
     per100,
     ...(input.barcode ? { barcode: input.barcode } : {}),
   });

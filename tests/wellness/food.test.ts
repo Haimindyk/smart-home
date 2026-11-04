@@ -262,7 +262,7 @@ it("converts actual printed kJ, sodium grams and salt grams without model estima
   });
   expect(fromSalt.per100.kcal).toBeCloseTo(250);
   expect(fromSalt.per100.sodium).toBe(400);
-  expect(fromSalt.sourceId).toBe("label:printed-confirmed:v1");
+  expect(fromSalt.sourceId).toBe(`label:printed-confirmed:v1:${fromSalt.id}`);
   expect(
     foodFromPrintedLabel({ ...common, sodiumUnit: "g" }).per100.sodium,
   ).toBe(1000);

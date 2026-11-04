@@ -46,7 +46,7 @@ export function ProductLabel({ onAdd }: { onAdd: (item: MealItem) => void }) {
       const found = response.foods.find(
         (f) =>
           f.source === "openfoodfacts" ||
-          (f.source === "label" && f.sourceId === "label:printed-confirmed:v1"),
+          (f.source === "label" && f.sourceId?.startsWith("label:printed-confirmed:v1:")),
       );
       if (found) setFood(found);
       else {

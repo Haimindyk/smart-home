@@ -17,7 +17,7 @@ also supports printed kJ (divide by 4.184), sodium grams (multiply by 1000 for m
 or salt grams (multiply by 1000/2.5 for sodium mg).
 
 Confirmed printed entries use `source=label` and
-`sourceId=label:printed-confirmed:v1`. Legacy AI-labeled personal foods without
+`sourceId=label:printed-confirmed:v1:<food-id>`. Legacy AI-labeled personal foods without
 this marker are not used by the label-only lookup. Product-cache keys use `off:v2`
 to avoid reusing historical inferred g/ml bases. Both AI endpoints reject label
 mode before inference, image reads or quota reservations. The old maintenance

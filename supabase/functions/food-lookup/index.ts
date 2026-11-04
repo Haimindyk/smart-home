@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     if (labelOnly)
       personalQuery = personalQuery
         .eq("data->>source", "label")
-        .eq("data->>sourceId", "label:printed-confirmed:v1");
+        .like("data->>sourceId", "label:printed-confirmed:v1:%");
     const { data: personal, error: personalError } = await personalQuery;
     if (personalError) throw new Error("failed");
     if (personal?.length) return json({ foods: personal.map((r) => r.data) });
