@@ -1,5 +1,5 @@
 "use client";
-import { useId } from "react";
+import { useId, useState } from "react";
 import type {
   InputHTMLAttributes,
   ReactNode,
@@ -12,14 +12,16 @@ export function Panel({
   title,
   children,
   action,
+  className = "",
 }: {
   title: string;
   children: ReactNode;
   action?: ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="health-panel rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
-      <div className="mb-4 flex items-center justify-between gap-2">
+    <section className={`health-panel rounded-2xl border bg-card p-4 shadow-sm sm:p-5 ${className}`}>
+      <div className="health-panel-heading mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{title}</h2>
         {action}
       </div>
@@ -62,7 +64,7 @@ export function SelectField({
 }
 export function Empty({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+    <p className="health-empty rounded-2xl bg-muted/40 p-5 text-center text-sm text-muted-foreground">
       {children}
     </p>
   );
@@ -164,3 +166,11 @@ export function AsyncButton({
 }
 export const round = (n: number | null | undefined) =>
   n == null ? "—" : Math.round(n).toLocaleString();
+
+export function Disclosure({title,children,initialOpen=false,className="",value}: {title:string;children:ReactNode;initialOpen?:boolean;className?:string;value?:string}) {
+  const [open,setOpen]=useState(initialOpen);
+  return <details className={`health-disclosure ${className}`} open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary><span>{title}</span>{value&&<small>{value}</small>}<span className="health-disclosure-arrow" aria-hidden="true">⌄</span></summary><div className="health-disclosure-body">{children}</div></details>;
+}
+export function ChoiceTabs<T extends string>({label,value,onChange,options}: {label:string;value:T;onChange:(value:T)=>void;options:readonly {value:T;label:string}[]}) {
+  return <div className="health-choice-tabs" role="group" aria-label={label}>{options.map(option=><button type="button" key={option.value} aria-pressed={value===option.value} onClick={()=>onChange(option.value)}>{option.label}</button>)}</div>;
+}

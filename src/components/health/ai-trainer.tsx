@@ -12,7 +12,9 @@ import { useHealthText } from "@/lib/health/i18n";
 import { wellnessExercises } from "../../../supabase/functions/_shared/exercise-catalog";
 import type { PlanData } from "../../../supabase/functions/_shared/wellness-core";
 import { AiConsent, useWellnessAvailability } from "./ai-consent";
-import { Panel, Field, SelectField, ErrorText } from "./shared";
+import { Panel, Field, SelectField, ErrorText, Disclosure, ChoiceTabs } from "./shared";
+
+import { HealthSheet } from "./health-sheet";
 
 const muscleLabels: Record<string, [string, string]> = {
   legs: ["רגליים", "Legs"],
@@ -167,7 +169,7 @@ export function AiTrainer({ date }: { date: string }) {
   }
   return (
     <Panel
-      title={h("המאמן האישי שלך", "Your personal coach")}
+      title={h("תוכנית שמתאימה לך", "A plan for you")}
       action={
         <Button
           variant="outline"
@@ -176,18 +178,19 @@ export function AiTrainer({ date }: { date: string }) {
         >
           {open
             ? h("סגירה", "Close")
-            : h("בנייה ושיפור תוכנית", "Build or improve a plan")}
+            : h("תוכנית עם AI", "Plan with AI")}
         </Button>
       }
     >
       <p className="text-sm text-muted-foreground">
         {h(
-          "תוכנית שמותאמת למטרה, לציוד ולשרירים שחשובים לך. כל שינוי מוצג לבדיקה לפני אישור.",
-          "A plan tailored to your goal, equipment and muscle priorities. Review every change before approving it.",
+          "תוכנית לפי המטרה והציוד שלך.",
+          "A plan that fits your goal and equipment.",
         )}
       </p>
       {open && (
-        <div className="mt-4 grid gap-4">
+        <HealthSheet title={h("תוכנית עם AI", "Plan with AI")} onClose={()=>setOpen(false)}>
+        <div className="grid gap-4">
           <AiConsent />
           <ErrorText error={error} />
           {notice && (
@@ -195,26 +198,7 @@ export function AiTrainer({ date }: { date: string }) {
               {notice}
             </p>
           )}
-          <div
-            className="flex gap-2"
-            role="group"
-            aria-label={h("סוג בקשה", "Request type")}
-          >
-            {(["program", "adjust"] as const).map((m) => (
-              <Button
-                key={m}
-                variant={mode === m ? "default" : "outline"}
-                onClick={() => {
-                  setMode(m);
-                  setProposal(null);
-                }}
-              >
-                {m === "program"
-                  ? h("תוכנית חדשה", "New program")
-                  : h("שיפור תוכנית קיימת", "Improve a plan")}
-              </Button>
-            ))}
-          </div>
+          <ChoiceTabs label={h("סוג בקשה", "Request type")} value={mode} onChange={next=>{setMode(next);setProposal(null)}} options={[{value:"program",label:h("תוכנית חדשה","New program")},{value:"adjust",label:h("שיפור תוכנית","Improve a plan")}]} />
           <div className="grid gap-3 sm:grid-cols-2">
             <SelectField
               label={h("המטרה שלי", "My goal")}
@@ -260,9 +244,9 @@ export function AiTrainer({ date }: { date: string }) {
               <option value="auto">
                 {h("התאם לי חלוקה", "Choose for me")}
               </option>
-              <option value="full_body">Full Body</option>
-              <option value="ab">AB</option>
-              <option value="abc">ABC</option>
+              <option value="full_body">{h("Full Body · כל הגוף", "Full Body · whole body")}</option>
+              <option value="ab">{h("AB · שני אימונים", "AB · two sessions")}</option>
+              <option value="abc">{h("ABC · שלושה אימונים", "ABC · three sessions")}</option>
               <option value="custom">
                 {h(
                   "חלוקה אישית לפי ימי האימון",
@@ -315,7 +299,7 @@ export function AiTrainer({ date }: { date: string }) {
             </legend>
             <div className="flex flex-wrap gap-3">
               {Object.entries(equipmentLabels).map(([key, label]) => (
-                <label key={key} className="flex items-center gap-2 text-sm">
+                <label key={key} className="health-option-chip">
                   <input
                     type="checkbox"
                     checked={preferences.equipment.includes(key)}
@@ -326,11 +310,12 @@ export function AiTrainer({ date }: { date: string }) {
               ))}
             </div>
           </fieldset>
+          <Disclosure title={h("דגשים והעדפות", "Focus and preferences")}>
           <fieldset>
             <legend className="mb-2 text-sm font-medium">
               {h(
-                "דגש על שרירים · עד שניים, בלי להזניח את השאר",
-                "Muscle emphasis · up to two, while keeping balance",
+                "שרירים בדגש · עד שניים",
+                "Muscle focus · up to two",
               )}
             </legend>
             <div className="flex flex-wrap gap-2">
@@ -364,7 +349,9 @@ export function AiTrainer({ date }: { date: string }) {
               ))}
             </div>
           </details>
+          </Disclosure>
           {mode === "program" ? (
+            <Disclosure className="health-help" title={h("משהו נוסף שכדאי לדעת?", "Anything else to consider?")}>
             <Field
               label={h(
                 "העדפות נוספות (בלי מידע רפואי מזהה)",
@@ -376,6 +363,7 @@ export function AiTrainer({ date }: { date: string }) {
                 setPreferences((p) => ({ ...p, notes: e.target.value }))
               }
             />
+            </Disclosure>
           ) : (
             <>
               <SelectField
@@ -407,13 +395,15 @@ export function AiTrainer({ date }: { date: string }) {
               />
             </>
           )}
+          <Disclosure className="health-help" title={h("איך התוכנית נבנית ונשמרת?", "How plans work")}>
           <p className="text-xs text-muted-foreground">
             {h(
               "חלוקת AB או ABC ממשיכה במחזור גם בין שבועות. תוכנית חדשה תתווסף לצד הקיימות. משקל התחלתי לא ינוחש. שיפור שאושר משנה את התוכנית הקבועה.",
               "AB/ABC rotates across weeks. A new program is added alongside existing plans. Starting loads are never guessed. Approved adjustments update the saved plan.",
             )}
           </p>
-          <Button
+          </Disclosure>
+          <Button className="health-primary-action"
             disabled={
               !availability.ready ||
               busy ||
@@ -425,16 +415,15 @@ export function AiTrainer({ date }: { date: string }) {
           >
             {busy
               ? h("מכין הצעה…", "Preparing a proposal…")
-              : h("הכנת הצעה לבדיקה", "Prepare a proposal to review")}
+              : mode === "program" ? h("יצירת תוכנית", "Create program") : h("הצעת שיפור", "Suggest changes")}
           </Button>
           {proposal && (
             <section
               className="rounded-2xl border bg-muted/20 p-4"
               aria-label={h("הצעה לאישור", "Proposal to approve")}
             >
-              <p className="whitespace-pre-wrap text-sm leading-7">
-                {proposal.message}
-              </p>
+              <p className="text-sm font-semibold">{h("התוכנית מוכנה לבדיקה", "Your plan is ready to review")}</p>
+              <Disclosure className="health-help" title={h("למה התוכנית מתאימה לי?", "Why this plan?")}><p className="whitespace-pre-wrap">{proposal.message}</p>{proposal.reasons.map((reason,index)=><p key={index}>{reason}</p>)}</Disclosure>
               {proposal.changes.map((change) => {
                 const previous = data.workout_plans.find(
                   (p) => p.id === change.id,
@@ -474,11 +463,6 @@ export function AiTrainer({ date }: { date: string }) {
                   </div>
                 );
               })}
-              {proposal.reasons.map((reason, index) => (
-                <p key={index} className="mt-2 text-sm">
-                  {reason}
-                </p>
-              ))}
               <div className="mt-4 flex flex-wrap gap-2">
                 {!!proposal.changes.length && (
                   <Button disabled={busy} onClick={() => void apply()}>
@@ -559,6 +543,7 @@ export function AiTrainer({ date }: { date: string }) {
             </div>
           )}
         </div>
+        </HealthSheet>
       )}
     </Panel>
   );

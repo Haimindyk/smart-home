@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useHealthText } from "@/lib/health/i18n";
 import { ageOnDate, calculateGoal, goalForDate, localDate } from "@/lib/health/calculations";
 import { payloadSchemas, type HealthProfile, type Payload } from "@/lib/health/model";
-import { Field, ErrorText } from "./shared";
+import { Field, ErrorText, Disclosure } from "./shared";
 
 export function ProfileJourney({profile, onChange, goals, onSave, busy}: {
   profile: HealthProfile;
@@ -46,7 +46,7 @@ export function ProfileJourney({profile, onChange, goals, onSave, busy}: {
     <div className="journey-top"><span className="journey-badge"><Sparkles size={15}/>{h("מותאם לך", "MADE FOR YOU")}</span><span>{step+1} / 3</span></div>
     <div className="journey-progress" aria-label={h("התקדמות מילוי הפרופיל", "Profile progress")}>{titles.map((title,i)=><span key={title} className={i<=step?"done":""}/>)}</div>
     <h2 ref={heading} tabIndex={-1} className="mt-7 outline-none text-3xl font-bold tracking-tight">{titles[step]}</h2>
-    <p className="mt-3 mb-7 text-sm leading-7 text-muted-foreground">{[h("בוחרים כיוון. אנחנו נדאג לחישוב היעדים.", "Pick a direction. We'll work out your targets."),h("כמה פרטים כדי להתאים את התזונה לגוף שלך. הגיל מתעדכן לבד לפי תאריך הלידה.", "A few details to tailor your targets. Your age stays up to date from your birthday."),h("בוחרים את קצב היום. הקלוריות והערכים מחושבים עבורך, ואפשר תמיד לבחור אחרת.", "Choose your daily pace. Calories and macros are calculated for you; you can always choose your own.")][step]}</p>
+    <p className="mt-3 mb-7 text-sm leading-7 text-muted-foreground">{[h("בוחרים כיוון. אנחנו נדאג לחישוב היעדים.", "Pick a direction. We'll work out your targets."),h("הפרטים משמשים לחישוב יעד התחלתי.", "These details help calculate a starting target."),h("בדקו את היעד. אפשר לשנות אותו בכל רגע.", "Review your target. You can change it anytime.")][step]}</p>
     <ErrorText error={error}/>
     {step===0 && <div className="grid gap-3">{([
       ["lose",h("ירידה מתונה במשקל", "Lose weight gradually"),h("צעדים קטנים, הרגלים שנשארים", "Small steps, lasting habits"),Footprints],
@@ -70,6 +70,6 @@ export function ProfileJourney({profile, onChange, goals, onSave, busy}: {
     <label className="my-6 flex items-center justify-between gap-4 rounded-2xl border p-4 text-sm"><span>{h("אני רוצה לבחור יעדים בעצמי", "I want to choose my own targets")}</span><input type="checkbox" checked={manual} onChange={e=>{if(e.target.checked&&suggested)setCustom(suggested);setManual(e.target.checked);setError(null)}}/></label>
     {manual && step===2 && <div className="mb-5 grid grid-cols-2 gap-4">{([['kcal',h("קלוריות", "Calories")],['protein',h("חלבון בגרם", "Protein (g)")],['carbs',h("פחמימות בגרם", "Carbs (g)")],['fat',h("שומן בגרם", "Fat (g)")]] as const).map(([key,label])=><Field key={key} label={label} type="number" min={key==='kcal'?500:0} value={custom[key]} onChange={e=>setCustom(g=>({...g,[key]:+e.target.value}))}/>)}</div>}
     <div className="flex gap-3">{step>0&&<Button variant="outline" disabled={busy} onClick={()=>{setStep(s=>s-1);setError(null);focusStep()}}>{h("חזרה", "Back")}</Button>}<Button className="min-h-12 flex-1" disabled={busy} onClick={()=>{if(step<2)next();else void finish()}}>{busy?h("שומר…", "Saving…"):step<2?h("ממשיכים", "Continue"):h("שמירת הפרופיל והיעדים", "Save profile & targets")}{step<2 && <span className="rtl:rotate-180"><ArrowRight size={17}/></span>}{step===2&&<Check size={17}/>}</Button></div>
-    <p className="mt-5 text-xs leading-6 text-muted-foreground">{h("החישוב למבוגרים לפי Mifflin–St Jeor הוא נקודת התחלה שאפשר לשנות, לא הנחיה רפואית. אימונים אינם מוסיפים קלוריות ליעד.", "Adult Mifflin–St Jeor estimates are an editable starting point, not medical advice. Workouts do not add calories to the target.")}</p>
+    <Disclosure className="health-help" title={h("על חישוב היעדים", "About calculated targets")}><p className="text-xs leading-6 text-muted-foreground">{h("החישוב למבוגרים לפי Mifflin–St Jeor הוא נקודת התחלה שאפשר לשנות, לא הנחיה רפואית. אימונים אינם מוסיפים קלוריות ליעד.", "Adult Mifflin–St Jeor estimates are an editable starting point, not medical advice. Workouts do not add calories to the target.")}</p></Disclosure>
   </section>;
 }

@@ -54,11 +54,13 @@ const data: Record<string, unknown[]> = {
 };
 export const useHealthStore = create(() => ({
   owner: "11111111-1111-4111-8111-111111111111",
+  loading:false, error:null, conflict:null, boot:async()=>{}, flush:async()=>{}, reset:async()=>{}, resolveConflict:async()=>{},
   pending: 0,
   data,
-  save: async (table: string, value: unknown) => {
+  save: async (table: string, value: unknown, existing?: {id:string;version:number}, id?:string) => {
     calls.push({ action: "save", table });
-    return value;
+    const row={id:existing?.id??id??crypto.randomUUID(),owner_user_id:useHealthStore.getState().owner,version:(existing?.version??0)+1,data:value};
+    useHealthStore.setState(s=>({data:{...s.data,[table]:[...s.data[table].filter((r:unknown)=>(r as {id:string}).id!==row.id),row]}}));return row;
   },
   remove: async () => {},
   refresh: async () => {},
@@ -198,6 +200,10 @@ export async function healthFunction(
       ),
       requestId: input.requestId,
     };
+  if(input.action==="correct_meal"){
+    const row=useHealthStore.getState().data.meals.find((m:unknown)=>(m as {id:string}).id===input.mealId) as {data:{items: {food:Record<string,unknown>}[]}};
+    return {mealId:input.mealId,expectedVersion:input.expectedVersion,items:row.data.items.map(i=>({...i,food:{...i.food,name:"דג",source:"ai"}}))};
+  }
   if (input.action === "nutrition")
     return {
       analysisId: input.requestId,
@@ -227,3 +233,11 @@ Object.assign(window, {
     },
   },
 });
+
+export const useIdentity = create(() => ({actingMemberId:"preview-member"}));
+export const useAppStore = create(() => ({members:{"preview-member":{display_name:document.documentElement.lang==="he"?"דנה":"Dana"}}}));
+if(new URLSearchParams(location.search).has("preview")){
+  const today=new Date().toISOString().slice(0,10);
+  data.nutrition_goals=[{id:crypto.randomUUID(),version:1,data:{date:today,kcal:2000,protein:100,carbs:250,fat:65,method:"manual"}}];
+  data.workout_plans=[{id:crypto.randomUUID(),version:1,data:makeProgram({plans:[{name:document.documentElement.lang==="he"?"יום 1 — כל הגוף":"Day 1 — Full Body",exercises:["Bodyweight_Squat","Glute_Bridge","Push_Up","Dumbbell_Row","Plank"].map(catalogId=>({catalogId,sets:2,reps:10,rest:60}))}]},parsePreferences({goal:"muscle",experience:"beginner",days:[0,2,4],minutes:45,split:"full_body",focus:[],equipment:["bodyweight","dumbbell"],avoid:[],notes:""}),today).changes[0].data}];
+}

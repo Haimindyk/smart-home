@@ -6,7 +6,7 @@ import { wellnessRequest } from "@/lib/health/wellness-api";
 import { adult } from "../../../supabase/functions/_shared/wellness-core";
 import { localDate } from "@/lib/health/calculations";
 import { useHealthText } from "@/lib/health/i18n";
-import { ErrorText } from "./shared";
+import { Disclosure, ErrorText } from "./shared";
 const capabilities = new Map<
   string,
   {
@@ -93,8 +93,8 @@ export function AiConsent() {
     return (
       <p className="rounded-xl bg-muted p-3 text-sm">
         {h(
-          "השירות האישי עדיין לא הופעל. אפשר להמשיך לתעד ולערוך ידנית.",
-          "The personal AI service is not enabled yet. You can keep logging and editing manually.",
+          "ה־AI עדיין לא זמין. אפשר להמשיך ידנית.",
+          "AI is not available yet. Manual logging is ready.",
         )}
       </p>
     );
@@ -102,7 +102,7 @@ export function AiConsent() {
     return (
       <p className="text-sm text-muted-foreground">
         {h(
-          "המלצות AI מיועדות לבני 18 ומעלה. יש להשלים תאריך לידה בהגדרות.",
+          "המלצות AI זמינות מגיל 18, לאחר השלמת תאריך לידה בהגדרות.",
           "AI recommendations are for adults 18+. Complete your birth date in Settings.",
         )}
       </p>
@@ -110,12 +110,8 @@ export function AiConsent() {
   if (state.consented) return null;
   return (
     <div className="rounded-xl border bg-muted/30 p-4 text-sm">
-      <p>
-        {h(
-          "כדי לקבל הערכות והצעות, תוכן הבקשה הדרוש יישלח לעיבוד ב־Cloudflare. לא נשלחים שם, PIN או פרופיל גוף מלא. אין שימוש בתוכן לאימון המודלים. הערכות דורשות בדיקה, וכל שינוי בתוכנית מחייב אישור שלך.",
-          "Relevant request content is processed by Cloudflare. Your name, PIN and full body profile are not sent. Content is not used to train models. Estimates need review; every plan change requires your approval.",
-        )}
-      </p>
+      <p>{h("אישור שימוש ב־AI שולח את תוכן הבקשה הדרוש ל־Cloudflare. התוצאות דורשות בדיקה ואישור שלך.", "Enabling AI sends the necessary request content to Cloudflare. Review and approve the results.")}</p>
+      <Disclosure className="health-help" title={h("פרטיות ואופן השימוש", "Privacy and use")}><p>{h("שם, PIN ופרופיל גוף מלא אינם נשלחים אוטומטית. אין שימוש בתוכן לאימון המודלים. אפשר לבטל בהגדרות.", "Your name, PIN and full body profile are not sent automatically. Content is not used to train models. You can revoke access in Settings.")}</p></Disclosure>
       <ErrorText error={error} />
       <Button
         className="mt-3"

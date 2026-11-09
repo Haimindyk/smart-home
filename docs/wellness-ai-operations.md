@@ -82,8 +82,14 @@ must be resolved in a follow-up PR merged to main, not a manual deploy.
 - [Workers AI data usage](https://developers.cloudflare.com/workers-ai/platform/data-usage/)
   states Customer Content is not used for model training. This is provider policy,
   not a claim that the app is an independently trained model.
-- Photos are private, owner-prefixed and signed briefly. Photo retention is opt-in
-  per meal. Unreferenced originals are removed by existing daily maintenance after
+- Photos are private, owner-prefixed and signed briefly. Photograph meal opens a
+  live camera and saves a successful AI estimate and its photo directly to the diary,
+  without an ingredient confirmation step. No-food/errors create no meal. The camera
+  explains photo retention; manual entries keep their existing retention controls.
+  A saved estimate accepts a free-text correction, updating the same versioned meal
+  and preserving unrelated foods and measured quantities. Corrections use the text
+  allowance and send only eligible ingredients, never the whole diary.
+  Unreferenced originals are removed by existing daily maintenance after
   24 hours. Saved meal photos and illustration rows remain referenced.
 - Generated results and approved snapshots expire after 30 days via daily maintenance.
   The UI offers up to the most recent 30 snapshots. Undo requires that the current

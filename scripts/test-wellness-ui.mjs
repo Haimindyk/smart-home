@@ -2,7 +2,7 @@
 import { build } from "esbuild";
 import { chromium } from "@playwright/test";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import assert from "node:assert/strict";
@@ -23,7 +23,7 @@ try {
           b.onResolve(
             {
               filter:
-                /^(?:@\/lib\/(?:health\/(?:store|api|i18n)|supabase\/client)|\.\/(?:store|api))$/,
+                /^(?:@\/lib\/(?:health\/(?:store|api|i18n)|supabase\/client|store\/app-store|identity)|\.\/(?:store|api))$/,
             },
             (args) => {
               if (
@@ -49,7 +49,12 @@ try {
     )
   ).join("\n");
   const js = await readFile(join(temp, "fixture.js"));
-  server = createServer((req, res) => {
+  server = createServer(async (req, res) => {
+    const path = new URL(req.url, "http://localhost").pathname;
+    if (path.startsWith("/_next/static/media/") && /^[a-zA-Z0-9_.-]+\.woff2?$/.test(path.split("/").at(-1))) {
+      try {res.setHeader("Content-Type","font/woff2");res.end(await readFile(join(root,".next/static/media",path.split("/").at(-1))));}catch{res.statusCode=404;res.end();}return;
+    }
+
     if (req.url === "/fixture.js") {
       res.setHeader("Content-Type", "text/javascript");
       res.end(js);
@@ -59,7 +64,7 @@ try {
     } else {
       const he = req.url.includes("he");
       res.end(
-        `<html dir="${he ? "rtl" : "ltr"}" lang="${he ? "he" : "en"}"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"></head><body><div id="root"></div><script src="/fixture.js"></script></body></html>`,
+        `<html dir="${he ? "rtl" : "ltr"}" lang="${he ? "he" : "en"}"><head><style>:root{--font-heebo:${css.match(/--font-heebo:([^;}]+)/)?.[1]??"Arial,sans-serif"};font-family:var(--font-heebo),Arial,sans-serif}</style><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"></head><body><div id="root"></div><script src="/fixture.js"></script></body></html>`,
       );
     }
   });
@@ -84,11 +89,11 @@ try {
     await page.goto(base + "/?lang=" + language);
     await page
       .getByRole("button", {
-        name: he ? "בנייה ושיפור תוכנית" : "Build or improve a plan",
+        name: he ? "תוכנית עם AI" : "Plan with AI",
       })
       .click();
     const generate = page.getByRole("button", {
-      name: he ? "הכנת הצעה לבדיקה" : "Prepare a proposal to review",
+      name: he ? "יצירת תוכנית" : "Create program",
     });
     await generate.waitFor();
     await generate.click();
@@ -119,6 +124,7 @@ try {
       ),
       "mobile page should not overflow",
     );
+    await page.getByRole("button",{name:he?"סגירה":"Close",exact:true}).click();
     await page
       .getByRole("button", {
         name: he ? "הוספת ארוחה" : "Add meal",
@@ -135,7 +141,7 @@ try {
       .fill(he ? "אכלתי כוס אורז מבושל" : "I ate a cup of cooked rice");
     await page
       .getByRole("button", {
-        name: he ? "הערכת הארוחה לבדיקה" : "Estimate meal for review",
+        name: he ? "הצגת הערכה" : "Show estimate",
       })
       .click();
     await page.getByText("אורז לבן מבושל", { exact: true }).waitFor();
@@ -144,12 +150,12 @@ try {
       "food estimate never auto-saves",
     );
     const nutritionCalls = (await actions(page)).filter(c => c.action === "nutrition").length;
-    await page.getByLabel(he ? "איך להזין?" : "Input method").selectOption("label");
+    await page.getByRole("button",{name:he?"מוצר":"Product",exact:true}).click();
     const labelSection = page.getByRole("region", {name: he ? "ערכי מוצר מהאריזה" : "Product label values"});
     await labelSection.getByLabel(he ? "ברקוד המוצר" : "Product barcode", {exact:true}).fill("12345678");
     await labelSection.getByRole("button", {name: he ? "איתור מוצר" : "Find product", exact:true}).click();
     await labelSection.getByText("Synthetic packaged food", {exact:true}).waitFor();
-    const addProduct = labelSection.getByRole("button", {name:he ? "הוספת המוצר לטיוטה" : "Add product to draft"});
+    const addProduct = labelSection.getByRole("button", {name:he ? "הוספה לארוחה" : "Add to meal"});
     assert(await addProduct.isDisabled(), "database values require package confirmation");
     const labelConfirm = labelSection.getByLabel(he ? "בדקתי שהמוצר, היחידה והערכים תואמים לאריזה" : "I checked that the product, unit and values match the package");
     await labelConfirm.check(); await addProduct.click();
@@ -170,7 +176,7 @@ try {
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "product label fits mobile width");
     await page
       .getByRole("button", {
-        name: he ? "אישור והוספה ליומן" : "Confirm & save to diary",
+        name: he ? "שמירה ביומן" : "Save to diary",
       })
       .click();
     assert.equal(
@@ -266,8 +272,8 @@ try {
     await page
       .getByLabel(
         he
-          ? "לצרף סיכום מהיומן שלי: ערכים שנרשמו היום, היעד השמור ואימונים אחרונים. בלי תמונות, שם או הערות אישיות."
-          : "Include a diary summary: today’s logged nutrients, saved target and recent workouts. No photos, name or personal notes.",
+          ? "לצרף סיכום יומן: ערכי היום, היעד ואימונים אחרונים"
+          : "Include diary summary: today’s nutrients, target and recent workouts",
       )
       .check();
     await page
@@ -293,19 +299,34 @@ try {
     await page
       .getByText(
         he
-          ? "אפשר להתחיל משאלה: איך לחלק חלבון לאורך היום, או מה ההבדל בין Full Body ל־AB?"
-          : "Start with a question: how should I spread protein through the day, or how does Full Body compare with AB?",
+          ? "על מה נדבר?"
+          : "What’s on your mind?", {exact:true}
       )
       .waitFor();
     assert.deepEqual(errors, []);
     await page.close();
   }
+  if(process.env.WELLNESS_SCREENSHOTS_DIR){
+    await mkdir(process.env.WELLNESS_SCREENSHOTS_DIR,{recursive:true});
+    for(const lang of ["he","en"]){
+      const preview=await browser.newPage({viewport:{width:390,height:844}});
+      preview.on("pageerror",e=>process.stderr.write("Preview error: "+e.message+"\n"));
+      await preview.goto(base+"/?preview=1&lang="+lang);
+      for(const [screen,he,en] of [["nutrition","היום","Today"],["workouts","אימונים","Workouts"],["coach","צ׳אט AI","AI chat"],["settings","הגדרות","Settings"],["progress","התקדמות","Progress"]]){
+        if(screen==="settings")await preview.locator("#health-settings-button").click();else await preview.getByRole("tab",{name:lang==="he"?he:en,exact:true}).click();
+        await preview.getByRole("tabpanel").locator("section").first().waitFor();
+        await preview.evaluate(async()=>{await document.fonts.ready;window.scrollTo(0,0)});
+        await preview.screenshot({path:join(process.env.WELLNESS_SCREENSHOTS_DIR,`${lang}-${screen}.png`),animations:"disabled"});
+      }
+      await preview.close();
+    }
+  }
   const minor = await browser.newPage();
   await minor.goto(base + "/?minor=1");
-  await minor.getByRole("button", { name: "Build or improve a plan" }).click();
+  await minor.getByRole("button", { name: "Plan with AI" }).click();
   assert(
     await minor
-      .getByRole("button", { name: "Prepare a proposal to review" })
+      .getByRole("button", { name: "Create program" })
       .isDisabled(),
     "minor cannot request AI",
   );
@@ -314,20 +335,19 @@ try {
   await photo.goto(base + "/?photo-test=1");
   await photo.getByRole("button", {name:"Add meal",exact:true}).click();
   await photo.getByRole("button", {name:"Photograph a meal",exact:true}).click();
-  await photo.getByLabel("Take or upload a photo",{exact:true}).setInputFiles({name:"synthetic.jpg",mimeType:"image/jpeg",buffer:Buffer.from([255,216,255,217])});
-  await photo.getByRole("button", {name:"Estimate meal for review",exact:true}).click();
-  const savePhoto = photo.getByRole("button", {name:"Confirm & save to diary",exact:true});
-  await photo.getByText("אורז לבן מבושל",{exact:true}).waitFor();
-  assert(await savePhoto.isDisabled(), "photo estimate cannot save before ingredient review");
-  await photo.getByLabel("I checked ingredients and portions, corrected identities and added missing foods",{exact:true}).check();
-  await savePhoto.click();
-  assert.equal((await actions(photo)).filter(c=>c.table==="meals").length,1);
+  await photo.locator('input[type="file"]').setInputFiles({name:"synthetic.jpg",mimeType:"image/jpeg",buffer:Buffer.from([255,216,255,217])});
+  await photo.getByRole("dialog").waitFor({state:"hidden"});
+  assert.equal((await actions(photo)).filter(c=>c.table==="meals").length,1,"photo saves automatically once");
+  await photo.getByRole("button",{name:"Photo meal",exact:true}).click();
+  await photo.getByLabel("What should change?").fill("זה דג ולא חזה עוף");
+  await photo.getByRole("button",{name:"Update meal",exact:true}).click();
+  await photo.getByText("Meal updated",{exact:true}).waitFor();
+  assert.equal((await actions(photo)).filter(c=>c.table==="meals").length,2,"correction updates the existing meal");
   await photo.close();
   const noAI = await browser.newPage({viewport:{width:390,height:844}});
   await noAI.goto(base + "/?ai-off=1");
   await noAI.getByRole("button", {name:"Add meal", exact:true}).click();
-  await noAI.getByRole("button", {name:"Photograph a meal", exact:true}).click();
-  await noAI.getByLabel("Input method").selectOption("label");
+  await noAI.getByRole("button", {name:"Packaged product", exact:true}).click();
   await noAI.getByLabel("Product barcode", {exact:true}).fill("12345678");
   const lookup = noAI.getByRole("button", {name:"Find product",exact:true});
   assert(await lookup.isEnabled(), "barcode lookup works with AI disabled");
@@ -337,7 +357,7 @@ try {
   await noAI.close();
 
   console.log(
-    "PASS: Hebrew/English mobile proposal approval, food estimate confirmation, non-AI barcode/printed-label flow with AI disabled, separate training consent, per-example approval/revocation, no automatic writes, adult gate, chat follow-ups/history/deletion, opt-in context and escaped model text. Synthetic services; live model not tested.",
+    "PASS: Hebrew/English mobile proposal approval, food estimate confirmation, non-AI barcode/printed-label flow with AI disabled, separate training consent, per-example approval/revocation, automatic photo save and saved-meal correction, adult gate, chat follow-ups/history/deletion, opt-in context and escaped model text. Synthetic services; live model not tested.",
   );
 } finally {
   await browser?.close();

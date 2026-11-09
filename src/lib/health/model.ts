@@ -131,6 +131,7 @@ export const payloadSchemas = {
     name: z.string().max(200).default(""),
     items: z.array(mealItemSchema).min(1).max(100),
     imagePath: z.string().max(500).nullable().default(null),
+    aiEstimate: z.object({ analysisId:z.string().uuid(), lastCorrectionId:z.string().uuid().optional() }).optional(),
   }),
   water_logs: z.object({
     date: dateSchema,
