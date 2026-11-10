@@ -5,6 +5,8 @@ import { correctSavedMeal } from "@/lib/health/wellness-api";
 import { useHealthText } from "@/lib/health/i18n";
 import { HealthSheet } from "./health-sheet";
 import { AiConsent, useWellnessAvailability } from "./ai-consent";
+import { mealNutrients } from "@/lib/health/calculations";
+import { Disclosure, round } from "./shared";
 import { Button } from "@/components/ui/button";
 export function MealDetails({
   id,
@@ -26,7 +28,8 @@ export function MealDetails({
       null,
     );
   if (!row) return null;
-  const meal = row;
+  const meal = row,
+    totals = mealNutrients(row.data.items);
   async function correct() {
     if (lock.current || !text.trim() || !availability.ready) return;
     lock.current = true;
@@ -63,14 +66,40 @@ export function MealDetails({
       onClose={onClose}
     >
       <div className="grid gap-5">
+        <div className="health-meal-detail-total">
+          <strong>
+            {round(totals.kcal)} <small>kcal</small>
+          </strong>
+          <p>
+            {h("חלבון", "Protein")} {round(totals.protein)}g ·{" "}
+            {h("פחמימות", "Carbs")} {round(totals.carbs)}g · {h("שומן", "Fat")}{" "}
+            {round(totals.fat)}g
+          </p>
+        </div>
         {row.data.items.map((i) => (
           <div key={i.id}>
             <strong>{i.food.name}</strong>
             <p>
-              {i.quantity} {i.food.basis}
+              {i.quantity}{" "}
+              {i.food.basis === "g" ? h("גרם", "g") : h("מ״ל", "ml")}
             </p>
           </div>
         ))}
+        {row.data.items.some((i) => i.quantityRange || i.assumption) && (
+          <Disclosure title={h("על ההערכה", "About this estimate")}>
+            {row.data.items
+              .filter((i) => i.quantityRange || i.assumption)
+              .map((i) => (
+                <p key={i.id} className="text-sm">
+                  <strong>{i.food.name}</strong>
+                  {i.quantityRange
+                    ? ` · ${round(i.quantityRange.low)}–${round(i.quantityRange.high)} ${i.food.basis}`
+                    : ""}
+                  {i.assumption ? ` · ${i.assumption}` : ""}
+                </p>
+              ))}
+          </Disclosure>
+        )}
         {row.data.items.some((i) => ["ai", "usda"].includes(i.food.source)) && (
           <>
             <p>

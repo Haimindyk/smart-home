@@ -54,22 +54,75 @@ const data: Record<string, unknown[]> = {
 };
 export const useHealthStore = create(() => ({
   owner: "11111111-1111-4111-8111-111111111111",
-  loading:false, error:null, conflict:null, boot:async()=>{}, flush:async()=>{}, reset:async()=>{}, resolveConflict:async()=>{},
+  loading: false,
+  error: null,
+  conflict: null,
+  boot: async () => {},
+  flush: async () => {},
+  reset: async () => {},
+  resolveConflict: async () => {},
   pending: 0,
   data,
-  save: async (table: string, value: unknown, existing?: {id:string;version:number}, id?:string) => {
+  save: async (
+    table: string,
+    value: unknown,
+    existing?: { id: string; version: number },
+    id?: string,
+  ) => {
     calls.push({ action: "save", table });
-    const row={id:existing?.id??id??crypto.randomUUID(),owner_user_id:useHealthStore.getState().owner,version:(existing?.version??0)+1,data:value};
-    useHealthStore.setState(s=>({data:{...s.data,[table]:[...s.data[table].filter((r:unknown)=>(r as {id:string}).id!==row.id),row]}}));return row;
+    const row = {
+      id: existing?.id ?? id ?? crypto.randomUUID(),
+      owner_user_id: useHealthStore.getState().owner,
+      version: (existing?.version ?? 0) + 1,
+      data: value,
+    };
+    useHealthStore.setState((s) => ({
+      data: {
+        ...s.data,
+        [table]: [
+          ...s.data[table].filter(
+            (r: unknown) => (r as { id: string }).id !== row.id,
+          ),
+          row,
+        ],
+      },
+    }));
+    return row;
   },
   remove: async () => {},
   refresh: async () => {},
 }));
 export const useHealthText = () => (he: string, en: string) =>
   document.documentElement.lang === "he" ? he : en;
-export const lookupFood = async (_query: string, barcode?: string, labelOnly?: boolean) => {
+export const lookupFood = async (
+  _query: string,
+  barcode?: string,
+  labelOnly?: boolean,
+) => {
   calls.push({ action: labelOnly ? "label-lookup" : "food-lookup" });
-  return barcode === "12345678" ? { foods: [{ id: "off:12345678", name: "Synthetic packaged food", barcode, basis: "g", source: "openfoodfacts", per100: {kcal:250,protein:10,carbs:30,fat:10,fiber:null,sugar:null,saturatedFat:null,sodium:400} }] } : {foods:[], needsLabel:true, name:""};
+  return barcode === "12345678"
+    ? {
+        foods: [
+          {
+            id: "off:12345678",
+            name: "Synthetic packaged food",
+            barcode,
+            basis: "g",
+            source: "openfoodfacts",
+            per100: {
+              kcal: 250,
+              protein: 10,
+              carbs: 30,
+              fat: 10,
+              fiber: null,
+              sugar: null,
+              saturatedFat: null,
+              sodium: 400,
+            },
+          },
+        ],
+      }
+    : { foods: [], needsLabel: true, name: "" };
 };
 export const uploadMealImage = async () =>
   `${useHealthStore.getState().owner}/test.jpg`;
@@ -171,7 +224,10 @@ export async function healthFunction(
     return { examples: [] };
   }
   if (input.action === "capabilities")
-    return { available: !new URLSearchParams(location.search).has("ai-off"), serviceReady: true };
+    return {
+      available: !new URLSearchParams(location.search).has("ai-off"),
+      serviceReady: true,
+    };
   if (input.action === "program")
     return {
       ...makeProgram(
@@ -200,11 +256,34 @@ export async function healthFunction(
       ),
       requestId: input.requestId,
     };
-  if(input.action==="correct_meal"){
-    const row=useHealthStore.getState().data.meals.find((m:unknown)=>(m as {id:string}).id===input.mealId) as {data:{items: {food:Record<string,unknown>}[]}};
-    return {mealId:input.mealId,expectedVersion:input.expectedVersion,items:row.data.items.map(i=>({...i,food:{...i.food,name:"דג",source:"ai"}}))};
+  if (input.action === "correct_meal") {
+    const row = useHealthStore
+      .getState()
+      .data.meals.find(
+        (m: unknown) => (m as { id: string }).id === input.mealId,
+      ) as { data: { items: { food: Record<string, unknown> }[] } };
+    return {
+      mealId: input.mealId,
+      expectedVersion: input.expectedVersion,
+      items: row.data.items.map((i) => ({
+        ...i,
+        food: { ...i.food, name: "דג", source: "ai" },
+      })),
+    };
   }
-  if (input.action === "nutrition")
+  if (input.action === "nutrition") {
+    if (new URLSearchParams(location.search).has("photo-empty"))
+      return {
+        analysisId: input.requestId,
+        items: [],
+        needsClarification: false,
+        question: "",
+      };
+    if (
+      new URLSearchParams(location.search).has("photo-retry") &&
+      calls.filter((c) => c.action === "nutrition").length === 1
+    )
+      throw new Error("temporary_failure");
     return {
       analysisId: input.requestId,
       needsClarification: false,
@@ -222,22 +301,84 @@ export async function healthFunction(
         },
       ],
     };
+  }
   if (input.action === "history") return { versions: [] };
   return { applied: true };
 }
 Object.assign(window, {
   wellnessFixture: {
     calls,
+    meals: () => useHealthStore.getState().data.meals,
     clear: () => {
       calls.length = 0;
     },
   },
 });
 
-export const useIdentity = create(() => ({actingMemberId:"preview-member"}));
-export const useAppStore = create(() => ({members:{"preview-member":{display_name:document.documentElement.lang==="he"?"דנה":"Dana"}}}));
-if(new URLSearchParams(location.search).has("preview")){
-  const today=new Date().toISOString().slice(0,10);
-  data.nutrition_goals=[{id:crypto.randomUUID(),version:1,data:{date:today,kcal:2000,protein:100,carbs:250,fat:65,method:"manual"}}];
-  data.workout_plans=[{id:crypto.randomUUID(),version:1,data:makeProgram({plans:[{name:document.documentElement.lang==="he"?"יום 1 — כל הגוף":"Day 1 — Full Body",exercises:["Bodyweight_Squat","Glute_Bridge","Push_Up","Dumbbell_Row","Plank"].map(catalogId=>({catalogId,sets:2,reps:10,rest:60}))}]},parsePreferences({goal:"muscle",experience:"beginner",days:[0,2,4],minutes:45,split:"full_body",focus:[],equipment:["bodyweight","dumbbell"],avoid:[],notes:""}),today).changes[0].data}];
+export const useIdentity = create(() => ({ actingMemberId: "preview-member" }));
+export const useAppStore = create(() => ({
+  members: {
+    "preview-member": {
+      display_name: document.documentElement.lang === "he" ? "דנה" : "Dana",
+    },
+  },
+}));
+if (new URLSearchParams(location.search).has("preview")) {
+  const today = new Date().toISOString().slice(0, 10);
+  data.nutrition_goals = [
+    {
+      id: crypto.randomUUID(),
+      version: 1,
+      data: {
+        date: today,
+        kcal: 2000,
+        protein: 100,
+        carbs: 250,
+        fat: 65,
+        method: "manual",
+      },
+    },
+  ];
+  data.workout_plans = [
+    {
+      id: crypto.randomUUID(),
+      version: 1,
+      data: makeProgram(
+        {
+          plans: [
+            {
+              name:
+                document.documentElement.lang === "he"
+                  ? "יום 1 — כל הגוף"
+                  : "Day 1 — Full Body",
+              exercises: [
+                "Bodyweight_Squat",
+                "Glute_Bridge",
+                "Push_Up",
+                "Dumbbell_Row",
+                "Plank",
+              ].map((catalogId) => ({
+                catalogId,
+                sets: 2,
+                reps: 10,
+                rest: 60,
+              })),
+            },
+          ],
+        },
+        parsePreferences({
+          goal: "muscle",
+          experience: "beginner",
+          days: [0, 2, 4],
+          minutes: 45,
+          split: "full_body",
+          focus: [],
+          equipment: ["bodyweight", "dumbbell"],
+          avoid: [],
+          notes: "",
+        }),
+        today,
+      ).changes[0].data,
+    },
+  ];
 }

@@ -17,7 +17,9 @@ export function MealCamera({
     availability = useWellnessAvailability(),
     video = useRef<HTMLVideoElement>(null),
     gallery = useRef<HTMLInputElement>(null),
-    lock = useRef(false);
+    lock = useRef(false),
+    capturing = useRef(false),
+    finished = useRef(false);
   const attempt = useRef<{
     id: string;
     file: File;
@@ -26,7 +28,9 @@ export function MealCamera({
   } | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [noCamera, setNoCamera] = useState(false);
+    [noCamera, setNoCamera] = useState(false),
+    [noFood, setNoFood] = useState(false),
+    [cameraReady, setCameraReady] = useState(false);
   useEffect(() => {
     let disposed = false;
     let stream: MediaStream | undefined;
@@ -48,20 +52,23 @@ export function MealCamera({
         if (disposed) s.getTracks().forEach((t) => t.stop());
         else if (video.current) video.current.srcObject = s;
       })
-      .catch(() => setNoCamera(true));
+      .catch(() => {
+        if (!disposed) setNoCamera(true);
+      });
     return () => {
       disposed = true;
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, []);
   async function submit(file?: File) {
-    if (lock.current || !availability.ready) return;
+    if (lock.current || finished.current || !availability.ready) return;
     if (file) attempt.current = { id: crypto.randomUUID(), file };
     const job = attempt.current;
     if (!job) return;
     lock.current = true;
     setBusy(true);
     setError("");
+    setNoFood(false);
     const owner = useHealthStore.getState().owner;
     try {
       job.path ??= await uploadMealImage(job.file, owner!);
@@ -74,23 +81,25 @@ export function MealCamera({
       });
       if (useHealthStore.getState().owner !== owner)
         throw Error("session_mismatch");
-      if (!job.result.items.length) throw Error("no_food");
+      if (!job.result.items.length) {
+        setNoFood(true);
+        throw Error("no_food");
+      }
       if (!useHealthStore.getState().data.meals.some((m) => m.id === job.id))
-        await useHealthStore
-          .getState()
-          .save(
-            "meals",
-            {
-              date,
-              kind: "snack",
-              name: h("ארוחה מצולמת", "Photo meal"),
-              items: job.result.items,
-              imagePath: job.path,
-              aiEstimate: { analysisId: job.id },
-            },
-            undefined,
-            job.id,
-          );
+        await useHealthStore.getState().save(
+          "meals",
+          {
+            date,
+            kind: "snack",
+            name: h("ארוחה מצולמת", "Photo meal"),
+            items: job.result.items,
+            imagePath: job.path,
+            aiEstimate: { analysisId: job.id },
+          },
+          undefined,
+          job.id,
+        );
+      finished.current = true;
       onClose();
     } catch {
       setError(
@@ -106,7 +115,9 @@ export function MealCamera({
   }
   function capture() {
     const v = video.current;
-    if (!v?.videoWidth || lock.current) return;
+    if (!v?.videoWidth || lock.current || capturing.current || finished.current)
+      return;
+    capturing.current = true;
     const c = document.createElement("canvas"),
       scale = Math.min(1, 1536 / v.videoWidth);
     c.width = v.videoWidth * scale;
@@ -114,7 +125,18 @@ export function MealCamera({
     c.getContext("2d")?.drawImage(v, 0, 0, c.width, c.height);
     c.toBlob(
       (b) => {
-        if (b) void submit(new File([b], "meal.jpg", { type: "image/jpeg" }));
+        if (b)
+          void submit(
+            new File([b], "meal.jpg", { type: "image/jpeg" }),
+          ).finally(() => {
+            capturing.current = false;
+          });
+        else {
+          capturing.current = false;
+          setError(
+            h("הצילום נכשל. נסו שוב.", "Capture failed. Please try again."),
+          );
+        }
       },
       "image/jpeg",
       0.85,
@@ -127,12 +149,18 @@ export function MealCamera({
         if (!o && !lock.current) onClose();
       }}
     >
-      <DialogContent className="health-meal-camera" showCloseButton={false}>
+      <DialogContent
+        className="health-app health-meal-camera"
+        style={{ translate: "0 0", maxHeight: "none" }}
+        blurOverlay={false}
+        showCloseButton={false}
+      >
         <video
           ref={video}
           autoPlay
           playsInline
           muted
+          onLoadedData={() => setCameraReady(true)}
           aria-label={h("תצוגת מצלמה", "Camera preview")}
         />
         <header>
@@ -170,10 +198,17 @@ export function MealCamera({
           </p>
           {error && (
             <div role="alert">
-              {error}
-              <button disabled={busy} onClick={() => void submit()}>
-                {h("ניסיון נוסף", "Retry")}
-              </button>
+              {noFood
+                ? h(
+                    "לא זוהה אוכל בתמונה. נסו צילום קרוב וברור יותר.",
+                    "No food identified. Try a clearer, closer photo.",
+                  )
+                : error}
+              {!noFood && (
+                <button disabled={busy} onClick={() => void submit()}>
+                  {h("ניסיון נוסף", "Retry")}
+                </button>
+              )}
             </div>
           )}
           <div className="health-camera-actions">
@@ -185,7 +220,7 @@ export function MealCamera({
             </button>
             <button
               className="health-camera-shutter"
-              disabled={busy || noCamera || !availability.ready}
+              disabled={busy || noCamera || !cameraReady || !availability.ready}
               onClick={capture}
               aria-label={h("צילום", "Take photo")}
             />
