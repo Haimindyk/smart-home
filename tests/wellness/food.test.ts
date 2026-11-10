@@ -267,3 +267,65 @@ it("converts actual printed kJ, sodium grams and salt grams without model estima
     foodFromPrintedLabel({ ...common, sodiumUnit: "g" }).per100.sodium,
   ).toBe(1000);
 });
+
+import compactLive from "./meal-photo-compact-live.json";
+import {
+  normalizeCompactMeal,
+  compactMealSchema,
+} from "../../supabase/functions/_shared/wellness-food";
+describe("compact photo normalization", () => {
+  it("keeps all foods, Hebrew names, portions and unknown nutrient values", () => {
+    const result = normalizeCompactMeal(compactLive.output, true);
+    expect(result.items).toHaveLength(4);
+    expect(result.items.every((i) => /[א-ת]/.test(i.name))).toBe(true);
+    expect(result.items[0]).toMatchObject({
+      name: "חזה עוף מגריל",
+      quantity: 150,
+      quantityLow: 100,
+      quantityHigh: 200,
+      per100: { kcal: 165, protein: 31, sodium: null },
+    });
+    expect(result.needsClarification).toBe(false);
+    expect(result.question).toBe("");
+  });
+  it("does not accept incomplete nutrient vectors or English names", () => {
+    const food = compactLive.output.foods[0];
+    expect(() =>
+      normalizeCompactMeal(
+        { foods: [{ ...food, per100: [165, 31, 0] }] },
+        true,
+      ),
+    ).toThrow("invalid_output");
+    expect(() =>
+      normalizeCompactMeal({ foods: [{ ...food, nameHe: "chicken" }] }, true),
+    ).toThrow("invalid_output");
+    expect(() =>
+      normalizeCompactMeal({ foods: [{ ...food, nameHe: "ח" }] }, true),
+    ).toThrow("invalid_output");
+    expect(() =>
+      normalizeCompactMeal(
+        { foods: [{ ...food, portion: [150, 200, 100] }] },
+        true,
+      ),
+    ).toThrow("invalid_output");
+  });
+  it("uses model Hebrew for prepared foods outside the small canonical dictionary", () => {
+    expect(
+      normalizeCompactMeal(
+        {
+          foods: [
+            {
+              ...compactLive.output.foods[0],
+              nameEn: "baked salmon with herbs",
+              nameHe: "סלמון אפוי עם עשבי תיבול",
+            },
+          ],
+        },
+        true,
+      ).items[0].name,
+    ).toBe("סלמון אפוי עם עשבי תיבול");
+    expect(compactMealSchema().properties.foods.items.required).toContain(
+      "nameHe",
+    );
+  });
+});

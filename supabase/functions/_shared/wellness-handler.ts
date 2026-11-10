@@ -41,9 +41,9 @@ import {
   nutritionPrompt,
   nutritionSchema,
   observationPrompt,
-  mealNutritionPrompt,
-  mealNutritionSchema,
-  normalizeObservedMeal,
+  compactMealPrompt,
+  compactMealSchema,
+  normalizeCompactMeal,
   normalizeFoodEstimate,
   assertEstimatedFoodMode,
 } from "./wellness-food.ts";
@@ -381,33 +381,34 @@ export async function handleWellness(req: Request, env: Environment) {
         );
       }
       const raw = await provider.structured(
-        imagePath ? mealNutritionPrompt : nutritionPrompt,
+        imagePath
+          ? compactMealPrompt +
+              "\nSchema: " +
+              JSON.stringify(compactMealSchema())
+          : nutritionPrompt,
         { mode, description, ...(imagePath ? { visualObservations } : {}) },
         imagePath ? 1800 : 2500,
         "nutrition_text",
-        imagePath ? mealNutritionSchema() : nutritionSchema(),
+        imagePath ? compactMealSchema() : nutritionSchema(),
         !!imagePath,
       );
       const estimate = imagePath
-        ? normalizeObservedMeal(raw, input.automatic === true)
+        ? normalizeCompactMeal(raw, input.automatic === true)
         : normalizeFoodEstimate(raw);
       // Exact catalog names/basis only: no silent raw/cooked or g/ml mismatches.
       const names = estimate.items.map((i) => i.name);
       if (names.length) {
-        const catalogMatches = check(
-          await admin
-            .from("food_catalog")
-            .select("data")
-            .in("data->>name", names),
-        );
-        const personal = check(
-          await admin
+        const [catalogResponse, personalResponse] = await Promise.all([
+          admin.from("food_catalog").select("data").in("data->>name", names),
+          admin
             .from("personal_foods")
             .select("data")
             .eq("owner_user_id", user.id)
             .is("deleted_at", null)
             .in("data->>name", names),
-        );
+        ]);
+        const catalogMatches = check(catalogResponse),
+          personal = check(personalResponse);
         for (const item of estimate.items) {
           const match = [...(personal ?? []), ...(catalogMatches ?? [])].find(
             (m) => m.data.name === item.name && m.data.basis === item.basis,

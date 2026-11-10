@@ -1,11 +1,13 @@
 "use client";
+import { displayedMealTitle } from "@/lib/health/meal-presentation";
+import { Utensils } from "lucide-react";
 import { useRef, useState } from "react";
 import { useHealthStore } from "@/lib/health/store";
 import { correctSavedMeal } from "@/lib/health/wellness-api";
 import { useHealthText } from "@/lib/health/i18n";
 import { HealthSheet } from "./health-sheet";
 import { AiConsent, useWellnessAvailability } from "./ai-consent";
-import { mealNutrients } from "@/lib/health/calculations";
+import { mealNutrients, scaleNutrients } from "@/lib/health/calculations";
 import { Disclosure, round } from "./shared";
 import { Button } from "@/components/ui/button";
 export function MealDetails({
@@ -62,7 +64,7 @@ export function MealDetails({
   }
   return (
     <HealthSheet
-      title={row.data.name || h("הארוחה שלי", "My meal")}
+      title={displayedMealTitle(row.data, h("הארוחה שלי", "My meal"))}
       onClose={onClose}
     >
       <div className="grid gap-5">
@@ -76,15 +78,32 @@ export function MealDetails({
             {round(totals.fat)}g
           </p>
         </div>
-        {row.data.items.map((i) => (
-          <div key={i.id}>
-            <strong>{i.food.name}</strong>
-            <p>
-              {i.quantity}{" "}
-              {i.food.basis === "g" ? h("גרם", "g") : h("מ״ל", "ml")}
-            </p>
-          </div>
-        ))}
+        <ul
+          className="health-ingredient-list"
+          aria-label={h("מרכיבי הארוחה", "Meal ingredients")}
+        >
+          {row.data.items.map((i) => {
+            const nutrients = scaleNutrients(i.food.per100, i.quantity);
+            return (
+              <li key={i.id}>
+                <span className="health-ingredient-icon" aria-hidden="true">
+                  <Utensils size={19} />
+                </span>
+                <div className="health-ingredient-copy">
+                  <strong>{i.food.name}</strong>
+                  <span>
+                    {round(i.quantity)}{" "}
+                    {i.food.basis === "g" ? h("גרם", "g") : h("מ״ל", "ml")}
+                  </span>
+                </div>
+                <span className="health-ingredient-energy">
+                  <strong>{round(nutrients.kcal)}</strong>
+                  <small>{h("קל׳", "kcal")}</small>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
         {row.data.items.some((i) => i.quantityRange || i.assumption) && (
           <Disclosure title={h("על ההערכה", "About this estimate")}>
             {row.data.items
@@ -112,7 +131,7 @@ export function MealDetails({
             <label>
               {h("מה צריך לתקן?", "What should change?")}
               <textarea
-                className="mt-2 w-full"
+                className="health-meal-correction mt-2 w-full"
                 disabled={busy}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -124,6 +143,7 @@ export function MealDetails({
               />
             </label>
             <Button
+              className="health-primary-action"
               disabled={busy || !availability.ready || !text.trim()}
               onClick={() => void correct()}
             >
