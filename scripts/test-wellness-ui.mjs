@@ -559,7 +559,13 @@ try {
   await noAI
     .getByRole("button", { name: "Packaged product", exact: true })
     .click();
+  await noAI.getByLabel("Barcode scanner", {exact:true}).waitFor();
+  assert.equal(await noAI.getByRole("group",{name:"Entry method",exact:true}).count(),0,"packaged product skips input method selection");
+  assert.equal(await noAI.getByText("Meal details & date",{exact:true}).count(),0,"packaged product starts without meal metadata");
+  assert.equal(await noAI.getByRole("button",{name:"Save to diary",exact:true}).count(),0,"no empty diary save before product selection");
+  if(process.env.WELLNESS_SCREENSHOTS_DIR)await noAI.screenshot({path:join(process.env.WELLNESS_SCREENSHOTS_DIR,"direct-product.png"),animations:"disabled"});
   await noAI.getByLabel("Product barcode", { exact: true }).fill("12345678");
+  assert.equal(await noAI.getByLabel("Barcode scanner",{exact:true}).count(),0,"typing releases the camera");
   const lookup = noAI.getByRole("button", {
     name: "Find product",
     exact: true,

@@ -7,13 +7,13 @@ import { type Food, type MealItem } from "@/lib/health/model";
 import { useHealthStore } from "@/lib/health/store";
 import { useHealthText } from "@/lib/health/i18n";
 import { BarcodeCamera } from "./barcode-camera";
-import { ErrorText, Field, SelectField, Disclosure, ChoiceTabs } from "./shared";
+import { ErrorText, Field, SelectField, Disclosure } from "./shared";
 
-export function ProductLabel({ onAdd }: { onAdd: (item: MealItem) => void }) {
+export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem) => void; autoScan?: boolean }) {
   const h = useHealthText(),
     owner = useHealthStore((s) => s.owner);
   const [barcode, setBarcode] = useState(""),
-    [camera, setCamera] = useState(false),
+    [camera, setCamera] = useState(autoScan),
     [busy, setBusy] = useState(false);
   const [food, setFood] = useState<Food | null>(null),
     [error, setError] = useState<string | null>(null),
@@ -29,6 +29,7 @@ export function ProductLabel({ onAdd }: { onAdd: (item: MealItem) => void }) {
     [sodiumUnit, setSodiumUnit] = useState<"mg" | "g" | "salt_g">("mg");
   const request = useRef(0);
   async function search(code = barcode) {
+    setCamera(false);
     const serial = ++request.current;
     setBusy(true);
     setError(null);
@@ -114,17 +115,15 @@ export function ProductLabel({ onAdd }: { onAdd: (item: MealItem) => void }) {
   }
   const valueField = (key:string,label:string) => <Field key={key} label={label} type="number" min="0" step="any" value={values[key]??""} onChange={e=>{setValues(v=>({...v,[key]:e.target.value}));setConfirmed(false)}}/>;
   return <section className="product-entry grid gap-4" aria-label={h("ערכי מוצר מהאריזה", "Product label values")}>
-    <ChoiceTabs label={h("דרך זיהוי המוצר", "Product entry method")} value={manual?"printed":"barcode"} onChange={next=>{++request.current;setBusy(false);setManual(next==="printed");setCamera(false);setFood(null);setConfirmed(false);setError(null)}} options={[{value:"barcode",label:h("ברקוד", "Barcode")},{value:"printed",label:h("מהאריזה", "Printed values")}]} />
-    <p className="text-xs text-muted-foreground">{h("נתוני מוצר מהמאגר או מהאריזה. ללא הערכת AI.", "Product data from the database or package. No AI estimates.")}</p>
     <ErrorText error={error}/>
-    {!manual && <><form className="flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();void search()}}>
-      <div className="min-w-0 flex-1"><Field label={h("ברקוד המוצר", "Product barcode")} inputMode="numeric" value={barcode} onChange={e=>{++request.current;setBusy(false);setBarcode(e.target.value.replace(/\D/g,""));setFood(null);setConfirmed(false)}}/></div>
+    {!manual && <>{camera&&<BarcodeCamera onCode={code=>{setBarcode(code);setCamera(false);void search(code)}}/>}<form className="flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();void search()}}>
+      <div className="min-w-0 flex-1"><Field label={h("ברקוד המוצר", "Product barcode")} inputMode="numeric" placeholder={h("הזינו מספר ברקוד", "Enter barcode number")} onFocus={()=>setCamera(false)} value={barcode} onChange={e=>{++request.current;setBusy(false);setBarcode(e.target.value.replace(/\D/g,""));setFood(null);setConfirmed(false)}}/></div>
       <Button type="submit" disabled={busy||!/^\d{8,14}$/.test(barcode)}>{busy?h("מחפש…","Looking up…"):h("איתור מוצר", "Find product")}</Button>
-    </form><Button type="button" variant="outline" className="product-camera-action" onClick={()=>setCamera(v=>!v)}>{h("סריקת ברקוד במצלמה", "Scan barcode with camera")}</Button>
-    {camera&&<BarcodeCamera onCode={code=>{setBarcode(code);setCamera(false);void search(code)}}/>}</>}
+    </form>{!camera&&<Button type="button" variant="outline" onClick={()=>setCamera(true)}>{h("סריקת ברקוד במצלמה", "Scan barcode with camera")}</Button>}
+    <button type="button" className="justify-self-start text-sm text-muted-foreground underline" onClick={()=>{++request.current;setCamera(false);setBusy(false);setManual(true);setFood(null);setConfirmed(false);setError(null)}}>{h("אין ברקוד? הזנה מהאריזה", "No barcode? Enter package values")}</button></>}
     {message&&<p role="status" className="text-sm">{message}</p>}
     {food&&!manual&&<div className="product-result"><strong>{food.name}</strong><p>{h("לכל 100", "Per 100")} {food.basis}: {food.per100.kcal} kcal · P {food.per100.protein} / C {food.per100.carbs} / F {food.per100.fat}</p><small>{food.source==="openfoodfacts"?"Open Food Facts":h("תווית שאושרה", "Confirmed label")}</small></div>}
-    {manual&&<div className="grid gap-4">
+    {manual&&<div className="grid gap-4"><button type="button" className="justify-self-start text-sm underline" onClick={()=>{setManual(false);setCamera(true);setError(null);setMessage("")}}>{h("חזרה לסריקת ברקוד", "Back to barcode scanner")}</button>
       <Field label={h("שם המוצר שעל האריזה", "Product name on package")} value={name} onChange={e=>{setName(e.target.value);setConfirmed(false)}}/>
       <div className="grid grid-cols-2 gap-3"><Field label={h("הערכים המודפסים הם לכמות", "Printed values are per amount")} type="number" min="0.1" value={printedAmount} onChange={e=>{setPrintedAmount(e.target.value);setConfirmed(false)}}/><SelectField label={h("יחידת התווית", "Label unit")} value={basis} onChange={e=>{setBasis(e.target.value as "g"|"ml");setConfirmed(false)}}><option value="g">{h("גרם", "grams")}</option><option value="ml">{h("מ״ל", "ml")}</option></SelectField></div>
       <p className="text-xs text-muted-foreground">{h("ארבעת הערכים הראשיים נדרשים. אפס מזינים במפורש.", "All four main values are required. Enter zero explicitly.")}</p>

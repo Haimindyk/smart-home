@@ -486,10 +486,10 @@ function MealEditor({
   const totals = mealNutrients(meal.items);
   return (
     <Dialog open onOpenChange={(open)=>{if(!open&&!busy)onClose()}}>
-    <DialogContent className="health-app meal-composer start-0 top-auto bottom-0 translate-x-0 translate-y-0 rtl:translate-x-0" showCloseButton={false}>
+    <DialogContent blurOverlay={mode!=="label"} className="health-app meal-composer start-0 top-auto bottom-0 translate-x-0 translate-y-0 rtl:translate-x-0" showCloseButton={false}>
     <DialogTitle className="sr-only">{h("הוספת ארוחה", "Add meal")}</DialogTitle>
     <Panel
-      title={existing ? h("עריכת ארוחה", "Meal editor") : h("מה אוכלים היום?", "What’s on your plate?")}
+      title={existing ? h("עריכת ארוחה", "Meal editor") : foodMode==="product" ? h("מוצר ארוז", "Packaged product") : h("מה אוכלים היום?", "What’s on your plate?")}
       action={
         <Button variant="ghost" disabled={busy} onClick={onClose}>
           {h("סגירה", "Close")}
@@ -498,8 +498,8 @@ function MealEditor({
     >
       <div className="grid gap-4">
         <ErrorText error={error} />
-        <p className="text-sm text-muted-foreground">{h("בדקו את הכמויות לפני השמירה.", "Review portions before saving.")}</p>
-        <details className="meal-metadata"><summary>{h("פרטי הארוחה והתאריך", "Meal details & date")}</summary>
+        {foodMode!=="product"&&<p className="text-sm text-muted-foreground">{h("בדקו את הכמויות לפני השמירה.", "Review portions before saving.")}</p>}
+        {(foodMode!=="product"||meal.items.length>0)&&<details className="meal-metadata"><summary>{h("פרטי הארוחה והתאריך", "Meal details & date")}</summary>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field
             label={h("תאריך הארוחה", "Meal date")}
@@ -536,8 +536,8 @@ function MealEditor({
           value={meal.name}
           onChange={(e) => setMeal((m) => ({ ...m, name: e.target.value }))}
         />
-        </details>
-        {(capture||foodMode==="text"||foodMode==="product")&&<section className="meal-photo-entry rounded-xl border p-4" aria-label={h("הערכת ארוחה עם AI","AI meal estimate")}>
+        </details>}
+        {foodMode==="product"?<ProductLabel key={owner} autoScan onAdd={item=>setMeal(m=>({...m,items:[...m.items,item]}))}/>: (capture||foodMode==="text")&&<section className="meal-photo-entry rounded-xl border p-4" aria-label={h("הערכת ארוחה עם AI","AI meal estimate")}>
           <h3 className="font-semibold">{h("מוסיפים לארוחה","Add to your meal")}</h3>
           <div className="mt-3 grid gap-3">
             <ChoiceTabs label={h("דרך הוספה", "Entry method")} value={mode} onChange={next=>{setMode(next);setMeal(m=>({...m,imagePath:null}));setSecondPhoto(null);setRequestId(crypto.randomUUID());}} options={[{value:"meal",label:h("צילום", "Photo")},{value:"text",label:h("תיאור", "Describe")},{value:"label",label:h("מוצר", "Product")}]} />
@@ -663,7 +663,7 @@ function MealEditor({
             </details>
           </div>
         ))}
-        <div className="meal-savebar"><strong>
+        {(foodMode!=="product"||meal.items.length>0)&&<div className="meal-savebar"><strong>
           {round(totals.kcal)} kcal · P {round(totals.protein)} / C{" "}
           {round(totals.carbs)} / F {round(totals.fat)}
         </strong>
@@ -675,7 +675,7 @@ function MealEditor({
         >
           {h("שמירה ביומן", "Save to diary")}
         </Button>
-        </div>
+        </div>}
         {meal.items.length > 0 && (
           <details>
             <summary>
