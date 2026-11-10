@@ -114,9 +114,12 @@ export function parseObservations(raw: unknown) {
       quantityHigh = number(f.quantityHigh, 0.1, 10000);
     if (quantityLow > quantity || quantityHigh < quantity)
       throw new Error("invalid_output");
+    const translated = f.nameHe == null ? "" : text(f.nameHe, 200);
     const nameHe = Object.hasOwn(names, nameEn.toLowerCase().trim())
       ? names[nameEn.toLowerCase().trim()]
-      : nameEn;
+      : /[א-ת]/.test(translated)
+        ? translated
+        : nameEn;
     if (!nameHe) throw new Error("invalid_output");
     return {
       id,
@@ -291,7 +294,7 @@ export function assertEstimatedFoodMode(mode: unknown) {
   if (mode !== "meal" && mode !== "text") throw new Error("invalid_input");
 }
 
-export const mealNutritionPrompt = `Extract ONLY food candidates from visualObservations, with the user's description as additional context. Explicit user confirmations/corrections override visual guesses; omit any ingredient the user says is absent. Return the supplied schema. nameEn is the English identity, not a translation. question is Hebrew. Return EVERY distinct food candidate mentioned, not only the first. Keep alternatives and uncertainty from the observations; never silently choose between egg/radish or tofu/meat. If a visual identity has plausible alternatives, certainty MUST be uncertain. Give a defensible best-guess nutrient estimate for that candidate; per100 is null only if no defensible food estimate is possible. Do not add foods or hidden oil/sauces unless explicitly stated by the user. Each food occurs ONCE even with two views of the same plate. Quantities/bounds are rough estimates in grams (g) for solids or ml for liquids, never cups/pieces/ounces. Explicit user-weighed amounts override visual guesses and have identical bounds. Never convert ml to g without documented density: omit that candidate and ask a question if this is required. For likely foods, give estimated nutrients per 100 g/ml, with unknown optional nutrients null. Do not invent database references or label values. If the observations are not food, malformed or refused, return foods=[] and a clarification question. All identities and portions will require user confirmation.`;
+export const mealNutritionPrompt = `Extract ONLY food candidates from visualObservations, with the user's description as additional context. Explicit user confirmations/corrections override visual guesses; omit any ingredient the user says is absent. Return the supplied schema. nameEn is the English identity. nameHe MUST be its natural Hebrew translation, including preparation; never copy English into nameHe. question is Hebrew. Return EVERY distinct food candidate mentioned, not only the first. Keep alternatives and uncertainty from the observations; never silently choose between egg/radish or tofu/meat. If a visual identity has plausible alternatives, certainty MUST be uncertain. Give a defensible best-guess nutrient estimate for that candidate; per100 is null only if no defensible food estimate is possible. Do not add foods or hidden oil/sauces unless explicitly stated by the user. Each food occurs ONCE even with two views of the same plate. Quantities/bounds are rough estimates in grams (g) for solids or ml for liquids, never cups/pieces/ounces. Explicit user-weighed amounts override visual guesses and have identical bounds. Never convert ml to g without documented density: omit that candidate and ask a question if this is required. For likely foods, give estimated nutrients per 100 g/ml, with unknown optional nutrients null. Do not invent database references or label values. If the observations are not food, malformed or refused, return foods=[] and a clarification question. Names, identities and portions are estimates that the user can correct after saving.`;
 export function mealNutritionSchema() {
   const nutrient = nutritionSchema().properties.items.items.properties.per100;
   return {
@@ -304,11 +307,18 @@ export function mealNutritionSchema() {
           ...observationSchema.properties.foods.items,
           properties: {
             ...observationSchema.properties.foods.items.properties,
+            nameHe: {
+              type: "string",
+              maxLength: 200,
+              minLength: 2,
+              pattern: ".*[א-ת].*",
+            },
             per100: { anyOf: [nutrient, { type: "null" }] },
           },
           required: [
             ...observationSchema.properties.foods.items.required,
             "per100",
+            "nameHe",
           ],
         },
       },
@@ -318,6 +328,8 @@ export function mealNutritionSchema() {
 export function normalizeObservedMeal(raw: unknown, automatic = false) {
   const observed = parseObservations(raw);
   const supplied = record(raw).foods as Record<string, unknown>[];
+  if (automatic && observed.foods.some((f) => !/[א-ת]/.test(f.nameHe)))
+    throw new Error("invalid_output");
   const likely = observed.foods
     .filter(
       (f) =>
@@ -355,6 +367,119 @@ export function normalizeObservedMeal(raw: unknown, automatic = false) {
   if (automatic) {
     estimate.needsClarification = false;
     estimate.question = "";
+    estimate.items.forEach((item, index) => {
+      item.assumption = item.assumption.replace(
+        "זיהוי וכמות משוערים מתמונה — נדרש אישור.",
+        "זיהוי וכמות משוערים מתמונה. ניתן לתקן ביומן.",
+      );
+      if (
+        observed.foods.find((f) => f.id === likely[index].id)?.certainty ===
+        "uncertain"
+      )
+        item.assumption = "הזיהוי אינו ודאי. " + item.assumption;
+    });
   }
   return estimate;
+}
+
+// A smaller representation of the same candidate contract cuts generated tokens.
+export const compactMealPrompt = `${mealNutritionPrompt}\nUse the compact schema: portion is [estimate, lower bound, upper bound] in the declared g/ml basis. per100 is an ordered array [kcal, protein_g, carbs_g, fat_g, fiber_g, sugar_g, saturatedFat_g, sodium_mg], or null if no defensible estimate exists. The first four nutrient values are required numbers; unknown optional ones are null. Return complete Hebrew words in nameHe. Do not emit IDs or code. Keep EVERY visible candidate and its alternatives. Do not invent exact weighed portions.`;
+export function compactMealSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      foods: {
+        type: "array",
+        maxItems: 20,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            nameEn: { type: "string" },
+            nameHe: {
+              type: "string",
+              minLength: 2,
+              maxLength: 200,
+              pattern: ".*[א-ת].*",
+            },
+            certainty: { type: "string", enum: ["likely", "uncertain"] },
+            alternatives: {
+              type: "array",
+              maxItems: 3,
+              items: { type: "string" },
+            },
+            basis: { type: "string", enum: ["g", "ml"] },
+            portion: {
+              type: "array",
+              minItems: 3,
+              maxItems: 3,
+              items: { type: "number", minimum: 0.1, maximum: 10000 },
+            },
+            per100: {
+              anyOf: [
+                {
+                  type: "array",
+                  minItems: 8,
+                  maxItems: 8,
+                  items: { type: ["number", "null"], minimum: 0 },
+                },
+                { type: "null" },
+              ],
+            },
+          },
+          required: [
+            "nameEn",
+            "nameHe",
+            "certainty",
+            "alternatives",
+            "basis",
+            "portion",
+            "per100",
+          ],
+        },
+      },
+      question: { type: "string" },
+    },
+    required: ["foods", "question"],
+  };
+}
+export function normalizeCompactMeal(raw: unknown, automatic = false) {
+  const r = record(raw);
+  if (!Array.isArray(r.foods) || r.foods.length > 20)
+    throw new Error("invalid_output");
+  const foods = r.foods.map((value, index) => {
+    const f = record(value),
+      portion = f.portion,
+      a = f.per100,
+      nameHe = text(f.nameHe, 200);
+    if (
+      !Array.isArray(portion) ||
+      portion.length !== 3 ||
+      (nameHe.match(/[א-ת]/g)?.length ?? 0) < 2 ||
+      !(a === null || (Array.isArray(a) && a.length === 8))
+    )
+      throw new Error("invalid_output");
+    return {
+      ...f,
+      id: `f${index + 1}`,
+      quantity: portion[0],
+      quantityLow: portion[1],
+      quantityHigh: portion[2],
+      per100:
+        a === null
+          ? null
+          : {
+              kcal: a[0],
+              protein: a[1],
+              carbs: a[2],
+              fat: a[3],
+              fiber: a[4],
+              sugar: a[5],
+              saturatedFat: a[6],
+              sodium: a[7],
+            },
+    };
+  });
+  return normalizeObservedMeal({ ...r, foods }, automatic);
 }

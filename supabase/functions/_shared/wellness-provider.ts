@@ -94,7 +94,12 @@ export function createProvider(
         : {
             source: "hosted",
             base: task === "nutrition_photo" ? MODELS.vision : MODELS.text,
-            ...(task === "nutrition_photo" ? { normalizer: MODELS.mealText, contract: "meal-candidates-v1" } : {}),
+            ...(task === "nutrition_photo"
+              ? {
+                  normalizer: MODELS.mealText,
+                  contract: "meal-candidates-v2-compact",
+                }
+              : {}),
           };
     },
     async structured(

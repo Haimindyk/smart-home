@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import { displayedMealTitle } from "@/lib/health/meal-presentation";
 import { useEffect, useState } from "react";
 import { Camera, ArrowUpLeft, Flame, Beef, Wheat, Droplet, Plus, Search, Bookmark, PenLine, ScanBarcode, Utensils } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -239,7 +240,7 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
                   >
                     <div className="health-meal-card-main">
                       {m.data.imagePath ? <MealImage path={m.data.imagePath} thumbnail/> : <span className="health-meal-thumb health-meal-placeholder" aria-hidden="true"><Utensils size={23}/></span>}
-                      <div className="min-w-0 flex-1"><h3><button onClick={()=>setDetailsId(m.id)}>{m.data.name || label(kind)}</button></h3><p className="health-meal-foods">{m.data.items.slice(0,2).map(i=>`${i.food.name} · ${i.quantity} ${i.food.basis === "ml" ? h("מ״ל","ml") : h("גרם","g")}`).join(" · ")}</p>{m.data.items.length>2&&<small>{h(`ועוד ${m.data.items.length-2} פריטים`,`+${m.data.items.length-2} more items`)}</small>}</div>
+                      <div className="min-w-0 flex-1"><h3><button onClick={()=>setDetailsId(m.id)}>{displayedMealTitle(m.data,label(kind))}</button></h3><p className="health-meal-foods">{m.data.items.slice(0,2).map(i=>`${i.food.name} · ${i.quantity} ${i.food.basis === "ml" ? h("מ״ל","ml") : h("גרם","g")}`).join(" · ")}</p>{m.data.items.length>2&&<small>{h(`ועוד ${m.data.items.length-2} פריטים`,`+${m.data.items.length-2} more items`)}</small>}</div>
                       <div className="health-meal-card-end"><strong>{round(n.kcal)} <small>kcal</small></strong><Button size="sm" variant="ghost" onClick={()=>{setEditing(m);setEditor(true)}}>{h("עריכה", "Edit")}</Button></div>
                     </div>
                     <div className="health-meal-macros">{([["protein",h("חלבון","Protein"),Beef],["carbs",h("פחמימות","Carbs"),Wheat],["fat",h("שומן","Fat"),Droplet]] as const).map(([key,title,Icon])=><span key={key} className={`meal-macro-${key}`} aria-label={`${title}: ${round(n[key])} g`}><Icon size={13}/>{round(n[key])} {h("ג׳","g")}</span>)}</div>

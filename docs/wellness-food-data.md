@@ -34,23 +34,29 @@ the text/chat/program model. Photo normalization refuses owned-model mode until
 the new contract is independently qualified for owned adapters.
 
 The schema separates identity, alternatives, estimated quantity, bounds, g/ml
-basis and per-100 nutrients. Known food-name translations are deterministic;
-unmapped English identities stay English instead of inventing a Hebrew identity.
-Alternatives force uncertainty even if the model says `likely`. Uncertain foods
-are excluded and named in a fixed clarification message. Duplicate IDs/identities,
-unknown units and mass/volume mismatches are rejected. The nutrition step cannot
-rename an observed food or duplicate/reweigh its portion.
+basis and per-100 nutrients. The normalizer now returns complete Hebrew names;
+known canonical names still prevent conflicting translations. New photo results
+with English-only or one-letter names are rejected. A compact, validated vector
+stores portion [estimate, low, high] and eight ordered per-100 nutrients, reducing
+repeated output tokens without changing models or dropping optional-null values.
+References are assigned by the server. Alternatives still force uncertainty.
+Automatic capture includes defensible best-guess candidates as estimates, while
+the older manual-review contract excludes uncertain candidates. Duplicate identities,
+malformed vectors, unknown units and mass/volume mismatches are rejected.
 
 Mass kg/oz/lb and volume litres in text estimates use exact arithmetic. A cup,
 spoon or piece is not silently treated as grams. Food-specific household gram
 estimates remain explicitly described estimates; otherwise ask for a weighed
 amount. No density is guessed to convert ml to g.
 
-The photo draft warns that totals include listed items only. It exposes food
-search/manual addition for omitted candidates and requires explicit confirmation
-of corrections/missing ingredients before saving. Nutrients remain AI estimates
-unless an exact, basis-matched food-catalog record supplies them. Photos do not
-establish actual weights, hidden oil or preparation.
+A new photo displays the captured image immediately, stops the live camera and
+shows an indeterminate scan with real upload/analysis/save stages. Successful
+analysis saves automatically; failure/empty results do not create a meal. The title
+uses detected food names without another model request. Opening the meal shows
+ingredient cards, estimated ranges and free-text AI correction; correcting an
+automatic title updates it while preserving custom titles. Nutrients remain AI
+estimates unless an exact, basis-matched catalog record supplies them. Photos do
+not establish actual weights, hidden oil or preparation.
 
 ## Validation
 
@@ -71,3 +77,10 @@ establish actual weights, hidden oil or preparation.
 
 The full 50-example food evaluation, coaching evaluation and authenticated
 browser-to-Edge-to-provider test remain required before broad AI enablement.
+
+- A four-food synthetic observation probe of the compact contract retained all
+  foods, Hebrew names, units, portion ranges and unknown nutrient values. One
+  normalization-stage probe took about 11 seconds versus about 18 seconds for
+  the verbose contract. This is a single diagnostic comparison, not an end-to-end
+  latency guarantee or accuracy benchmark. Faster Qwen probes were rejected for
+  omissions/translation errors; the production photo model remains Llama 3.3.

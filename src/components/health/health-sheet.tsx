@@ -29,7 +29,7 @@ export function HealthSheet({
         <div className="health-sheet-heading">
           <span className="health-sheet-handle" aria-hidden="true" />
           <div>
-            <DialogTitle>{title}</DialogTitle>
+            <DialogTitle style={{ fontFamily: "inherit" }}>{title}</DialogTitle>
             <Button
               variant="ghost"
               onClick={onClose}

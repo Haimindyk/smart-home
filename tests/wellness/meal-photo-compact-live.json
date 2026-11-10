@@ -1,0 +1,97 @@
+{
+  "source": "Synthetic four-food observation input; live Cloudflare response. Contract regression, not food accuracy or a latency benchmark.",
+  "normalizationMs": 11359,
+  "output": {
+    "foods": [
+      {
+        "nameEn": "chicken breast",
+        "nameHe": "חזה עוף מגריל",
+        "certainty": "likely",
+        "alternatives": [],
+        "basis": "g",
+        "portion": [
+          150,
+          100,
+          200
+        ],
+        "per100": [
+          165,
+          31,
+          0,
+          3.6,
+          null,
+          null,
+          1,
+          null
+        ]
+      },
+      {
+        "nameEn": "white rice",
+        "nameHe": "אורז לבן מבושל",
+        "certainty": "likely",
+        "alternatives": [],
+        "basis": "g",
+        "portion": [
+          180,
+          120,
+          240
+        ],
+        "per100": [
+          130,
+          2.7,
+          28,
+          0.5,
+          0.4,
+          null,
+          null,
+          1
+        ]
+      },
+      {
+        "nameEn": "cucumber",
+        "nameHe": "מלפפון חתוך",
+        "certainty": "likely",
+        "alternatives": [],
+        "basis": "g",
+        "portion": [
+          50,
+          30,
+          70
+        ],
+        "per100": [
+          16,
+          0.6,
+          3.6,
+          0.1,
+          0.5,
+          1.7,
+          null,
+          2
+        ]
+      },
+      {
+        "nameEn": "cherry tomatoes",
+        "nameHe": "עגבניות צ'רי",
+        "certainty": "likely",
+        "alternatives": [],
+        "basis": "g",
+        "portion": [
+          60,
+          40,
+          90
+        ],
+        "per100": [
+          18,
+          0.9,
+          3.9,
+          0.2,
+          1.1,
+          2.6,
+          null,
+          1
+        ]
+      }
+    ],
+    "question": "האם המידע המופיע נכון?"
+  }
+}

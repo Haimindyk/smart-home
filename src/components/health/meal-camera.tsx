@@ -1,4 +1,7 @@
 "use client";
+import Image from "next/image";
+import { Check, LoaderCircle } from "lucide-react";
+import { mealTitle } from "@/lib/health/meal-presentation";
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useHealthStore } from "@/lib/health/store";
@@ -31,8 +34,17 @@ export function MealCamera({
     [error, setError] = useState(""),
     [noCamera, setNoCamera] = useState(false),
     [noFood, setNoFood] = useState(false),
-    [cameraReady, setCameraReady] = useState(false);
+    [cameraReady, setCameraReady] = useState(false),
+    [preview, setPreview] = useState<string | null>(null),
+    [phase, setPhase] = useState<"upload" | "analysis" | "save">("upload");
+  useEffect(
+    () => () => {
+      if (preview) URL.revokeObjectURL(preview);
+    },
+    [preview],
+  );
   useEffect(() => {
+    if (preview) return;
     let disposed = false;
     let stream: MediaStream | undefined;
     if (!navigator.mediaDevices) {
@@ -50,6 +62,7 @@ export function MealCamera({
       })
       .then((s) => {
         stream = s;
+        if (!disposed) setNoCamera(false);
         if (disposed) s.getTracks().forEach((t) => t.stop());
         else if (video.current) video.current.srcObject = s;
       })
@@ -60,10 +73,13 @@ export function MealCamera({
       disposed = true;
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, []);
+  }, [preview]);
   async function submit(file?: File) {
     if (lock.current || finished.current || !availability.ready) return;
-    if (file) attempt.current = { id: crypto.randomUUID(), file };
+    if (file) {
+      attempt.current = { id: crypto.randomUUID(), file };
+      setPreview(URL.createObjectURL(file));
+    }
     const job = attempt.current;
     if (!job) return;
     lock.current = true;
@@ -73,8 +89,12 @@ export function MealCamera({
     const owner = useHealthStore.getState().owner;
     let stage = "upload";
     try {
-      job.path ??= await uploadMealImage(job.file, owner!);
+      if (!job.path) {
+        setPhase("upload");
+        job.path = await uploadMealImage(job.file, owner!);
+      }
       stage = "analysis";
+      if (!job.result) setPhase("analysis");
       job.result ??= await estimateMeal({
         requestId: job.id,
         mode: "meal",
@@ -89,13 +109,14 @@ export function MealCamera({
         throw Error("no_food");
       }
       stage = "save";
+      setPhase("save");
       if (!useHealthStore.getState().data.meals.some((m) => m.id === job.id))
         await useHealthStore.getState().save(
           "meals",
           {
             date,
             kind: "snack",
-            name: h("ארוחה מצולמת", "Photo meal"),
+            name: mealTitle(job.result.items),
             items: job.result.items,
             imagePath: job.path,
             aiEstimate: { analysisId: job.id },
@@ -183,7 +204,7 @@ export function MealCamera({
         showCloseButton={false}
       >
         <video
-          style={{ zIndex: 0 }}
+          style={{ zIndex: 0, display: preview ? "none" : undefined }}
           ref={video}
           autoPlay
           playsInline
@@ -191,6 +212,21 @@ export function MealCamera({
           onLoadedData={() => setCameraReady(true)}
           aria-label={h("תצוגת מצלמה", "Camera preview")}
         />
+        {preview && (
+          <Image
+            src={preview}
+            alt={h("הארוחה שצולמה", "Captured meal")}
+            fill
+            sizes="100vw"
+            unoptimized
+            className="health-capture-preview"
+          />
+        )}
+        {preview && busy && (
+          <div className="health-capture-scan" aria-hidden="true">
+            <span />
+          </div>
+        )}
         <header style={{ zIndex: 1 }}>
           <button
             disabled={busy}
@@ -200,10 +236,13 @@ export function MealCamera({
             ×
           </button>
           <DialogTitle style={{ fontFamily: "inherit" }}>
-            {h("צילום ארוחה", "Photograph meal")}
+            {busy
+              ? h("מזהים את הארוחה", "Analyzing meal")
+              : h("צילום ארוחה", "Photograph meal")}
           </DialogTitle>
         </header>
         <div
+          hidden={!!preview}
           className="health-camera-frame"
           style={{ zIndex: 1 }}
           aria-hidden="true"
@@ -217,19 +256,84 @@ export function MealCamera({
               )}
             </p>
           )}
-          {!availability.ready && <AiConsent />}
-          <p>
-            {h(
-              "הארוחה תתווסף כהערכה. אפשר לתקן ביומן.",
-              "Added as an estimate. Correct it in your diary.",
-            )}
-          </p>
-          <p>
-            {h(
-              "התמונה תישמר ביומן האישי עם הארוחה.",
-              "The photo is saved with the meal in your private diary.",
-            )}
-          </p>
+          {!busy && !availability.ready && <AiConsent />}
+          {busy && (
+            <div
+              className="health-capture-progress"
+              role="progressbar"
+              aria-live="polite"
+              aria-label={h("פענוח הארוחה", "Meal analysis")}
+              aria-valuetext={
+                phase === "upload"
+                  ? h("מעלים תמונה", "Uploading photo")
+                  : phase === "analysis"
+                    ? h(
+                        "מזהים מרכיבים וכמויות",
+                        "Identifying foods and portions",
+                      )
+                    : h("שומרים ביומן", "Saving to diary")
+              }
+            >
+              <ol>
+                {(["upload", "analysis", "save"] as const).map(
+                  (step, index) => {
+                    const active = phase === step,
+                      done =
+                        index < ["upload", "analysis", "save"].indexOf(phase);
+                    return (
+                      <li key={step} data-active={active} data-done={done}>
+                        {done ? (
+                          <Check size={16} />
+                        ) : active ? (
+                          <LoaderCircle
+                            size={16}
+                            className="health-capture-spinner"
+                          />
+                        ) : (
+                          <span className="health-capture-dot" />
+                        )}
+                        {step === "upload"
+                          ? h("העלאה", "Upload")
+                          : step === "analysis"
+                            ? h("זיהוי", "Analyze")
+                            : h("שמירה", "Save")}
+                      </li>
+                    );
+                  },
+                )}
+              </ol>
+              <strong>
+                {phase === "upload"
+                  ? h("מעלים את התמונה…", "Uploading your photo…")
+                  : phase === "analysis"
+                    ? h(
+                        "מזהים מרכיבים וכמויות…",
+                        "Identifying foods and portions…",
+                      )
+                    : h(
+                        "מוסיפים את הארוחה ליומן…",
+                        "Adding your meal to the diary…",
+                      )}
+              </strong>
+            </div>
+          )}
+
+          {!busy && (
+            <p>
+              {h(
+                "הארוחה תתווסף כהערכה. אפשר לתקן ביומן.",
+                "Added as an estimate. Correct it in your diary.",
+              )}
+            </p>
+          )}
+          {!busy && (
+            <p>
+              {h(
+                "התמונה תישמר ביומן האישי עם הארוחה.",
+                "The photo is saved with the meal in your private diary.",
+              )}
+            </p>
+          )}
           {error && (
             <div>
               {noFood ? (
@@ -249,26 +353,39 @@ export function MealCamera({
               )}
             </div>
           )}
-          <div className="health-camera-actions">
-            <button
-              disabled={busy || !availability.ready}
-              onClick={() => gallery.current?.click()}
-            >
-              {h("גלריה", "Gallery")}
-            </button>
-            <button
-              className="health-camera-shutter"
-              disabled={busy || noCamera || !cameraReady || !availability.ready}
-              onClick={capture}
-              aria-label={h("צילום", "Take photo")}
-            />
-            <span />
-          </div>
-          <p role="status">
-            {busy
-              ? h("מזהה ומוסיף ליומן…", "Analyzing and adding to diary…")
-              : ""}
-          </p>
+          {!busy && (
+            <div className="health-camera-actions">
+              <button
+                disabled={busy || !availability.ready}
+                onClick={() => gallery.current?.click()}
+              >
+                {h("גלריה", "Gallery")}
+              </button>
+              {preview ? (
+                <button
+                  onClick={() => {
+                    setPreview(null);
+                    setCameraReady(false);
+                    setError("");
+                    setNoFood(false);
+                    attempt.current = null;
+                  }}
+                >
+                  {h("צילום חדש", "Retake photo")}
+                </button>
+              ) : (
+                <button
+                  className="health-camera-shutter"
+                  disabled={
+                    busy || noCamera || !cameraReady || !availability.ready
+                  }
+                  onClick={capture}
+                  aria-label={h("צילום", "Take photo")}
+                />
+              )}
+              <span />
+            </div>
+          )}
           <input
             ref={gallery}
             hidden

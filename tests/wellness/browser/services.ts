@@ -132,8 +132,11 @@ export const lookupFood = async (
       }
     : { foods: [], needsLabel: true, name: "" };
 };
-export const uploadMealImage = async () =>
-  `${useHealthStore.getState().owner}/test.jpg`;
+export const uploadMealImage = async () => {
+  if (new URLSearchParams(location.search).has("photo-progress"))
+    await new Promise((r) => setTimeout(r, 350));
+  return `${useHealthStore.getState().owner}/test.jpg`;
+};
 export const createClient = () => ({
   storage: {
     from: () => ({
@@ -286,6 +289,8 @@ export async function healthFunction(
     };
   }
   if (input.action === "nutrition") {
+    if (new URLSearchParams(location.search).has("photo-progress"))
+      await new Promise((r) => setTimeout(r, 1800));
     if (new URLSearchParams(location.search).has("photo-empty"))
       return {
         analysisId: input.requestId,

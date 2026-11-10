@@ -538,10 +538,19 @@ try {
   const savedMealId = await photo.evaluate(
     () => window.wellnessFixture.meals().at(-1).id,
   );
-  await photo.getByRole("button", { name: "Photo meal", exact: true }).click();
+  await photo
+    .getByRole("button", { name: "אורז לבן מבושל", exact: true })
+    .click();
   await photo.getByLabel("What should change?").fill("זה דג ולא חזה עוף");
   await photo.getByRole("button", { name: "Update meal", exact: true }).click();
   await photo.getByText("Meal updated", { exact: true }).waitFor();
+  await photo
+    .getByRole("dialog")
+    .getByRole("heading", { name: "דג", exact: true })
+    .waitFor();
+  await photo
+    .getByRole("list", { name: "Meal ingredients", exact: true })
+    .waitFor();
   assert.equal(
     (await actions(photo)).filter((c) => c.table === "meals").length,
     2,
@@ -550,9 +559,8 @@ try {
   assert.equal(
     await photo.evaluate(
       () =>
-        window.wellnessFixture
-          .meals()
-          .filter((m) => m.data.name === "Photo meal").length,
+        window.wellnessFixture.meals().filter((m) => !!m.data.aiEstimate)
+          .length,
     ),
     1,
     "correction does not insert another meal",
@@ -583,9 +591,8 @@ try {
     assert.equal(
       await p.evaluate(
         () =>
-          window.wellnessFixture
-            .meals()
-            .filter((m) => m.data.name === "Photo meal").length,
+          window.wellnessFixture.meals().filter((m) => !!m.data.aiEstimate)
+            .length,
       ),
       0,
       "failed attempt creates no diary row",
@@ -647,6 +654,82 @@ try {
     "all AI consumers share one retried availability request",
   );
   await recovery.close();
+  for (const language of ["he", "en"]) {
+    const isHebrew = language === "he";
+    const progress = await browser.newPage({
+      viewport: { width: 390, height: 844 },
+    });
+    await progress.goto(base + "/?photo-progress=1&lang=" + language);
+    await progress
+      .getByRole("button", {
+        name: isHebrew ? "הוספת ארוחה" : "Add meal",
+        exact: true,
+      })
+      .click();
+    await progress
+      .getByRole("button", {
+        name: isHebrew ? "צלם ארוחה" : "Photograph a meal",
+        exact: true,
+      })
+      .click();
+    await progress.waitForFunction(
+      () => document.querySelector("video")?.videoWidth > 0,
+    );
+    await progress
+      .getByRole("button", {
+        name: isHebrew ? "צילום" : "Take photo",
+        exact: true,
+      })
+      .click();
+    await progress
+      .getByAltText(isHebrew ? "הארוחה שצולמה" : "Captured meal", {
+        exact: true,
+      })
+      .waitFor();
+    await progress.waitForFunction(() =>
+      [...document.querySelector("video").srcObject.getTracks()].every(
+        (t) => t.readyState === "ended",
+      ),
+    );
+    await progress
+      .getByRole("progressbar", {
+        name: isHebrew ? "פענוח הארוחה" : "Meal analysis",
+        exact: true,
+      })
+      .waitFor();
+    assert.equal(
+      await progress.getByRole("progressbar").getAttribute("aria-valuenow"),
+      null,
+      "analysis progress is not a fabricated percentage",
+    );
+    await progress
+      .getByText(
+        isHebrew ? "מזהים מרכיבים וכמויות…" : "Identifying foods and portions…",
+        { exact: true },
+      )
+      .waitFor();
+    if (process.env.WELLNESS_SCREENSHOTS_DIR)
+      await progress.screenshot({
+        path: join(
+          process.env.WELLNESS_SCREENSHOTS_DIR,
+          language + "-meal-processing.png",
+        ),
+        animations: "disabled",
+      });
+    await progress.getByRole("dialog").waitFor({ state: "hidden" });
+    await progress
+      .getByRole("button", { name: "אורז לבן מבושל", exact: true })
+      .click();
+    if (process.env.WELLNESS_SCREENSHOTS_DIR)
+      await progress.screenshot({
+        path: join(
+          process.env.WELLNESS_SCREENSHOTS_DIR,
+          language + "-meal-ingredients.png",
+        ),
+        animations: "disabled",
+      });
+    await progress.close();
+  }
   const noAI = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await noAI.goto(base + "/?ai-off=1");
   await noAI.getByRole("button", { name: "Add meal", exact: true }).click();

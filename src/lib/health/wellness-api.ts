@@ -1,4 +1,5 @@
 "use client";
+import { mealTitle, isAutomaticMealTitle } from "./meal-presentation";
 import { healthFunction } from "./api";
 import { useHealthStore } from "./store";
 import { mealItemSchema, type HealthRow } from "./model";
@@ -143,18 +144,19 @@ export async function correctSavedMeal(
   )
     throw new Error("version_conflict");
   const items = response.items.map((i) => mealItemSchema.parse(i));
-  return useHealthStore
-    .getState()
-    .save(
-      "meals",
-      {
-        ...latest.data,
-        items,
-        aiEstimate: {
-          analysisId: latest.data.aiEstimate?.analysisId ?? requestId,
-          lastCorrectionId: requestId,
-        },
+  return useHealthStore.getState().save(
+    "meals",
+    {
+      ...latest.data,
+      name: isAutomaticMealTitle(latest.data)
+        ? mealTitle(items)
+        : latest.data.name,
+      items,
+      aiEstimate: {
+        analysisId: latest.data.aiEstimate?.analysisId ?? requestId,
+        lastCorrectionId: requestId,
       },
-      latest,
-    );
+    },
+    latest,
+  );
 }
