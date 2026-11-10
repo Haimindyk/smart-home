@@ -150,12 +150,17 @@ export function MealCamera({
       }}
     >
       <DialogContent
-        className="health-app health-meal-camera"
-        style={{ translate: "0 0", maxHeight: "none" }}
+        className="health-meal-camera"
+        style={{
+          translate: "0 0",
+          maxHeight: "none",
+          fontFamily: "var(--font-heebo),Arial,sans-serif",
+        }}
         blurOverlay={false}
         showCloseButton={false}
       >
         <video
+          style={{ zIndex: 0 }}
           ref={video}
           autoPlay
           playsInline
@@ -163,7 +168,7 @@ export function MealCamera({
           onLoadedData={() => setCameraReady(true)}
           aria-label={h("תצוגת מצלמה", "Camera preview")}
         />
-        <header>
+        <header style={{ zIndex: 1 }}>
           <button
             disabled={busy}
             onClick={onClose}
@@ -171,10 +176,16 @@ export function MealCamera({
           >
             ×
           </button>
-          <DialogTitle>{h("צילום ארוחה", "Photograph meal")}</DialogTitle>
+          <DialogTitle style={{ fontFamily: "inherit" }}>
+            {h("צילום ארוחה", "Photograph meal")}
+          </DialogTitle>
         </header>
-        <div className="health-camera-frame" aria-hidden="true" />
-        <footer>
+        <div
+          className="health-camera-frame"
+          style={{ zIndex: 1 }}
+          aria-hidden="true"
+        />
+        <footer style={{ zIndex: 1 }}>
           {noCamera && (
             <p>
               {h(

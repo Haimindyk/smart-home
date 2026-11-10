@@ -448,6 +448,9 @@ try {
   await photo.waitForFunction(
     () => document.querySelector("video")?.videoWidth > 0,
   );
+  await photo.evaluate(() => {
+    document.querySelector("[role=dialog]").scrollTop = 0;
+  });
   const cameraBounds = await photo.getByRole("dialog").boundingBox();
   assert(
     cameraBounds &&
@@ -458,19 +461,20 @@ try {
     "camera fills the viewport without popup translation: " +
       JSON.stringify({
         cameraBounds,
-        styles: await photo
-          .getByRole("dialog")
-          .evaluate((el) => ({
-            translate: getComputedStyle(el).translate,
-            transform: getComputedStyle(el).transform,
-            inset: getComputedStyle(el).inset,
-            margin: getComputedStyle(el).margin,
-          })),
+        styles: await photo.getByRole("dialog").evaluate((el) => ({
+          translate: getComputedStyle(el).translate,
+          transform: getComputedStyle(el).transform,
+          inset: getComputedStyle(el).inset,
+          margin: getComputedStyle(el).margin,
+        })),
       }),
   );
   if (process.env.WELLNESS_SCREENSHOTS_DIR)
     await photo.screenshot({
-      path: join(process.env.WELLNESS_SCREENSHOTS_DIR, "meal-camera.png"),
+      path: join(
+        process.env.WELLNESS_SCREENSHOTS_DIR,
+        "meal-camera-verified.png",
+      ),
       animations: "disabled",
     });
   await photo
