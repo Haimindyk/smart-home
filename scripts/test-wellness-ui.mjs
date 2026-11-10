@@ -156,6 +156,10 @@ try {
         name: he ? "כתבו מה אכלתם" : "Describe your meal",
       })
       .click();
+    assert.equal(await page.getByRole("group",{name:he?"דרך הוספה":"Entry method",exact:true}).count(),0,"description skips method chooser");
+    assert.equal(await page.getByRole("button",{name:he?"שמירה ביומן":"Save to diary",exact:true}).count(),0,"description hides empty save");
+    assert.equal(await page.getByText(he?"חיפוש מזון או מוצר":"Find a food or product",{exact:true}).count(),0,"description skips duplicate food search");
+    if(process.env.WELLNESS_SCREENSHOTS_DIR)await page.screenshot({path:join(process.env.WELLNESS_SCREENSHOTS_DIR,language+"-direct-description.png"),animations:"disabled"});
     await page
       .getByLabel(he ? "מה אכלתם וכמה?" : "What did you eat, and how much?")
       .fill(he ? "אכלתי כוס אורז מבושל" : "I ate a cup of cooked rice");
@@ -172,9 +176,9 @@ try {
     const nutritionCalls = (await actions(page)).filter(
       (c) => c.action === "nutrition",
     ).length;
-    await page
-      .getByRole("button", { name: he ? "מוצר" : "Product", exact: true })
-      .click();
+    await page.getByRole("button",{name:he?"סגירה":"Close",exact:true}).click();
+    await page.getByRole("button",{name:he?"הוספת ארוחה":"Add meal",exact:true}).click();
+    await page.getByRole("button",{name:he?"מוצר ארוז":"Packaged product",exact:true}).click();
     const labelSection = page.getByRole("region", {
       name: he ? "ערכי מוצר מהאריזה" : "Product label values",
     });
@@ -559,7 +563,13 @@ try {
   await noAI
     .getByRole("button", { name: "Packaged product", exact: true })
     .click();
+  await noAI.getByLabel("Barcode scanner", {exact:true}).waitFor();
+  assert.equal(await noAI.getByRole("group",{name:"Entry method",exact:true}).count(),0,"packaged product skips input method selection");
+  assert.equal(await noAI.getByText("Meal details & date",{exact:true}).count(),0,"packaged product starts without meal metadata");
+  assert.equal(await noAI.getByRole("button",{name:"Save to diary",exact:true}).count(),0,"no empty diary save before product selection");
+  if(process.env.WELLNESS_SCREENSHOTS_DIR)await noAI.screenshot({path:join(process.env.WELLNESS_SCREENSHOTS_DIR,"direct-product.png"),animations:"disabled"});
   await noAI.getByLabel("Product barcode", { exact: true }).fill("12345678");
+  assert.equal(await noAI.getByLabel("Barcode scanner",{exact:true}).count(),0,"typing releases the camera");
   const lookup = noAI.getByRole("button", {
     name: "Find product",
     exact: true,
