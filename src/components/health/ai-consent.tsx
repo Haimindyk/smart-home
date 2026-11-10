@@ -29,6 +29,7 @@ export function useWellnessAvailability() {
   const owner = useHealthStore((s) => s.owner),
     profile = useHealthStore((s) => s.data.health_profiles[0]?.data),
     pending = useHealthStore((s) => s.pending);
+  const [retry, setRetry] = useState(0);
   const [state, setState] = useState<{
     owner: string | null;
     available: boolean;
@@ -37,6 +38,10 @@ export function useWellnessAvailability() {
   }>({ owner: null, available: false, serviceReady: false, checked: false });
   useEffect(() => {
     let cancelled = false;
+    const recheck = () => setRetry((n) => n + 1);
+    window.addEventListener("wellness:availability", recheck);
+    window.addEventListener("online", recheck);
+    window.addEventListener("focus", recheck);
     if (owner)
       void capability(owner)
         .then((r) => {
@@ -59,10 +64,18 @@ export function useWellnessAvailability() {
         });
     return () => {
       cancelled = true;
+      window.removeEventListener("wellness:availability", recheck);
+      window.removeEventListener("online", recheck);
+      window.removeEventListener("focus", recheck);
     };
-  }, [owner]);
+  }, [owner, retry, pending]);
   const eligible = !!profile && adult(profile, localDate(profile.timezone));
   return {
+    retry: () => {
+      if (owner) capabilities.delete(owner);
+      window.dispatchEvent(new Event("wellness:availability"));
+    },
+    pending,
     manageReady: state.owner === owner && state.serviceReady && pending === 0,
     available: state.owner === owner && state.available,
     checked: state.owner === owner && state.checked,
@@ -91,12 +104,34 @@ export function AiConsent() {
     );
   if (!state.available)
     return (
-      <p className="rounded-xl bg-muted p-3 text-sm">
-        {h(
-          "ה־AI עדיין לא זמין. אפשר להמשיך ידנית.",
-          "AI is not available yet. Manual logging is ready.",
-        )}
-      </p>
+      <div className="rounded-xl bg-muted p-3 text-sm">
+        <p>
+          {h(
+            "ה־AI עדיין לא זמין. אפשר להמשיך ידנית.",
+            "AI is not available yet. Manual logging is ready.",
+          )}
+        </p>
+        <Button variant="outline" className="mt-2" onClick={state.retry}>
+          {h("בדיקה מחדש", "Check again")}
+        </Button>
+      </div>
+    );
+  if (state.pending > 0)
+    return (
+      <div role="status" className="text-sm">
+        <p>
+          {h(
+            "ממתין לסנכרון היומן לפני שימוש ב־AI.",
+            "Sync your diary before using AI.",
+          )}
+        </p>
+        <Button
+          variant="outline"
+          onClick={() => void useHealthStore.getState().flush()}
+        >
+          {h("סנכרון מחדש", "Retry sync")}
+        </Button>
+      </div>
     );
   if (!state.eligible)
     return (
@@ -110,8 +145,23 @@ export function AiConsent() {
   if (state.consented) return null;
   return (
     <div className="rounded-xl border bg-muted/30 p-4 text-sm">
-      <p>{h("אישור שימוש ב־AI שולח את תוכן הבקשה הדרוש ל־Cloudflare. התוצאות דורשות בדיקה ואישור שלך.", "Enabling AI sends the necessary request content to Cloudflare. Review and approve the results.")}</p>
-      <Disclosure className="health-help" title={h("פרטיות ואופן השימוש", "Privacy and use")}><p>{h("שם, PIN ופרופיל גוף מלא אינם נשלחים אוטומטית. אין שימוש בתוכן לאימון המודלים. אפשר לבטל בהגדרות.", "Your name, PIN and full body profile are not sent automatically. Content is not used to train models. You can revoke access in Settings.")}</p></Disclosure>
+      <p>
+        {h(
+          "אישור שימוש ב־AI שולח את תוכן הבקשה הדרוש ל־Cloudflare. התוצאות דורשות בדיקה ואישור שלך.",
+          "Enabling AI sends the necessary request content to Cloudflare. Review and approve the results.",
+        )}
+      </p>
+      <Disclosure
+        className="health-help"
+        title={h("פרטיות ואופן השימוש", "Privacy and use")}
+      >
+        <p>
+          {h(
+            "שם, PIN ופרופיל גוף מלא אינם נשלחים אוטומטית. אין שימוש בתוכן לאימון המודלים. אפשר לבטל בהגדרות.",
+            "Your name, PIN and full body profile are not sent automatically. Content is not used to train models. You can revoke access in Settings.",
+          )}
+        </p>
+      </Disclosure>
       <ErrorText error={error} />
       <Button
         className="mt-3"

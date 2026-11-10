@@ -5,6 +5,7 @@ import { useHealthStore } from "@/lib/health/store";
 import { uploadMealImage } from "@/lib/health/api";
 import { estimateMeal } from "@/lib/health/wellness-api";
 import { useHealthText } from "@/lib/health/i18n";
+import { ErrorText } from "./shared";
 import { AiConsent, useWellnessAvailability } from "./ai-consent";
 export function MealCamera({
   date,
@@ -70,8 +71,10 @@ export function MealCamera({
     setError("");
     setNoFood(false);
     const owner = useHealthStore.getState().owner;
+    let stage = "upload";
     try {
       job.path ??= await uploadMealImage(job.file, owner!);
+      stage = "analysis";
       job.result ??= await estimateMeal({
         requestId: job.id,
         mode: "meal",
@@ -85,6 +88,7 @@ export function MealCamera({
         setNoFood(true);
         throw Error("no_food");
       }
+      stage = "save";
       if (!useHealthStore.getState().data.meals.some((m) => m.id === job.id))
         await useHealthStore.getState().save(
           "meals",
@@ -99,14 +103,33 @@ export function MealCamera({
           undefined,
           job.id,
         );
+      else await useHealthStore.getState().flush();
+      if (useHealthStore.getState().conflict?.row.id === job.id)
+        throw new Error("sync_required");
       finished.current = true;
       onClose();
-    } catch {
+    } catch (e) {
+      const code = e instanceof Error ? e.message : "failed";
       setError(
-        h(
-          "לא הצלחנו להוסיף את הארוחה. אפשר לנסות שוב או לבחור תמונה אחרת.",
-          "Could not add the meal. Retry or choose another photo.",
-        ),
+        [
+          "not_configured",
+          "rate_limited",
+          "quota_exhausted",
+          "session_required",
+          "session_mismatch",
+          "online_required",
+          "invalid_image",
+          "invalid_output",
+          "provider_failed",
+          "analysis_busy",
+          "sync_required",
+        ].includes(code)
+          ? code
+          : stage === "upload"
+            ? "upload_failed"
+            : stage === "save"
+              ? "meal_save_failed"
+              : "request_failed",
       );
     } finally {
       lock.current = false;
@@ -208,13 +231,17 @@ export function MealCamera({
             )}
           </p>
           {error && (
-            <div role="alert">
-              {noFood
-                ? h(
+            <div>
+              {noFood ? (
+                <p role="alert">
+                  {h(
                     "לא זוהה אוכל בתמונה. נסו צילום קרוב וברור יותר.",
                     "No food identified. Try a clearer, closer photo.",
-                  )
-                : error}
+                  )}
+                </p>
+              ) : (
+                <ErrorText error={error} />
+              )}
               {!noFood && (
                 <button disabled={busy} onClick={() => void submit()}>
                   {h("ניסיון נוסף", "Retry")}

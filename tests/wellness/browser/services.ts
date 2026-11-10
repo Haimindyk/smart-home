@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { profileSchema } from "../../../src/lib/health/model";
+import { profileSchema, payloadSchemas } from "../../../src/lib/health/model";
 import {
   makeProgram,
   parsePreferences,
@@ -70,6 +70,14 @@ export const useHealthStore = create(() => ({
     id?: string,
   ) => {
     calls.push({ action: "save", table });
+    if (table === "meals") {
+      payloadSchemas.meals.parse(value);
+      if (
+        new URLSearchParams(location.search).has("save-retry") &&
+        calls.filter((c) => c.table === "meals").length === 1
+      )
+        throw new Error("indexeddb_failed");
+    }
     const row = {
       id: existing?.id ?? id ?? crypto.randomUUID(),
       owner_user_id: useHealthStore.getState().owner,
@@ -223,11 +231,17 @@ export async function healthFunction(
     }
     return { examples: [] };
   }
-  if (input.action === "capabilities")
+  if (input.action === "capabilities") {
+    if (
+      new URLSearchParams(location.search).has("capability-retry") &&
+      calls.filter((c) => c.action === "capabilities").length === 1
+    )
+      return { available: false, serviceReady: true };
     return {
       available: !new URLSearchParams(location.search).has("ai-off"),
       serviceReady: true,
     };
+  }
   if (input.action === "program")
     return {
       ...makeProgram(
