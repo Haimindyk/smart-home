@@ -484,12 +484,13 @@ function MealEditor({
     }));
   }
   const totals = mealNutrients(meal.items);
+  const foodPicker=<FoodPicker initialMode={foodMode==="text"||foodMode==="product"?"search":foodMode} onAdd={item=>setMeal(m=>({...m,items:[...m.items,item]}))}/>;
   return (
     <Dialog open onOpenChange={(open)=>{if(!open&&!busy)onClose()}}>
     <DialogContent blurOverlay={mode!=="label"} className="health-app meal-composer start-0 top-auto bottom-0 translate-x-0 translate-y-0 rtl:translate-x-0" showCloseButton={false}>
     <DialogTitle className="sr-only">{h("הוספת ארוחה", "Add meal")}</DialogTitle>
     <Panel
-      title={existing ? h("עריכת ארוחה", "Meal editor") : foodMode==="product" ? h("מוצר ארוז", "Packaged product") : h("מה אוכלים היום?", "What’s on your plate?")}
+      title={existing ? h("עריכת ארוחה", "Meal editor") : foodMode==="product" ? h("מוצר ארוז", "Packaged product") : foodMode==="text" ? h("תיאור ארוחה", "Describe your meal") : h("מה אוכלים היום?", "What’s on your plate?")}
       action={
         <Button variant="ghost" disabled={busy} onClick={onClose}>
           {h("סגירה", "Close")}
@@ -498,8 +499,8 @@ function MealEditor({
     >
       <div className="grid gap-4">
         <ErrorText error={error} />
-        {foodMode!=="product"&&<p className="text-sm text-muted-foreground">{h("בדקו את הכמויות לפני השמירה.", "Review portions before saving.")}</p>}
-        {(foodMode!=="product"||meal.items.length>0)&&<details className="meal-metadata"><summary>{h("פרטי הארוחה והתאריך", "Meal details & date")}</summary>
+        {foodMode!=="product"&&foodMode!=="text"&&<p className="text-sm text-muted-foreground">{h("בדקו את הכמויות לפני השמירה.", "Review portions before saving.")}</p>}
+        {((foodMode!=="product"&&foodMode!=="text")||meal.items.length>0)&&<details className="meal-metadata"><summary>{h("פרטי הארוחה והתאריך", "Meal details & date")}</summary>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field
             label={h("תאריך הארוחה", "Meal date")}
@@ -538,15 +539,15 @@ function MealEditor({
         />
         </details>}
         {foodMode==="product"?<ProductLabel key={owner} autoScan onAdd={item=>setMeal(m=>({...m,items:[...m.items,item]}))}/>: (capture||foodMode==="text")&&<section className="meal-photo-entry rounded-xl border p-4" aria-label={h("הערכת ארוחה עם AI","AI meal estimate")}>
-          <h3 className="font-semibold">{h("מוסיפים לארוחה","Add to your meal")}</h3>
+          {foodMode!=="text"&&<h3 className="font-semibold">{h("מוסיפים לארוחה","Add to your meal")}</h3>}
           <div className="mt-3 grid gap-3">
-            <ChoiceTabs label={h("דרך הוספה", "Entry method")} value={mode} onChange={next=>{setMode(next);setMeal(m=>({...m,imagePath:null}));setSecondPhoto(null);setRequestId(crypto.randomUUID());}} options={[{value:"meal",label:h("צילום", "Photo")},{value:"text",label:h("תיאור", "Describe")},{value:"label",label:h("מוצר", "Product")}]} />
+            {foodMode!=="text"&&<ChoiceTabs label={h("דרך הוספה", "Entry method")} value={mode} onChange={next=>{setMode(next);setMeal(m=>({...m,imagePath:null}));setSecondPhoto(null);setRequestId(crypto.randomUUID());}} options={[{value:"meal",label:h("צילום", "Photo")},{value:"text",label:h("תיאור", "Describe")},{value:"label",label:h("מוצר", "Product")}]} />}
             {mode === "label" ? <ProductLabel key={owner} onAdd={item => setMeal(m => ({ ...m, items: [...m.items, item] }))}/> : <>
             <AiConsent/>
             {mode!=="text"&&<><Field label={h("צילום או העלאת תמונה","Take or upload a photo")} type="file" accept="image/*" onChange={e=>{setPhoto(e.target.files?.[0]??null);setMeal(m=>({...m,imagePath:null}));setRequestId(crypto.randomUUID());}}/>
               {mode==="meal"&&<Field label={h("תמונה שנייה של אותה מנה מהצד (אופציונלי)","Second side view of the same meal (optional)")} type="file" accept="image/*" onChange={e=>{setSecondPhoto(e.target.files?.[0]??null);setMeal(m=>({...m,imagePath:null}));setRequestId(crypto.randomUUID());}}/>}</>}
             <label className="grid gap-2 text-sm"><span>{mode==="text"?h("מה אכלתם וכמה?","What did you eat, and how much?"):h("הסבר על המרכיבים והכמות","Food and portion details")}</span><textarea className="min-h-24 rounded-xl border bg-background p-3 text-foreground" maxLength={2500} value={description} placeholder={h("למשל: שתי ביצים, חצי פיתה ושתי כפות קוטג׳","For example: two eggs, half a pita and two tablespoons of cottage cheese")} onChange={e=>{setDescription(e.target.value);setRequestId(crypto.randomUUID());}}/></label>
-            <p className="text-xs text-muted-foreground">{h("הערכה בלבד — בדקו גם שמן ורטבים. שום דבר לא נשמר אוטומטית.", "Estimates only — check oil and sauces. Nothing is saved automatically.")}</p>
+            <p className="text-xs text-muted-foreground">{h("הערכת AI. אפשר לתקן לפני השמירה.", "AI estimate. Edit before saving.")}</p>
             <Disclosure className="health-help" title={h("לשיפור הדיוק", "For a better estimate")}><p>{h("ציינו משקל וכמויות ידועים ואופן הכנה. הניתוח מחליף את פריטי הטיוטה; מזונות שלא זוהו בביטחון דורשים השלמה.", "Include known weights, quantities and preparation. Analysis replaces draft items; add any ingredients that could not be identified reliably.")}</p></Disclosure>
             <Button variant="outline" disabled={busy||!availability.ready||(mode==="text"?!description.trim():!photo)} onClick={()=>void analyze()}>{busy?h("מכין הערכה…","Estimating…"):h("הצגת הערכה","Show estimate")}</Button>
             {question&&<p role="status" className="rounded-xl bg-amber-500/10 p-3 text-sm">{question}</p>}
@@ -555,13 +556,7 @@ function MealEditor({
           </div>
         </section>}
         {capture && mode!=="label" && <Button variant="outline" onClick={onBrowse}>{h("חיפוש או הוספת מזון ידנית", "Search or add food manually")}</Button>}
-        {mode!=="label" && (!capture || photoReviewRequired) && <div className="meal-search-section"><p className="mb-3 text-sm font-semibold">{h("חיפוש מזון או מוצר", "Find a food or product")}</p>
-        <FoodPicker initialMode={foodMode==="text"||foodMode==="product"?"search":foodMode}
-          onAdd={(item) =>
-            setMeal((m) => ({ ...m, items: [...m.items, item] }))
-          }
-        />
-        </div>}
+        {mode!=="label" && (!capture || photoReviewRequired) && (foodMode!=="text"||meal.items.length>0) && (foodMode==="text" ? <Disclosure title={h("הוספת מזון נוסף", "Add another food")}>{foodPicker}</Disclosure> : <div className="meal-search-section"><p className="mb-3 text-sm font-semibold">{h("חיפוש מזון או מוצר", "Find a food or product")}</p>{foodPicker}</div>)}
         {meal.items.length>0 && <h3 className="mt-2 text-xl font-bold">{h("בארוחה שלך", "On your plate")}</h3>}
         {meal.items.map((i) => (
           <div key={i.id} className="meal-review-item rounded-xl border p-3">
@@ -663,7 +658,7 @@ function MealEditor({
             </details>
           </div>
         ))}
-        {(foodMode!=="product"||meal.items.length>0)&&<div className="meal-savebar"><strong>
+        {((foodMode!=="product"&&foodMode!=="text")||meal.items.length>0)&&<div className="meal-savebar"><strong>
           {round(totals.kcal)} kcal · P {round(totals.protein)} / C{" "}
           {round(totals.carbs)} / F {round(totals.fat)}
         </strong>
