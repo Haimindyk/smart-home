@@ -1,7 +1,7 @@
 "use client";
 import { healthFunction } from "./api";
 import { useHealthStore } from "./store";
-import { mealItemSchema } from "./model";
+import { mealItemSchema, type HealthRow } from "./model";
 import {
   parseNutrition,
   type NutritionEstimate,
@@ -25,6 +25,7 @@ export async function estimateMeal(input: {
   mode: "text" | "meal";
   description: string;
   imagePath?: string;
+  automatic?: boolean;
 }) {
   const response = await wellnessRequest<
     NutritionEstimate & { analysisId: string }
@@ -102,4 +103,58 @@ export async function combineMealPhotos(
     a.close();
     b?.close();
   }
+}
+
+export async function correctSavedMeal(
+  row: HealthRow<"meals">,
+  description: string,
+  requestId: string,
+) {
+  const owner = useHealthStore.getState().owner;
+  if (!owner || row.owner_user_id !== owner)
+    throw new Error("session_mismatch");
+  const current = useHealthStore
+    .getState()
+    .data.meals.find((m) => m.id === row.id);
+  if (current?.data.aiEstimate?.lastCorrectionId === requestId) return current;
+  if (!current || current.version !== row.version)
+    throw new Error("version_conflict");
+  if (useHealthStore.getState().pending) throw new Error("sync_required");
+  const response = await wellnessRequest<{
+    items: unknown[];
+    expectedVersion: number;
+    mealId: string;
+  }>({
+    action: "correct_meal",
+    mealId: row.id,
+    expectedVersion: row.version,
+    description,
+    requestId,
+  });
+  const latest = useHealthStore
+    .getState()
+    .data.meals.find((m) => m.id === row.id);
+  if (useHealthStore.getState().owner !== owner)
+    throw new Error("session_mismatch");
+  if (
+    !latest ||
+    response.mealId !== row.id ||
+    latest.version !== response.expectedVersion
+  )
+    throw new Error("version_conflict");
+  const items = response.items.map((i) => mealItemSchema.parse(i));
+  return useHealthStore
+    .getState()
+    .save(
+      "meals",
+      {
+        ...latest.data,
+        items,
+        aiEstimate: {
+          analysisId: latest.data.aiEstimate?.analysisId ?? requestId,
+          lastCorrectionId: requestId,
+        },
+      },
+      latest,
+    );
 }

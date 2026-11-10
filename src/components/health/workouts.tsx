@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { HealthSheet } from "./health-sheet";
 import { AiTrainer } from "./ai-trainer";
 import { isPlanScheduled } from "../../../supabase/functions/_shared/wellness-core";
 import { Button } from "@/components/ui/button";
@@ -87,7 +88,7 @@ export function Workouts({
     }
   }
   if(session) return <SessionEditor key={session.id} row={session} onClose={()=>setSession(null)}/>;
-  if(planEditor) return <PlanEditor key={editing?.id||editing?.data.name||"new"} existing={editing} initialExerciseId={editingExerciseId} onClose={()=>setPlanEditor(false)}/>;
+  if(planEditor) return <HealthSheet title={editing ? h("עריכת תוכנית", "Edit plan") : h("תוכנית חדשה", "New plan")} onClose={()=>setPlanEditor(false)}><PlanEditor key={editing?.id||editing?.data.name||"new"} existing={editing} initialExerciseId={editingExerciseId} onClose={()=>setPlanEditor(false)}/></HealthSheet>;
   if(selectedPlan) return <PlanDayView plan={selectedPlan} dayNumber={planDayNumber(selectedPlan.data.name)} onClose={()=>setSelectedPlanId(null)} onStart={()=>void start(selectedPlan)} onEdit={exerciseId=>{setEditing(selectedPlan);setEditingExerciseId(exerciseId??null);setPlanEditor(true)}}/>;
   return (
     <div className="grid gap-5">

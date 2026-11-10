@@ -48,6 +48,13 @@ import {
   assertEstimatedFoodMode,
 } from "./wellness-food.ts";
 
+import {
+  correctionContext,
+  correctionPrompt,
+  correctionSchema,
+  applyFoodCorrection,
+} from "./wellness-food-correction.ts";
+
 export async function handleWellness(req: Request, env: Environment) {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -150,9 +157,14 @@ export async function handleWellness(req: Request, env: Environment) {
       throw new Error("consent_required");
     const provider = createProvider(env);
     if (
-      !["nutrition", "program", "adjust", "illustration", "restore"].includes(
-        String(input.action),
-      )
+      ![
+        "nutrition",
+        "correct_meal",
+        "program",
+        "adjust",
+        "illustration",
+        "restore",
+      ].includes(String(input.action))
     )
       throw new Error("invalid_input");
     if (!configured(env) && input.action !== "restore")
@@ -166,7 +178,8 @@ export async function handleWellness(req: Request, env: Environment) {
       typeof input.description === "string"
         ? text(input.description, 2500)
         : "";
-    if (mode === "text" && !description) throw new Error("invalid_input");
+    if ((mode === "text" || input.action === "correct_meal") && !description)
+      throw new Error("invalid_input");
     const imagePath =
       mode && mode !== "text" ? text(input.imagePath, 500) : null;
     if (
@@ -174,6 +187,27 @@ export async function handleWellness(req: Request, env: Environment) {
       (!imagePath.startsWith(user.id + "/") || imagePath.includes(".."))
     )
       throw new Error("invalid_image");
+    const correctionMeal =
+      input.action === "correct_meal"
+        ? check(
+            await admin
+              .from("meals")
+              .select("*")
+              .eq("id", uuid(input.mealId))
+              .eq("owner_user_id", user.id)
+              .is("deleted_at", null)
+              .maybeSingle(),
+          )
+        : null;
+    if (input.action === "correct_meal") {
+      if (env("WELLNESS_MODEL_SOURCE") === "owned")
+        throw new Error("not_configured");
+      if (!correctionMeal) throw new Error("not_found");
+      if (correctionMeal.version !== input.expectedVersion)
+        throw new Error("version_conflict");
+      if (!correctionContext(correctionMeal.data.items).length)
+        throw new Error("invalid_input");
+    }
     const preferences =
       input.action === "program"
         ? parsePreferences(input.preferences)
@@ -256,16 +290,19 @@ export async function handleWellness(req: Request, env: Environment) {
       throw new Error("version_conflict");
     const id = uuid(input.requestId),
       kind =
-        input.action === "nutrition"
-          ? mode === "text"
-            ? "nutrition_text"
-            : "nutrition_photo"
-          : input.action === "illustration"
-            ? "illustration"
-            : "coach";
+        input.action === "correct_meal"
+          ? "nutrition_text"
+          : input.action === "nutrition"
+            ? mode === "text"
+              ? "nutrition_text"
+              : "nutrition_photo"
+            : input.action === "illustration"
+              ? "illustration"
+              : "coach";
     const payload = JSON.stringify({
       input,
       planVersion: plan?.version,
+      correctionVersion: correctionMeal?.version,
       sessions: sessions.map((s) => s.data),
       restoreVersion: restorePlan?.version,
     });
@@ -305,7 +342,26 @@ export async function handleWellness(req: Request, env: Environment) {
     if (claim?.state !== "claimed") throw new Error("failed");
     claimed = { admin, id, owner: user.id };
     let result: Record<string, unknown>;
-    if (input.action === "nutrition") {
+    if (input.action === "correct_meal") {
+      const context = correctionContext(correctionMeal.data.items);
+      const corrected = await provider.structured(
+        correctionPrompt,
+        { correction: description, items: context },
+        1800,
+        "nutrition_text",
+        correctionSchema(context),
+      );
+      result = {
+        items: applyFoodCorrection(
+          corrected,
+          correctionMeal.data.items,
+          description,
+        ),
+        mealId: correctionMeal.id,
+        expectedVersion: correctionMeal.version,
+        analysisId: id,
+      };
+    } else if (input.action === "nutrition") {
       let visualObservations = "";
       if (imagePath) {
         const downloaded = await admin.storage
@@ -333,7 +389,7 @@ export async function handleWellness(req: Request, env: Environment) {
         !!imagePath,
       );
       const estimate = imagePath
-        ? normalizeObservedMeal(raw)
+        ? normalizeObservedMeal(raw, input.automatic === true)
         : normalizeFoodEstimate(raw);
       // Exact catalog names/basis only: no silent raw/cooked or g/ml mismatches.
       const names = estimate.items.map((i) => i.name);

@@ -7,7 +7,7 @@ import { type Food, type MealItem } from "@/lib/health/model";
 import { useHealthStore } from "@/lib/health/store";
 import { useHealthText } from "@/lib/health/i18n";
 import { BarcodeCamera } from "./barcode-camera";
-import { ErrorText, Field, SelectField } from "./shared";
+import { ErrorText, Field, SelectField, Disclosure, ChoiceTabs } from "./shared";
 
 export function ProductLabel({ onAdd }: { onAdd: (item: MealItem) => void }) {
   const h = useHealthText(),
@@ -54,8 +54,8 @@ export function ProductLabel({ onAdd }: { onAdd: (item: MealItem) => void }) {
         setManual(true);
         setMessage(
           h(
-            "אין נתונים מלאים למוצר. העתיקו את הערכים המודפסים מהאריזה; לא יושלמו ערכים בעזרת AI.",
-            "No complete product data. Copy the printed values from the package; AI will not fill in missing values.",
+            "אין נתונים מלאים למוצר. הזינו את הערכים מהאריזה.",
+            "No complete product data. Enter the printed package values.",
           ),
         );
       }
@@ -98,255 +98,41 @@ export function ProductLabel({ onAdd }: { onAdd: (item: MealItem) => void }) {
         throw new Error("label_values_required");
       onAdd({ id: crypto.randomUUID(), food: selected, quantity: amount });
       setFood(null);
+      setManual(false); setEnergyUnit("kcal"); setSodiumUnit("mg"); setPrintedAmount("100"); setBasis("g"); setQuantity("100");
       setConfirmed(false);
       setValues({});
       setName("");
       setMessage(
         h(
-          "המוצר נוסף לטיוטה. יש לשמור את הארוחה כדי להוסיף ליומן.",
-          "Product added to the draft. Save the meal to add it to your diary.",
+          "המוצר נוסף לארוחה. אפשר להוסיף עוד או לשמור ביומן.",
+          "Product added. Add another or save the meal to your diary.",
         ),
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "failed");
     }
   }
-  return (
-    <section
-      className="grid gap-3 rounded-2xl border bg-background p-4 text-foreground"
-      aria-label={h("ערכי מוצר מהאריזה", "Product label values")}
-    >
-      <p className="text-sm">
-        {h(
-          "סרקו את ברקוד המוצר כדי לקבל נתונים מ־Open Food Facts. זהו מאגר קהילתי — יש לבדוק התאמה למוצר ולאריזה. ערכי התווית אינם מוערכים ב־AI.",
-          "Scan the product barcode for Open Food Facts data. This is a community database: check the product and package match. Label values are never estimated by AI.",
-        )}
-      </p>
-      <ErrorText error={error} />
-      <form
-        className="flex flex-wrap items-end gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void search();
-        }}
-      >
-        <Field
-          label={h("ברקוד המוצר", "Product barcode")}
-          inputMode="numeric"
-          value={barcode}
-          onChange={(e) => {
-            ++request.current;
-            setBusy(false);
-            setBarcode(e.target.value.replace(/\D/g, ""));
-            setFood(null);
-            setConfirmed(false);
-          }}
-        />
-        <Button type="submit" disabled={busy || !/^\d{8,14}$/.test(barcode)}>
-          {h("איתור מוצר", "Find product")}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setCamera((v) => !v)}
-        >
-          {h("סריקת ברקוד במצלמה", "Scan barcode with camera")}
-        </Button>
-      </form>
-      {camera && (
-        <BarcodeCamera
-          onCode={(code) => {
-            setBarcode(code);
-            setCamera(false);
-            void search(code);
-          }}
-        />
-      )}
-      <Button
-        variant="outline"
-        disabled={busy}
-        onClick={() => {
-          ++request.current;
-          setManual((v) => !v);
-          setFood(null);
-          setConfirmed(false);
-          setError(null);
-        }}
-      >
-        {h("העתקת ערכים מהאריזה", "Copy values from package")}
-      </Button>
-      {message && (
-        <p role="status" className="text-sm">
-          {message}
-        </p>
-      )}
-      {food && !manual && (
-        <div className="rounded-xl border p-3 text-sm">
-          <strong>{food.name}</strong>
-          <p>
-            {h("לכל 100", "Per 100")} {food.basis}: {food.per100.kcal} kcal · P{" "}
-            {food.per100.protein} / C {food.per100.carbs} / F {food.per100.fat}
-          </p>
-          <p>
-            {food.source === "openfoodfacts"
-              ? "Open Food Facts (ODbL)"
-              : h(
-                  "תווית שהוזנה ואושרה בעבר",
-                  "Previously entered and confirmed label",
-                )}
-          </p>
-        </div>
-      )}
-      {manual && (
-        <div className="grid gap-3">
-          <Field
-            label={h("שם המוצר שעל האריזה", "Product name on package")}
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              setConfirmed(false);
-            }}
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <Field
-              label={h(
-                "הערכים המודפסים הם לכמות",
-                "Printed values are per amount",
-              )}
-              type="number"
-              min="0.1"
-              value={printedAmount}
-              onChange={(e) => {
-                setPrintedAmount(e.target.value);
-                setConfirmed(false);
-              }}
-            />
-            <SelectField
-              label={h("יחידת התווית", "Label unit")}
-              value={basis}
-              onChange={(e) => {
-                setBasis(e.target.value as "g" | "ml");
-                setConfirmed(false);
-              }}
-            >
-              <option value="g">{h("גרם", "grams")}</option>
-              <option value="ml">{h("מ״ל", "ml")}</option>
-            </SelectField>
-          </div>
-          <p className="text-xs">
-            {h(
-              "למשל, אם הערכים הם למנה של 30 גרם, הזינו 30. שדות חובה: קלוריות, חלבון, פחמימות ושומן. ערך אפס יש להזין במפורש; ערך לא ידוע אינו אפס.",
-              "For a 30 g serving, enter 30. Calories, protein, carbohydrate and fat are required. Enter zero explicitly; an unknown value is not zero.",
-            )}
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <SelectField
-              label={h("יחידת האנרגיה המודפסת", "Printed energy unit")}
-              value={energyUnit}
-              onChange={(e) => {
-                setEnergyUnit(e.target.value as typeof energyUnit);
-                setConfirmed(false);
-              }}
-            >
-              <option value="kcal">kcal</option>
-              <option value="kJ">kJ</option>
-            </SelectField>
-            <SelectField
-              label={h(
-                "יחידת הנתרן או המלח המודפסת",
-                "Printed sodium or salt unit",
-              )}
-              value={sodiumUnit}
-              onChange={(e) => {
-                setSodiumUnit(e.target.value as typeof sodiumUnit);
-                setConfirmed(false);
-              }}
-            >
-              <option value="mg">{h("נתרן במ״ג", "Sodium in mg")}</option>
-              <option value="g">{h("נתרן בגרם", "Sodium in g")}</option>
-              <option value="salt_g">{h("מלח בגרם", "Salt in g")}</option>
-            </SelectField>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {(
-              [
-                [
-                  "kcal",
-                  energyUnit === "kJ"
-                    ? h("אנרגיה (קילו־ג׳אול)", "Energy (kJ)")
-                    : h("קלוריות (קק״ל)", "Calories (kcal)"),
-                ],
-                ["protein", h("חלבון (גרם)", "Protein (g)")],
-                ["carbs", h("פחמימות (גרם)", "Carbohydrate (g)")],
-                ["fat", h("שומן (גרם)", "Fat (g)")],
-                ["fiber", h("סיבים (גרם, אופציונלי)", "Fiber (g, optional)")],
-                ["sugar", h("סוכר (גרם, אופציונלי)", "Sugar (g, optional)")],
-                [
-                  "saturatedFat",
-                  h(
-                    "שומן רווי (גרם, אופציונלי)",
-                    "Saturated fat (g, optional)",
-                  ),
-                ],
-                [
-                  "sodium",
-                  sodiumUnit === "salt_g"
-                    ? h("מלח (גרם, אופציונלי)", "Salt (g, optional)")
-                    : sodiumUnit === "g"
-                      ? h("נתרן (גרם, אופציונלי)", "Sodium (g, optional)")
-                      : h("נתרן (מ״ג, אופציונלי)", "Sodium (mg, optional)"),
-                ],
-              ] as const
-            ).map(([key, label]) => (
-              <Field
-                key={key}
-                label={label}
-                type="number"
-                min="0"
-                step="any"
-                value={values[key] ?? ""}
-                onChange={(e) => {
-                  setValues((v) => ({ ...v, [key]: e.target.value }));
-                  setConfirmed(false);
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-      {(food || manual) && (
-        <>
-          <Field
-            label={h("כמות שנאכלה", "Amount eaten")}
-            type="number"
-            min="0.1"
-            max="10000"
-            step="any"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-          />
-          <p className="text-xs">
-            {h(
-              "הכמות באותה יחידה של התווית או המאגר. אין המרה אוטומטית בין גרם למ״ל.",
-              "Use the same unit as the label or database. Grams and ml are not automatically converted.",
-            )}
-          </p>
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={confirmed}
-              onChange={(e) => setConfirmed(e.target.checked)}
-            />
-            {h(
-              "בדקתי שהמוצר, היחידה והערכים תואמים לאריזה",
-              "I checked that the product, unit and values match the package",
-            )}
-          </label>
-          <Button disabled={!confirmed || busy} onClick={add}>
-            {h("הוספת המוצר לטיוטה", "Add product to draft")}
-          </Button>
-        </>
-      )}
-    </section>
-  );
+  const valueField = (key:string,label:string) => <Field key={key} label={label} type="number" min="0" step="any" value={values[key]??""} onChange={e=>{setValues(v=>({...v,[key]:e.target.value}));setConfirmed(false)}}/>;
+  return <section className="product-entry grid gap-4" aria-label={h("ערכי מוצר מהאריזה", "Product label values")}>
+    <ChoiceTabs label={h("דרך זיהוי המוצר", "Product entry method")} value={manual?"printed":"barcode"} onChange={next=>{++request.current;setBusy(false);setManual(next==="printed");setCamera(false);setFood(null);setConfirmed(false);setError(null)}} options={[{value:"barcode",label:h("ברקוד", "Barcode")},{value:"printed",label:h("מהאריזה", "Printed values")}]} />
+    <p className="text-xs text-muted-foreground">{h("נתוני מוצר מהמאגר או מהאריזה. ללא הערכת AI.", "Product data from the database or package. No AI estimates.")}</p>
+    <ErrorText error={error}/>
+    {!manual && <><form className="flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();void search()}}>
+      <div className="min-w-0 flex-1"><Field label={h("ברקוד המוצר", "Product barcode")} inputMode="numeric" value={barcode} onChange={e=>{++request.current;setBusy(false);setBarcode(e.target.value.replace(/\D/g,""));setFood(null);setConfirmed(false)}}/></div>
+      <Button type="submit" disabled={busy||!/^\d{8,14}$/.test(barcode)}>{busy?h("מחפש…","Looking up…"):h("איתור מוצר", "Find product")}</Button>
+    </form><Button type="button" variant="outline" className="product-camera-action" onClick={()=>setCamera(v=>!v)}>{h("סריקת ברקוד במצלמה", "Scan barcode with camera")}</Button>
+    {camera&&<BarcodeCamera onCode={code=>{setBarcode(code);setCamera(false);void search(code)}}/>}</>}
+    {message&&<p role="status" className="text-sm">{message}</p>}
+    {food&&!manual&&<div className="product-result"><strong>{food.name}</strong><p>{h("לכל 100", "Per 100")} {food.basis}: {food.per100.kcal} kcal · P {food.per100.protein} / C {food.per100.carbs} / F {food.per100.fat}</p><small>{food.source==="openfoodfacts"?"Open Food Facts":h("תווית שאושרה", "Confirmed label")}</small></div>}
+    {manual&&<div className="grid gap-4">
+      <Field label={h("שם המוצר שעל האריזה", "Product name on package")} value={name} onChange={e=>{setName(e.target.value);setConfirmed(false)}}/>
+      <div className="grid grid-cols-2 gap-3"><Field label={h("הערכים המודפסים הם לכמות", "Printed values are per amount")} type="number" min="0.1" value={printedAmount} onChange={e=>{setPrintedAmount(e.target.value);setConfirmed(false)}}/><SelectField label={h("יחידת התווית", "Label unit")} value={basis} onChange={e=>{setBasis(e.target.value as "g"|"ml");setConfirmed(false)}}><option value="g">{h("גרם", "grams")}</option><option value="ml">{h("מ״ל", "ml")}</option></SelectField></div>
+      <p className="text-xs text-muted-foreground">{h("ארבעת הערכים הראשיים נדרשים. אפס מזינים במפורש.", "All four main values are required. Enter zero explicitly.")}</p>
+      <div className="grid grid-cols-2 gap-3">{valueField("kcal",energyUnit==="kJ"?h("אנרגיה (קילו־ג׳אול)","Energy (kJ)"):h("קלוריות (קק״ל)","Calories (kcal)"))}{valueField("protein",h("חלבון (גרם)","Protein (g)"))}{valueField("carbs",h("פחמימות (גרם)","Carbohydrate (g)"))}{valueField("fat",h("שומן (גרם)","Fat (g)"))}</div>
+      <Disclosure title={h("ערכים נוספים ויחידות", "More nutrients and units")}><div className="grid gap-3"><div className="grid grid-cols-2 gap-3"><SelectField label={h("יחידת האנרגיה המודפסת", "Printed energy unit")} value={energyUnit} onChange={e=>{setEnergyUnit(e.target.value as typeof energyUnit);setConfirmed(false)}}><option value="kcal">kcal</option><option value="kJ">kJ</option></SelectField><SelectField label={h("יחידת הנתרן או המלח המודפסת", "Printed sodium or salt unit")} value={sodiumUnit} onChange={e=>{setSodiumUnit(e.target.value as typeof sodiumUnit);setConfirmed(false)}}><option value="mg">{h("נתרן במ״ג","Sodium in mg")}</option><option value="g">{h("נתרן בגרם","Sodium in g")}</option><option value="salt_g">{h("מלח בגרם","Salt in g")}</option></SelectField></div>
+      <div className="grid grid-cols-2 gap-3">{valueField("fiber",h("סיבים (גרם, אופציונלי)","Fiber (g, optional)"))}{valueField("sugar",h("סוכר (גרם, אופציונלי)","Sugar (g, optional)"))}{valueField("saturatedFat",h("שומן רווי (גרם, אופציונלי)","Saturated fat (g, optional)"))}{valueField("sodium",sodiumUnit==="salt_g"?h("מלח (גרם, אופציונלי)","Salt (g, optional)"):sodiumUnit==="g"?h("נתרן (גרם, אופציונלי)","Sodium (g, optional)"):h("נתרן (מ״ג, אופציונלי)","Sodium (mg, optional)"))}</div></div></Disclosure>
+    </div>}
+    {(food||manual)&&<><Field label={`${h("כמות שאכלת", "Amount eaten")} (${manual?basis:food?.basis??"g"})`} type="number" min="0.1" max="10000" step="any" value={quantity} onChange={e=>setQuantity(e.target.value)}/><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>{h("בדקתי שהמוצר, היחידה והערכים תואמים לאריזה", "I checked that the product, unit and values match the package")}</label><Button disabled={!confirmed||busy} onClick={add}>{h("הוספה לארוחה", "Add to meal")}</Button></>}
+    <Disclosure className="health-help" title={h("מקור הנתונים ודיוק", "Data source and accuracy")}><p>{h("Open Food Facts הוא מאגר קהילתי (ODbL). יש לבדוק שהמוצר והערכים תואמים לאריזה. ערכים שלא ידועים נשארים ריקים. ערכי מנה מחושבים ל־100 גרם או מ״ל, בלי להמיר ביניהם.", "Open Food Facts is a community database (ODbL). Check the product and values against your package. Unknown values stay empty. Printed servings are scaled to 100 g or ml, without converting between mass and volume.")}</p></Disclosure>
+  </section>;
 }

@@ -291,7 +291,7 @@ export function assertEstimatedFoodMode(mode: unknown) {
   if (mode !== "meal" && mode !== "text") throw new Error("invalid_input");
 }
 
-export const mealNutritionPrompt = `Extract ONLY food candidates from visualObservations, with the user's description as additional context. Explicit user confirmations/corrections override visual guesses; omit any ingredient the user says is absent. Return the supplied schema. nameEn is the English identity, not a translation. question is Hebrew. Return EVERY distinct food candidate mentioned, not only the first. Keep alternatives and uncertainty from the observations; never silently choose between egg/radish or tofu/meat. If a visual identity has plausible alternatives, certainty MUST be uncertain and per100 null. Do not add foods or hidden oil/sauces unless explicitly stated by the user. Each food occurs ONCE even with two views of the same plate. Quantities/bounds are rough estimates in grams (g) for solids or ml for liquids, never cups/pieces/ounces. Explicit user-weighed amounts override visual guesses and have identical bounds. Never convert ml to g without documented density: omit that candidate and ask a question if this is required. For likely foods, give estimated nutrients per 100 g/ml, with unknown optional nutrients null. Do not invent database references or label values. If the observations are not food, malformed or refused, return foods=[] and a clarification question. All identities and portions will require user confirmation.`;
+export const mealNutritionPrompt = `Extract ONLY food candidates from visualObservations, with the user's description as additional context. Explicit user confirmations/corrections override visual guesses; omit any ingredient the user says is absent. Return the supplied schema. nameEn is the English identity, not a translation. question is Hebrew. Return EVERY distinct food candidate mentioned, not only the first. Keep alternatives and uncertainty from the observations; never silently choose between egg/radish or tofu/meat. If a visual identity has plausible alternatives, certainty MUST be uncertain. Give a defensible best-guess nutrient estimate for that candidate; per100 is null only if no defensible food estimate is possible. Do not add foods or hidden oil/sauces unless explicitly stated by the user. Each food occurs ONCE even with two views of the same plate. Quantities/bounds are rough estimates in grams (g) for solids or ml for liquids, never cups/pieces/ounces. Explicit user-weighed amounts override visual guesses and have identical bounds. Never convert ml to g without documented density: omit that candidate and ask a question if this is required. For likely foods, give estimated nutrients per 100 g/ml, with unknown optional nutrients null. Do not invent database references or label values. If the observations are not food, malformed or refused, return foods=[] and a clarification question. All identities and portions will require user confirmation.`;
 export function mealNutritionSchema() {
   const nutrient = nutritionSchema().properties.items.items.properties.per100;
   return {
@@ -315,10 +315,16 @@ export function mealNutritionSchema() {
     },
   };
 }
-export function normalizeObservedMeal(raw: unknown) {
+export function normalizeObservedMeal(raw: unknown, automatic = false) {
   const observed = parseObservations(raw);
   const supplied = record(raw).foods as Record<string, unknown>[];
-  const likely = observed.foods.filter((f) => f.certainty === "likely");
+  const likely = observed.foods
+    .filter(
+      (f) =>
+        (f.certainty === "likely" || automatic) &&
+        supplied.find((i) => i.id === f.id)?.per100 != null,
+    )
+    .map((f) => (automatic ? { ...f, certainty: "likely" as const } : f));
   const estimate = normalizeFoodEstimate(
     {
       items: likely.map((f) => ({
@@ -346,5 +352,9 @@ export function normalizeObservedMeal(raw: unknown) {
       0,
       1000,
     );
+  if (automatic) {
+    estimate.needsClarification = false;
+    estimate.question = "";
+  }
   return estimate;
 }

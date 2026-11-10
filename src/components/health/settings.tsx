@@ -8,7 +8,7 @@ import { useHealthText } from "@/lib/health/i18n";
 import { healthFunction } from "@/lib/health/api";
 import { TrainingData } from "./training-data";
 import { ProfileJourney } from "./profile-journey";
-import { Field, Panel, SelectField, ErrorText } from "./shared";
+import { Field, Panel, SelectField, ErrorText, Disclosure } from "./shared";
 export function HealthSettings() {
   const h = useHealthText();
   const data = useHealthStore((s) => s.data),
@@ -108,38 +108,28 @@ export function HealthSettings() {
           {notice}
         </p>
       )}
-      <Panel title={h("הגדרות אישיות", "Personal settings")}>
+      <Panel title={h("מה תרצו לעקוב?", "What would you like to track?")}>
         <div className="grid gap-4">
-          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border bg-muted/30 p-4 has-checked:border-foreground has-checked:bg-amber-50">
-            <input
-              type="checkbox"
-              checked={profile.nutritionEnabled}
-              onChange={(e) => patch("nutritionEnabled", e.target.checked)}
-            />
-            {h("הפעלת מעקב תזונה", "Enable nutrition tracking")}
-          </label>
-          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border bg-muted/30 p-4 has-checked:border-foreground has-checked:bg-amber-50">
-            <input
-              type="checkbox"
-              checked={profile.workoutsEnabled}
-              onChange={(e) => patch("workoutsEnabled", e.target.checked)}
-            />
-            {h("הפעלת מעקב אימונים", "Enable workout tracking")}
-          </label>
+          <label className="health-settings-toggle"><span>{h("הפעלת מעקב תזונה", "Enable nutrition tracking")}</span><input type="checkbox" checked={profile.nutritionEnabled} onChange={e=>patch("nutritionEnabled",e.target.checked)}/></label>
+          <label className="health-settings-toggle"><span>{h("הפעלת מעקב אימונים", "Enable workout tracking")}</span><input type="checkbox" checked={profile.workoutsEnabled} onChange={e=>patch("workoutsEnabled",e.target.checked)}/></label>
           <Button disabled={busy} onClick={() => void persist()}>
             {h("שמירת הגדרות", "Save settings")}
           </Button>
         </div>
       </Panel>
-      <Panel title={h("המאמן והערכות המזון ב־AI", "AI coach and food estimates")}>
+      <Disclosure title={h("המאמן והערכות מזון", "Coach and food estimates")} value={row?.data.aiProviderConsent ? h("מאושר", "Allowed") : h("כבוי", "Off")}>
+        <p className="mb-3">{h("הפעלת AI מאפשרת לשלוח את תוכן הבקשות הדרוש ל־Cloudflare. התוכן לא משמש לאימון המודלים.", "AI sends the necessary request content to Cloudflare. Content is not used to train models.")}</p>
         <label className="flex items-start gap-3 text-sm leading-7">
           <input type="checkbox" className="mt-2" checked={profile.aiProviderConsent} onChange={e=>patch("aiProviderConsent",e.target.checked)}/>
-          <span>{h("אני מסכים/ה לעיבוד תוכן הבקשות הדרוש ב־Cloudflare לצורך הערכת מזון והצעות אימון. שם, PIN ופרופיל גוף מלא אינם נשלחים אוטומטית. אין שימוש בתוכן לאימון המודלים. כל הערכה ניתנת לתיקון וכל שינוי בתוכנית דורש אישור. ביטול ההסכמה עוצר בקשות חדשות לאחר שמירת ההגדרות; תוכן שכבר נשלח לא ניתן להחזיר.", "I agree to Cloudflare processing the request content needed for food estimates and training proposals. Name, PIN and full body profile are not sent automatically. Content is not used to train models. Estimates are editable and plan changes require approval. Revoking consent stops new requests after saving; already sent content cannot be recalled.")}</span>
+          <span>{h("מאשר/ת שימוש ב־AI להערכות ולהצעות", "Allow AI estimates and suggestions")}</span>
         </label>
+        <Disclosure className="health-help" title={h("מה נשלח ומה נשמר?", "What is shared and saved?")}><p>{h("שם, PIN ופרופיל גוף מלא אינם נשלחים אוטומטית. כל הערכה ניתנת לתיקון וכל שינוי בתוכנית דורש אישור. ביטול ההסכמה עוצר בקשות חדשות לאחר שמירה; תוכן שכבר נשלח לא ניתן להחזיר.", "Name, PIN and full body profile are not sent automatically. Estimates are editable and plan changes require approval. Revoking consent stops new requests after saving; already sent content cannot be recalled.")}</p></Disclosure>
         <Button className="mt-3" disabled={busy} onClick={()=>void persist()}>{h("שמירת העדפת AI", "Save AI preference")}</Button>
-      </Panel>
+      </Disclosure>
+      <Disclosure title={h("הפרופיל והיעדים שלי", "My profile and targets")} initialOpen={!data.nutrition_goals.length} value={data.nutrition_goals.length ? h("מוגדר", "Set up") : h("נתחיל כאן", "Start here")}>
       <ProfileJourney profile={profile} onChange={setProfile} goals={data.nutrition_goals.map(g=>g.data)} onSave={saveProfileAndGoal} busy={busy}/>
-      <details className="rounded-3xl border bg-card p-5"><summary className="font-semibold">{h("העדפות נוספות", "More preferences")}</summary><div className="mt-5 grid gap-4">          <Field
+      </Disclosure>
+      <Disclosure title={h("העדפות נוספות", "More preferences")}><div className="grid gap-4">          <Field
             label={h("אזור זמן", "Time zone")}
             value={profile.timezone}
             onChange={(e) => patch("timezone", e.target.value)}
@@ -150,9 +140,9 @@ export function HealthSettings() {
               "Disabling a module keeps its history. Data is not shared with the household. Anyone who knows your PIN can sign in as you.",
             )}
           </p>
-<Field label={h("יעד מים במ״ל", "Water target (ml)")} type="number" min={250} max={10000} value={profile.waterTarget} onChange={e=>patch("waterTarget",+e.target.value)}/><Button disabled={busy} onClick={()=>void persist()}>{h("שמירת העדפות", "Save preferences")}</Button></div></details>
-      {data.nutrition_goals.length>0 && <details className="rounded-3xl border bg-card p-5"><summary className="font-semibold">{h("היסטוריית יעדים", "Goal history")}</summary>{[...data.nutrition_goals].sort((a,b)=>b.data.date.localeCompare(a.data.date)).map(g=><p className="mt-3 text-sm" key={g.id}>{g.data.date} · {g.data.kcal} kcal · P {g.data.protein} / C {g.data.carbs} / F {g.data.fat}</p>)}</details>}
-      <TrainingData/>
+<Field label={h("יעד מים במ״ל", "Water target (ml)")} type="number" min={250} max={10000} value={profile.waterTarget} onChange={e=>patch("waterTarget",+e.target.value)}/><Button disabled={busy} onClick={()=>void persist()}>{h("שמירת העדפות", "Save preferences")}</Button></div></Disclosure>
+      {data.nutrition_goals.length>0 && <Disclosure title={h("היסטוריית יעדים", "Goal history")} value={String(data.nutrition_goals.length)}>{[...data.nutrition_goals].sort((a,b)=>b.data.date.localeCompare(a.data.date)).map(g=><p className="mt-3 text-sm" key={g.id}>{g.data.date} · {g.data.kcal} kcal · P {g.data.protein} / C {g.data.carbs} / F {g.data.fat}</p>)}</Disclosure>}
+      <Disclosure title={h("עזרה בשיפור המודלים · לבחירתך", "Help improve our models · optional")}><TrainingData/></Disclosure>
       <Panel title={h("הנתונים שלך", "Your data")}>
         <Button variant="outline" onClick={exportCsv}>
           {h("ייצוא CSV", "Export CSV")}

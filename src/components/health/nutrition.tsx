@@ -1,6 +1,7 @@
 "use client";
+import Image from "next/image";
 import { useEffect, useState } from "react";
-import { Camera, ArrowUpLeft, Flame, Beef, Wheat, Droplet, Plus, Search, Bookmark, PenLine, Dumbbell } from "lucide-react";
+import { Camera, ArrowUpLeft, Flame, Beef, Wheat, Droplet, Plus, Search, Bookmark, PenLine, ScanBarcode, Utensils } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useHealthStore } from "@/lib/health/store";
@@ -20,15 +21,17 @@ import {
 import { uploadMealImage } from "@/lib/health/api";
 import { createClient } from "@/lib/supabase/client";
 import { useHealthText } from "@/lib/health/i18n";
-import { Panel, Field, SelectField, Empty, ErrorText, round } from "./shared";
+import { Panel, Field, SelectField, Empty, ErrorText, round, Disclosure, ChoiceTabs } from "./shared";
 import { FoodPicker } from "./food-picker";
 import { FoodLibrary } from "./food-library";
 import { estimateMeal, combineMealPhotos } from "@/lib/health/wellness-api";
 import { AiConsent, useWellnessAvailability } from "./ai-consent";
 import { NutrientRing } from "./nutrient-ring";
 import { ProductLabel } from "./product-label";
+import { MealCamera } from "./meal-camera";
+import { MealDetails } from "./meal-details";
 const kinds = ["breakfast", "lunch", "dinner", "snack"] as const;
-function MealImage({ path }: { path: string }) {
+function MealImage({ path, thumbnail=false }: { path: string; thumbnail?:boolean }) {
   const [url, setUrl] = useState("");
   const h = useHealthText();
   useEffect(() => {
@@ -44,25 +47,29 @@ function MealImage({ path }: { path: string }) {
     };
   }, [path]);
   return url ? (
-    <a
+    <a aria-label={h("פתיחת התמונה", "View photo")}
       href={url}
       target="_blank"
       rel="noreferrer"
       className="text-sm underline"
     >
-      {h("הצגת תמונת הארוחה", "View meal photo")}
+      {thumbnail ? <Image unoptimized width={64} height={64} src={url} alt={h("תמונת הארוחה", "Meal photo")} className="health-meal-thumb"/> : h("הצגת תמונת הארוחה", "View meal photo")}
     </a>
   ) : null;
 }
-export function Nutrition({ date, onWorkout }: { date: string; onWorkout?:()=>void }) {
+export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }: { date: string; initialAdd?:boolean; addRequest?:number; onAddClosed?:()=>void }) {
   const h = useHealthText();
   const data = useHealthStore((s) => s.data),
     save = useHealthStore((s) => s.save),
     remove = useHealthStore((s) => s.remove);
   const profile = data.health_profiles[0]?.data ?? profileSchema.parse({});
-  const [addMenu,setAddMenu]=useState(false);
-  const [foodMode,setFoodMode]=useState<"search"|"saved"|"manual"|"text">("search");
-  function openEntry(mode: "photo"|"search"|"saved"|"manual"|"text") {setAddMenu(false);setEditing(null);setCapture(mode==="photo");setFoodMode(mode==="photo"?"search":mode);setEditor(true)}
+  const [addMenu,setAddMenu]=useState(initialAdd);
+  const [seenAddRequest,setSeenAddRequest]=useState(addRequest);
+  if(addRequest!==seenAddRequest){setSeenAddRequest(addRequest);if(addRequest>0)setAddMenu(true)}
+  function closeAdd(){setAddMenu(false);onAddClosed?.()}
+  const [foodMode,setFoodMode]=useState<"search"|"saved"|"manual"|"text"|"product">("search");
+  const [cameraOpen,setCameraOpen]=useState(false),[detailsId,setDetailsId]=useState<string|null>(null);
+  function openEntry(mode: "photo"|"search"|"saved"|"manual"|"text"|"product") {closeAdd();if(mode==="photo"){setCameraOpen(true);return;}setEditing(null);setCapture(false);setFoodMode(mode);setEditor(true)}
   const [capture, setCapture] = useState(false);
   const [editing, setEditing] = useState<HealthRow<"meals"> | null>(null),
     [editor, setEditor] = useState(false),
@@ -115,6 +122,8 @@ export function Nutrition({ date, onWorkout }: { date: string; onWorkout?:()=>vo
   return (
     <div className="grid gap-5">
       <ErrorText error={error} />
+      {cameraOpen&&<MealCamera date={date} onClose={()=>setCameraOpen(false)}/>}
+      {detailsId&&<MealDetails id={detailsId} onClose={()=>setDetailsId(null)} onEdit={()=>{setEditing(data.meals.find(m=>m.id===detailsId)??null);setDetailsId(null);setEditor(true)}}/>}
       <div className="health-summary"><Panel
         title={h("התזונה שלי היום", "My nutrition today")}
         action={
@@ -189,15 +198,16 @@ export function Nutrition({ date, onWorkout }: { date: string; onWorkout?:()=>vo
         </details>
       </Panel>
       </div>
-      <button className="health-scan" onClick={()=>openEntry("photo")}><span><Camera size={25}/></span><span className="flex-1"><strong>{h("מצלמים. בודקים. מוסיפים.", "Snap. Review. Log.")}</strong><small>{h("צילום ארוחה או תווית עם AI", "Meal & nutrition label analysis")}</small></span><ArrowUpLeft size={19}/></button>
-      <Dialog open={addMenu} onOpenChange={setAddMenu}><DialogContent className="health-app meal-actions start-0 top-auto bottom-0 translate-x-0 translate-y-0 rtl:translate-x-0" showCloseButton={false}><DialogTitle>{h("מה מוסיפים?", "What would you like to add?")}</DialogTitle><div className="meal-action-grid">
-        {onWorkout&&<button className="workout-action" onClick={()=>{setAddMenu(false);onWorkout()}}><Dumbbell/>{h("רישום אימון", "Log a workout")}</button>}
+      <button className="health-scan" onClick={()=>openEntry("photo")}><span><Camera size={25}/></span><span className="flex-1"><strong>{h("מצלמים. הארוחה ביומן.", "Snap. Logged.")}</strong><small>{h("צילום, זיהוי והוספה ליומן", "Photograph, recognize and add to diary")}</small></span><ArrowUpLeft size={19}/></button>
+      <Dialog open={addMenu} onOpenChange={open=>{if(open)setAddMenu(true);else closeAdd()}}><DialogContent className="health-app meal-actions start-0 top-auto bottom-0 translate-x-0 translate-y-0 rtl:translate-x-0" showCloseButton={false}><DialogTitle>{h("מה מוסיפים?", "What would you like to add?")}</DialogTitle><div className="meal-action-grid">
+
         <button onClick={()=>openEntry("search")}><span className="amber"><Search/></span>{h("מאגר מזון", "Food database")}</button>
         <button onClick={()=>openEntry("saved")}><span className="pink"><Bookmark/></span>{h("שמורים", "Saved foods")}</button>
         <button onClick={()=>openEntry("photo")}><span><Camera/></span>{h("צלם ארוחה", "Photograph a meal")}</button>
         <button onClick={()=>openEntry("text")}><span className="amber"><PenLine/></span>{h("כתבו מה אכלתם", "Describe your meal")}</button>
+        <button onClick={()=>openEntry("product")}><span className="amber"><ScanBarcode/></span>{h("מוצר ארוז", "Packaged product")}</button>
         <button onClick={()=>openEntry("manual")}><span className="green"><PenLine/></span>{h("הזנה ידנית", "Manual entry")}</button>
-      </div><Button variant="ghost" onClick={()=>setAddMenu(false)}>{h("סגירה", "Close")}</Button></DialogContent></Dialog>
+      </div><Button variant="ghost" onClick={closeAdd}>{h("סגירה", "Close")}</Button></DialogContent></Dialog>
       {editor && (
         <MealEditor
           capture={capture}
@@ -214,7 +224,7 @@ export function Nutrition({ date, onWorkout }: { date: string; onWorkout?:()=>vo
       )}
       <h2 className="mt-3 text-2xl font-bold">{h("הארוחות של היום", "Your meals today")}</h2>
       {kinds.filter(kind=>meals.length===0 ? kind==="breakfast" : meals.some(m=>m.data.kind===kind)).map((kind) => (
-        <Panel key={kind} title={label(kind) ?? kind}>
+        <Panel key={kind} title={label(kind) ?? kind} className="health-meal-group">
           {meals.filter((m) => m.data.kind === kind).length === 0 ? (
             <Empty>{h("עדיין אין ארוחה", "No meal logged yet")}</Empty>
           ) : (
@@ -225,30 +235,14 @@ export function Nutrition({ date, onWorkout }: { date: string; onWorkout?:()=>vo
                 return (
                   <article
                     key={m.id}
-                    className="mb-3 rounded-xl border p-3 last:mb-0"
+                    className="health-meal-card"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-medium">
-                          {m.data.name ||
-                            m.data.items.map((i) => i.food.name).join(", ")}
-                        </h3>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {round(n.kcal)} kcal · P {round(n.protein)} / C{" "}
-                          {round(n.carbs)} / F {round(n.fat)}
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditing(m);
-                          setEditor(true);
-                        }}
-                      >
-                        {h("עריכה", "Edit")}
-                      </Button>
+                    <div className="health-meal-card-main">
+                      {m.data.imagePath ? <MealImage path={m.data.imagePath} thumbnail/> : <span className="health-meal-thumb health-meal-placeholder" aria-hidden="true"><Utensils size={23}/></span>}
+                      <div className="min-w-0 flex-1"><h3><button onClick={()=>setDetailsId(m.id)}>{m.data.name || label(kind)}</button></h3><p className="health-meal-foods">{m.data.items.slice(0,2).map(i=>`${i.food.name} · ${i.quantity} ${i.food.basis === "ml" ? h("מ״ל","ml") : h("גרם","g")}`).join(" · ")}</p>{m.data.items.length>2&&<small>{h(`ועוד ${m.data.items.length-2} פריטים`,`+${m.data.items.length-2} more items`)}</small>}</div>
+                      <div className="health-meal-card-end"><strong>{round(n.kcal)} <small>kcal</small></strong><Button size="sm" variant="ghost" onClick={()=>{setEditing(m);setEditor(true)}}>{h("עריכה", "Edit")}</Button></div>
                     </div>
+                    <div className="health-meal-macros">{([["protein",h("חלבון","Protein"),Beef],["carbs",h("פחמימות","Carbs"),Wheat],["fat",h("שומן","Fat"),Droplet]] as const).map(([key,title,Icon])=><span key={key} className={`meal-macro-${key}`} aria-label={`${title}: ${round(n[key])} g`}><Icon size={13}/>{round(n[key])} {h("ג׳","g")}</span>)}</div>
                     <details className="mt-2 text-sm">
                       <summary>
                         {h("פריטים ופעולות", "Items & actions")}
@@ -395,7 +389,7 @@ function MealEditor({
   onClose,
 }: {
   onBrowse: ()=>void;
-  foodMode?: "search"|"saved"|"manual"|"text";
+  foodMode?: "search"|"saved"|"manual"|"text"|"product";
   capture?: boolean;
   date: string;
   existing: HealthRow<"meals"> | null;
@@ -417,7 +411,7 @@ function MealEditor({
   );
   const [error, setError] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
-    [mode, setMode] = useState<"meal" | "label" | "text">(foodMode==="text"?"text":"meal"),
+    [mode, setMode] = useState<"meal" | "label" | "text">(foodMode==="text"?"text":foodMode==="product"?"label":"meal"),
     [description, setDescription] = useState("");
   const availability=useWellnessAvailability();
   const [secondPhoto,setSecondPhoto]=useState<File|null>(null);
@@ -504,7 +498,7 @@ function MealEditor({
     >
       <div className="grid gap-4">
         <ErrorText error={error} />
-        <p className="text-sm text-muted-foreground">{h("מוסיפים מזון, בודקים כמויות ושומרים ביומן שלך.", "Add food, review your portions and save to your diary.")}</p>
+        <p className="text-sm text-muted-foreground">{h("בדקו את הכמויות לפני השמירה.", "Review portions before saving.")}</p>
         <details className="meal-metadata"><summary>{h("פרטי הארוחה והתאריך", "Meal details & date")}</summary>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field
@@ -543,27 +537,26 @@ function MealEditor({
           onChange={(e) => setMeal((m) => ({ ...m, name: e.target.value }))}
         />
         </details>
-        {(capture||foodMode==="text")&&<section className="meal-photo-entry rounded-xl border p-4" aria-label={h("הערכת ארוחה עם AI","AI meal estimate")}>
-          <h3 className="font-semibold">{h("ספרו מה אכלתם — בתמונה או במילים","Tell us what you ate — photos or words")}</h3>
+        {(capture||foodMode==="text"||foodMode==="product")&&<section className="meal-photo-entry rounded-xl border p-4" aria-label={h("הערכת ארוחה עם AI","AI meal estimate")}>
+          <h3 className="font-semibold">{h("מוסיפים לארוחה","Add to your meal")}</h3>
           <div className="mt-3 grid gap-3">
-            <SelectField label={h("איך להזין?","Input method")} value={mode} onChange={e=>{setMode(e.target.value as typeof mode);setMeal(m=>({...m,imagePath:null}));setSecondPhoto(null);setRequestId(crypto.randomUUID());}}>
-              <option value="meal">{h("צילום ארוחה","Meal photo")}</option><option value="label">{h("מוצר ארוז — ברקוד או תווית","Packaged product — barcode or label")}</option><option value="text">{h("כתיבה חופשית","Free text")}</option>
-            </SelectField>
+            <ChoiceTabs label={h("דרך הוספה", "Entry method")} value={mode} onChange={next=>{setMode(next);setMeal(m=>({...m,imagePath:null}));setSecondPhoto(null);setRequestId(crypto.randomUUID());}} options={[{value:"meal",label:h("צילום", "Photo")},{value:"text",label:h("תיאור", "Describe")},{value:"label",label:h("מוצר", "Product")}]} />
             {mode === "label" ? <ProductLabel key={owner} onAdd={item => setMeal(m => ({ ...m, items: [...m.items, item] }))}/> : <>
             <AiConsent/>
             {mode!=="text"&&<><Field label={h("צילום או העלאת תמונה","Take or upload a photo")} type="file" accept="image/*" onChange={e=>{setPhoto(e.target.files?.[0]??null);setMeal(m=>({...m,imagePath:null}));setRequestId(crypto.randomUUID());}}/>
               {mode==="meal"&&<Field label={h("תמונה שנייה של אותה מנה מהצד (אופציונלי)","Second side view of the same meal (optional)")} type="file" accept="image/*" onChange={e=>{setSecondPhoto(e.target.files?.[0]??null);setMeal(m=>({...m,imagePath:null}));setRequestId(crypto.randomUUID());}}/>}</>}
             <label className="grid gap-2 text-sm"><span>{mode==="text"?h("מה אכלתם וכמה?","What did you eat, and how much?"):h("הסבר על המרכיבים והכמות","Food and portion details")}</span><textarea className="min-h-24 rounded-xl border bg-background p-3 text-foreground" maxLength={2500} value={description} placeholder={h("למשל: שתי ביצים, חצי פיתה ושתי כפות קוטג׳","For example: two eggs, half a pita and two tablespoons of cottage cheese")} onChange={e=>{setDescription(e.target.value);setRequestId(crypto.randomUUID());}}/></label>
-            <p className="text-xs leading-6 text-muted-foreground">{h("הכמויות והערכים הם אומדן. בדקו גם שמן, רטבים ואופן הכנה. הניתוח יחליף את פריטי הטיוטה; שום דבר לא יתווסף ליומן לפני אישור ושמירה.","Amounts and nutrition are estimates. Check oil, sauces and preparation. Analysis replaces draft items; nothing enters your diary until you approve and save.")}</p>
-            <Button variant="outline" disabled={busy||!availability.ready||(mode==="text"?!description.trim():!photo)} onClick={()=>void analyze()}>{busy?h("מכין הערכה…","Estimating…"):h("הערכת הארוחה לבדיקה","Estimate meal for review")}</Button>
+            <p className="text-xs text-muted-foreground">{h("הערכה בלבד — בדקו גם שמן ורטבים. שום דבר לא נשמר אוטומטית.", "Estimates only — check oil and sauces. Nothing is saved automatically.")}</p>
+            <Disclosure className="health-help" title={h("לשיפור הדיוק", "For a better estimate")}><p>{h("ציינו משקל וכמויות ידועים ואופן הכנה. הניתוח מחליף את פריטי הטיוטה; מזונות שלא זוהו בביטחון דורשים השלמה.", "Include known weights, quantities and preparation. Analysis replaces draft items; add any ingredients that could not be identified reliably.")}</p></Disclosure>
+            <Button variant="outline" disabled={busy||!availability.ready||(mode==="text"?!description.trim():!photo)} onClick={()=>void analyze()}>{busy?h("מכין הערכה…","Estimating…"):h("הצגת הערכה","Show estimate")}</Button>
             {question&&<p role="status" className="rounded-xl bg-amber-500/10 p-3 text-sm">{question}</p>}
             </>}
             {mode !== "label" && meal.imagePath&&<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={keepPhoto} onChange={e=>setKeepPhoto(e.target.checked)}/>{h("שמירת התמונה ביומן (אחרת תימחק לאחר 24 שעות)","Keep the photo in my diary (otherwise removed after 24 hours)")}</label>}
           </div>
         </section>}
-        {capture && <Button variant="outline" onClick={onBrowse}>{h("חיפוש או הוספת מזון ידנית", "Search or add food manually")}</Button>}
-        {(!capture || photoReviewRequired) && <div className="meal-search-section"><p className="mb-3 text-sm font-semibold">{h("חיפוש מזון או מוצר", "Find a food or product")}</p>
-        <FoodPicker initialMode={foodMode==="text"?"search":foodMode}
+        {capture && mode!=="label" && <Button variant="outline" onClick={onBrowse}>{h("חיפוש או הוספת מזון ידנית", "Search or add food manually")}</Button>}
+        {mode!=="label" && (!capture || photoReviewRequired) && <div className="meal-search-section"><p className="mb-3 text-sm font-semibold">{h("חיפוש מזון או מוצר", "Find a food or product")}</p>
+        <FoodPicker initialMode={foodMode==="text"||foodMode==="product"?"search":foodMode}
           onAdd={(item) =>
             setMeal((m) => ({ ...m, items: [...m.items, item] }))
           }
@@ -680,7 +673,7 @@ function MealEditor({
           disabled={busy || !meal.items.length || (photoReviewRequired && !photoReviewed)}
           onClick={() => void persist()}
         >
-          {h("אישור והוספה ליומן", "Confirm & save to diary")}
+          {h("שמירה ביומן", "Save to diary")}
         </Button>
         </div>
         {meal.items.length > 0 && (

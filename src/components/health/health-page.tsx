@@ -2,12 +2,13 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Leaf, Dumbbell, ChartNoAxesCombined, Settings2, ChevronRight, MessageCircle } from "lucide-react";
+import { House, Dumbbell, ChartNoAxesCombined, Settings2, ChevronRight, MessageCircle, Plus } from "lucide-react";
 import "./health.css";
 import { Button } from "@/components/ui/button";
 import { useHealthStore } from "@/lib/health/store";
 import { calculateGoal, goalForDate, localDate } from "@/lib/health/calculations";
 import { useHealthText } from "@/lib/health/i18n";
+import { MemberAvatar } from "@/components/identity/member-avatar";
 import { WeekPicker } from "./week-picker";
 import { useAppStore } from "@/lib/store/app-store";
 import { useIdentity } from "@/lib/identity";
@@ -46,7 +47,9 @@ export function HealthPage() {
   const h = useHealthText();
   const state = useHealthStore(),
     identity = useIdentity((s) => s.actingMemberId);
-  const memberName=useAppStore(s=>identity?s.members[identity]?.display_name:undefined)?.trim();
+  const member=useAppStore(s=>identity?s.members[identity]:undefined);
+  const memberName=member?.display_name?.trim();
+  const [entryVersion,setEntryVersion]=useState(0),[addFood,setAddFood]=useState(false);
   const [workoutFocus,setWorkoutFocus]=useState(false);
   const [tab, setTab] = useState("home"),
     [pickedDate, setDate] = useState<string | null>(null);
@@ -81,7 +84,7 @@ export function HealthPage() {
   }, [identity]);
   const tabs = [
     ...(profile?.nutritionEnabled
-      ? [["nutrition", h("תזונה", "Nutrition")]]
+      ? [["nutrition", h("היום", "Today")]]
       : []),
     ...(profile?.workoutsEnabled
       ? [["workouts", h("אימונים", "Workouts")]]
@@ -89,25 +92,19 @@ export function HealthPage() {
     ...(profile?.nutritionEnabled || profile?.workoutsEnabled
       ? [["progress", h("התקדמות", "Progress")]]
       : []),
-    ...((profile?.nutritionEnabled||profile?.workoutsEnabled)?[["coach",h("המאמן","Coach")]]:[]),
+    ...((profile?.nutritionEnabled||profile?.workoutsEnabled)?[["coach",h("צ׳אט AI","AI chat")]]:[]),
     ["settings", h("הגדרות", "Settings")],
   ];
-  const icons = { coach:MessageCircle, nutrition: Leaf, workouts: Dumbbell, progress: ChartNoAxesCombined, settings: Settings2 };
+  const icons = { coach:MessageCircle, nutrition: House, workouts: Dumbbell, progress: ChartNoAxesCombined, settings: Settings2 };
   const active = tabs.some(([key]) => key === tab) ? tab : profile?.nutritionEnabled && state.data.nutrition_goals.length ? "nutrition" : !profile?.nutritionEnabled && profile?.workoutsEnabled ? "workouts" : "settings";
   return (
-    <div className="health-app flex min-h-screen flex-1 flex-col">
-      <header className="health-topbar">
-        <Link href="/" className="health-back"><ChevronRight size={17}/>{h("חזרה לבית", "Smart Home")}</Link>
-        <Link href="/health" className="health-wordmark"><span className="health-mark"><Leaf size={20}/></span> KH <span>WELLNESS</span></Link>
-        <button className="health-profile" onClick={()=>setTab("settings")} aria-label={h("הגדרות אישיות", "Personal settings")}><Settings2 size={20}/></button>
+    <div className="health-app flex min-h-screen flex-1 flex-col" data-health-section={active} data-can-add={!!profile?.nutritionEnabled && !workoutFocus}>
+      <header className="health-topbar health-compact-header">
+        <span className="health-avatar" aria-hidden="true"><MemberAvatar member={member} className="size-11" emojiClassName="text-3xl"/></span>
+        <div className="health-header-copy"><h1 id="health-page-title">{active === "nutrition" ? (memberName ? `${h("שלום", "Hello")} ${memberName},` : h("היום שלך", "Your day")) : active === "coach" ? h("צ׳אט AI", "AI chat") : active === "workouts" ? h("האימונים שלך", "Your workouts") : active === "progress" ? h("ההתקדמות שלך", "Your progress") : h("הגדרות אישיות", "Personal settings")}</h1><p>{active === "nutrition" || active === "progress" ? new Intl.DateTimeFormat(h("he-IL","en-US"),{month:"long",day:"numeric",timeZone:"UTC"}).format(new Date(`${date}T12:00:00Z`)) : active === "coach" ? h("תזונה, אימונים וטכניקה", "Food, training and technique") : active === "workouts" ? h("הקצב שלך, ההתקדמות שלך", "Your pace, your progress") : h("הכול במקום אחד", "Everything in one place")}</p></div>
+        <div className="health-header-actions"><button id="health-settings-button" className="health-profile" onClick={()=>setTab("settings")} aria-label={h("הגדרות אישיות", "Personal settings")} aria-pressed={active==="settings"}><Settings2 size={21}/></button><Link href="/" className="health-back" aria-label={h("חזרה לבית", "Smart Home")}><ChevronRight size={20}/></Link></div>
       </header>
-      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-7 pb-32 sm:px-8">
-        {!workoutFocus&&<>
-        <div className="mb-7 flex items-end justify-between gap-3">
-          <div><p className="health-eyebrow">{h("קצת יותר טוב. בכל יום.", "A little better. Every day.")}</p>
-          <h1 aria-label={h("הבריאות שלי", "My health")} className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{memberName ? `${h("שלום", "Hello")}, ${memberName}` : h("שלום", "Hello")}<span aria-hidden="true" className="health-dot">.</span></h1></div>
-        </div>
-        </>}
+      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-5 pb-32 sm:px-8">
         {active !== "settings" && active !== "coach" && !workoutFocus && <WeekPicker date={date} today={localDate(profile?.timezone??"Asia/Jerusalem")} onChange={setDate}/>}
         {state.pending > 0 && (
           <p
@@ -145,12 +142,12 @@ export function HealthPage() {
           </Button>
         ) : (
           <>
-            <div
+            {(profile?.nutritionEnabled || profile?.workoutsEnabled) && <div
               role="tablist"
               aria-label={h("אזור הבריאות", "Health area")}
               className="health-bottom-nav"
             >
-              {tabs.map(([key, title]) => { const Icon = icons[key as keyof typeof icons]; return (
+              {tabs.filter(([key])=>key!=="settings").map(([key, title]) => { const Icon = icons[key as keyof typeof icons]; return (
                 <button
                   key={key}
                   type="button"
@@ -164,17 +161,18 @@ export function HealthPage() {
                   <Icon size={22}/><span>{title}</span>
                 </button>
               );})}
-            </div>
+            </div>}
+            {profile?.nutritionEnabled && !workoutFocus && <button type="button" className="health-global-add" aria-label={h("הוספת ארוחה", "Add meal")} onClick={()=>{setEntryVersion(v=>v+1);setAddFood(true);setTab("nutrition")}}><Plus size={32}/></button>}
             <div
               id="health-content"
               key={active}
               className="health-screen"
               role="tabpanel"
-              aria-labelledby={`health-tab-${active}`}
+              aria-labelledby={active === "settings" ? "health-page-title" : `health-tab-${active}`}
             >
               {active === "coach" && <CoachChat key={state.owner} onNavigate={key=>setTab(key==="nutrition"&&!profile?.nutritionEnabled||key==="workouts"&&!profile?.workoutsEnabled?"settings":key)}/>}
               {active === "settings" && <HealthSettings key={state.owner} />}
-              {active === "nutrition" && <Nutrition key={state.owner} date={date} onWorkout={()=>setTab(profile?.workoutsEnabled ? "workouts" : "settings")} />}{" "}
+              {active === "nutrition" && <Nutrition key={state.owner} date={date} initialAdd={addFood} addRequest={entryVersion} onAddClosed={()=>setAddFood(false)}/>}{" "}
               {active === "workouts" && (
                 <Workouts key={state.owner} date={date} onFocusChange={setWorkoutFocus} />
               )}{" "}
