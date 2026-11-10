@@ -107,6 +107,9 @@ export function ErrorText({ error }: { error: string | null }) {
       "החשבון התחלף. יש להיכנס מחדש.",
       "Account changed. Sign in again.",
     ),
+    meal_save_failed:h("הניתוח הצליח, אבל השמירה נכשלה. נסו שוב — לא ננתח את התמונה מחדש.","Analysis succeeded, but saving failed. Retry without analyzing the photo again."),
+    upload_failed:h("העלאת התמונה נכשלה. בדקו את החיבור ונסו שוב.","Photo upload failed. Check your connection and retry."),
+    request_failed:h("החיבור לשרת נקטע. נסו שוב.","The server connection failed. Please retry."),
     not_configured: h(
       "שירות ה־AI עדיין לא הוגדר או אינו זמין. אפשר להמשיך להזין ולערוך ידנית.",
       "The AI service is not configured or available. You can continue entering and editing manually.",

@@ -156,10 +156,43 @@ try {
         name: he ? "כתבו מה אכלתם" : "Describe your meal",
       })
       .click();
-    assert.equal(await page.getByRole("group",{name:he?"דרך הוספה":"Entry method",exact:true}).count(),0,"description skips method chooser");
-    assert.equal(await page.getByRole("button",{name:he?"שמירה ביומן":"Save to diary",exact:true}).count(),0,"description hides empty save");
-    assert.equal(await page.getByText(he?"חיפוש מזון או מוצר":"Find a food or product",{exact:true}).count(),0,"description skips duplicate food search");
-    if(process.env.WELLNESS_SCREENSHOTS_DIR)await page.screenshot({path:join(process.env.WELLNESS_SCREENSHOTS_DIR,language+"-direct-description.png"),animations:"disabled"});
+    assert.equal(
+      await page
+        .getByRole("group", {
+          name: he ? "דרך הוספה" : "Entry method",
+          exact: true,
+        })
+        .count(),
+      0,
+      "description skips method chooser",
+    );
+    assert.equal(
+      await page
+        .getByRole("button", {
+          name: he ? "שמירה ביומן" : "Save to diary",
+          exact: true,
+        })
+        .count(),
+      0,
+      "description hides empty save",
+    );
+    assert.equal(
+      await page
+        .getByText(he ? "חיפוש מזון או מוצר" : "Find a food or product", {
+          exact: true,
+        })
+        .count(),
+      0,
+      "description skips duplicate food search",
+    );
+    if (process.env.WELLNESS_SCREENSHOTS_DIR)
+      await page.screenshot({
+        path: join(
+          process.env.WELLNESS_SCREENSHOTS_DIR,
+          language + "-direct-description.png",
+        ),
+        animations: "disabled",
+      });
     await page
       .getByLabel(he ? "מה אכלתם וכמה?" : "What did you eat, and how much?")
       .fill(he ? "אכלתי כוס אורז מבושל" : "I ate a cup of cooked rice");
@@ -176,9 +209,21 @@ try {
     const nutritionCalls = (await actions(page)).filter(
       (c) => c.action === "nutrition",
     ).length;
-    await page.getByRole("button",{name:he?"סגירה":"Close",exact:true}).click();
-    await page.getByRole("button",{name:he?"הוספת ארוחה":"Add meal",exact:true}).click();
-    await page.getByRole("button",{name:he?"מוצר ארוז":"Packaged product",exact:true}).click();
+    await page
+      .getByRole("button", { name: he ? "סגירה" : "Close", exact: true })
+      .click();
+    await page
+      .getByRole("button", {
+        name: he ? "הוספת ארוחה" : "Add meal",
+        exact: true,
+      })
+      .click();
+    await page
+      .getByRole("button", {
+        name: he ? "מוצר ארוז" : "Packaged product",
+        exact: true,
+      })
+      .click();
     const labelSection = page.getByRole("region", {
       name: he ? "ערכי מוצר מהאריזה" : "Product label values",
     });
@@ -518,7 +563,7 @@ try {
     "correction preserves meal identity",
   );
   await photo.close();
-  for (const scenario of ["photo-empty", "photo-retry"]) {
+  for (const scenario of ["photo-empty", "photo-retry", "save-retry"]) {
     const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await p.goto(base + "/?" + scenario + "=1");
     await p.getByRole("button", { name: "Add meal", exact: true }).click();
@@ -532,9 +577,26 @@ try {
     await p.getByRole("alert").waitFor();
     assert.equal(
       (await actions(p)).filter((c) => c.table === "meals").length,
-      0,
-      "failed or empty analysis creates no meal",
+      scenario === "save-retry" ? 1 : 0,
+      "failed or empty analysis does not save a meal",
     );
+    assert.equal(
+      await p.evaluate(
+        () =>
+          window.wellnessFixture
+            .meals()
+            .filter((m) => m.data.name === "Photo meal").length,
+      ),
+      0,
+      "failed attempt creates no diary row",
+    );
+    if (scenario === "save-retry")
+      await p
+        .getByText(
+          "Analysis succeeded, but saving failed. Retry without analyzing the photo again.",
+          { exact: true },
+        )
+        .waitFor();
     if (scenario === "photo-empty") {
       await p
         .getByText("No food identified. Try a clearer, closer photo.", {
@@ -551,25 +613,77 @@ try {
       await p.getByRole("dialog").waitFor({ state: "hidden" });
       assert.equal(
         (await actions(p)).filter((c) => c.table === "meals").length,
-        1,
+        scenario === "save-retry" ? 2 : 1,
         "retry saves exactly one meal",
       );
     }
+    if (scenario === "save-retry")
+      assert.equal(
+        (await actions(p)).filter((c) => c.action === "nutrition").length,
+        1,
+        "retry after save failure reuses the completed estimate",
+      );
     await p.close();
   }
+  const recovery = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+  });
+  await recovery.goto(base + "/?capability-retry=1");
+  await recovery
+    .getByRole("button", { name: "Plan with AI", exact: true })
+    .click();
+  await recovery
+    .getByRole("button", { name: "Check again", exact: true })
+    .first()
+    .click();
+  await recovery.waitForFunction(() =>
+    [...document.querySelectorAll("button")].some(
+      (b) => b.textContent === "Create program" && !b.disabled,
+    ),
+  );
+  assert.equal(
+    (await actions(recovery)).filter((c) => c.action === "capabilities").length,
+    2,
+    "all AI consumers share one retried availability request",
+  );
+  await recovery.close();
   const noAI = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await noAI.goto(base + "/?ai-off=1");
   await noAI.getByRole("button", { name: "Add meal", exact: true }).click();
   await noAI
     .getByRole("button", { name: "Packaged product", exact: true })
     .click();
-  await noAI.getByLabel("Barcode scanner", {exact:true}).waitFor();
-  assert.equal(await noAI.getByRole("group",{name:"Entry method",exact:true}).count(),0,"packaged product skips input method selection");
-  assert.equal(await noAI.getByText("Meal details & date",{exact:true}).count(),0,"packaged product starts without meal metadata");
-  assert.equal(await noAI.getByRole("button",{name:"Save to diary",exact:true}).count(),0,"no empty diary save before product selection");
-  if(process.env.WELLNESS_SCREENSHOTS_DIR)await noAI.screenshot({path:join(process.env.WELLNESS_SCREENSHOTS_DIR,"direct-product.png"),animations:"disabled"});
+  await noAI.getByLabel("Barcode scanner", { exact: true }).waitFor();
+  assert.equal(
+    await noAI
+      .getByRole("group", { name: "Entry method", exact: true })
+      .count(),
+    0,
+    "packaged product skips input method selection",
+  );
+  assert.equal(
+    await noAI.getByText("Meal details & date", { exact: true }).count(),
+    0,
+    "packaged product starts without meal metadata",
+  );
+  assert.equal(
+    await noAI
+      .getByRole("button", { name: "Save to diary", exact: true })
+      .count(),
+    0,
+    "no empty diary save before product selection",
+  );
+  if (process.env.WELLNESS_SCREENSHOTS_DIR)
+    await noAI.screenshot({
+      path: join(process.env.WELLNESS_SCREENSHOTS_DIR, "direct-product.png"),
+      animations: "disabled",
+    });
   await noAI.getByLabel("Product barcode", { exact: true }).fill("12345678");
-  assert.equal(await noAI.getByLabel("Barcode scanner",{exact:true}).count(),0,"typing releases the camera");
+  assert.equal(
+    await noAI.getByLabel("Barcode scanner", { exact: true }).count(),
+    0,
+    "typing releases the camera",
+  );
   const lookup = noAI.getByRole("button", {
     name: "Find product",
     exact: true,
