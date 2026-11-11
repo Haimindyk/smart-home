@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "status": "research_candidate_not_production",
+  "synthetic": false,
+  "training": "learned log-ridge head on frozen RGB features; encoder not fine-tuned",
+  "input_excludes": [
+    "ingredient identities",
+    "mass",
+    "calories",
+    "depth",
+    "dish ID"
+  ],
+  "dataset_sha256": "15e59dbae7303f40b374811d71fdc36a1419f45f924e455a3acbf10b76b3f9da",
+  "model_sha256": "2600e7d8df3168f22519e50b86e3215728af664202099bf8da589791f3b23e26",
+  "counts": {
+    "train": 900,
+    "validation": 150,
+    "test": 250
+  },
+  "encoder": {
+    "architecture": "torchvision.mobilenet_v3_small",
+    "weights": "IMAGENET1K_V1",
+    "checkpoint_sha256": "047dcff4addef86ea5bc2eff13c9614dc11f47ab1160d0a71a25e7db994f4e1f",
+    "features": 576,
+    "input": "full-frame-RGB-letterbox-224",
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "torch": "2.9.1+cpu",
+    "torchvision": "0.24.1+cpu"
+  },
+  "hyperparameter_selection": [
+    {
+      "ridge": 1.0,
+      "validation": {
+        "examples": 150,
+        "mae_g": 109.22471959166919,
+        "median_absolute_error_g": 72.02001997482894,
+        "bias_g": 36.59691522427112,
+        "mape": 0.5812472204666025,
+        "within_25_percent": 0.32666666666666666
+      }
+    },
+    {
+      "ridge": 10.0,
+      "validation": {
+        "examples": 150,
+        "mae_g": 81.39519716634645,
+        "median_absolute_error_g": 51.800220379421575,
+        "bias_g": 16.860666836274092,
+        "mape": 0.43520303735358784,
+        "within_25_percent": 0.38666666666666666
+      }
+    },
+    {
+      "ridge": 100.0,
+      "validation": {
+        "examples": 150,
+        "mae_g": 61.75298230286044,
+        "median_absolute_error_g": 41.77494111887737,
+        "bias_g": -1.110432005413616,
+        "mape": 0.33295873316241825,
+        "within_25_percent": 0.48
+      }
+    },
+    {
+      "ridge": 1000.0,
+      "validation": {
+        "examples": 150,
+        "mae_g": 55.824127827844364,
+        "median_absolute_error_g": 33.93527404270786,
+        "bias_g": -6.996083663187147,
+        "mape": 0.32885993018970067,
+        "within_25_percent": 0.5266666666666666
+      }
+    },
+    {
+      "ridge": 10000.0,
+      "validation": {
+        "examples": 150,
+        "mae_g": 61.91692709673893,
+        "median_absolute_error_g": 39.96295814983634,
+        "bias_g": -21.432871743067476,
+        "mape": 0.4084743199719435,
+        "within_25_percent": 0.5
+      }
+    }
+  ],
+  "selected_ridge": 1000.0,
+  "baseline": {
+    "kind": "training_median_plate_mass",
+    "grams": 172.0,
+    "validation": {
+      "examples": 150,
+      "mae_g": 117.90666666666667,
+      "median_absolute_error_g": 95.5,
+      "bias_g": -47.49333333333333,
+      "mape": 0.9619434809061346,
+      "within_25_percent": 0.21333333333333335
+    },
+    "test": {
+      "examples": 250,
+      "mae_g": 107.256,
+      "median_absolute_error_g": 92.0,
+      "bias_g": -21.056,
+      "mape": 1.2464863943534097,
+      "within_25_percent": 0.236
+    }
+  },
+  "validation": {
+    "examples": 150,
+    "mae_g": 55.824127827844364,
+    "median_absolute_error_g": 33.93527404270786,
+    "bias_g": -6.996083663187147,
+    "mape": 0.32885993018970067,
+    "within_25_percent": 0.5266666666666666
+  },
+  "test": {
+    "examples": 250,
+    "mae_g": 54.22822072500187,
+    "median_absolute_error_g": 33.41679132001952,
+    "bias_g": -10.072826019022179,
+    "mape": 0.40988262749445076,
+    "within_25_percent": 0.476
+  },
+  "test_mae_improvement_fraction": 0.49440384943497917,
+  "test_mae_improvement_95_interval": {
+    "method": "paired_meal_bootstrap",
+    "replicates": 2000,
+    "lower": 0.44014166474586774,
+    "upper": 0.5470087559441583,
+    "caveat": "conditional on these sampled cafeteria meals; not cross-cuisine or plate-group uncertainty"
+  },
+  "production_qualified": false,
+  "limitations": [
+    "total plate mass only, not ingredient grams",
+    "fixed cafeteria scanning setup",
+    "no Hebrew/Israeli-food validation",
+    "not compared with the app vision pipeline",
+    "does not solve occlusion, sauces or physical scale in arbitrary phone photos"
+  ],
+  "attribution": "Nutrition5k, Thames et al., Google Research, CVPR 2021; CC BY 4.0; https://github.com/google-research-datasets/Nutrition5k",
+  "run_provenance": {
+    "python": "3.12.14",
+    "numpy": "2.3.4",
+    "source_sha256": {
+      "image_portion.py": "19ccdcf8bee26e004350ec7830f8e34e17a229756243e1cce420d905caee7667",
+      "portion.py": "309f7b6a9f8e8652bad01c8ddb37a85822e096bc663a71057dd70f4a2d8b43ed",
+      "import_nutrition5k.py": "f66d317c31272fbb170b57663a3b1d5d6f82cda29c3b56570d014fed4418c9a3"
+    },
+    "features_sha256": "b8de7964223b0af7c2b75d9163ffcf476b8792dbb6e1815eb97762c5a1df4ac2",
+    "model_sha256": "2600e7d8df3168f22519e50b86e3215728af664202099bf8da589791f3b23e26",
+    "dataset_sha256": "15e59dbae7303f40b374811d71fdc36a1419f45f924e455a3acbf10b76b3f9da"
+  }
+}

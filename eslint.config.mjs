@@ -15,6 +15,10 @@ const eslintConfig = defineConfig([
     // Deno runtime (Supabase Edge Functions) — separate toolchain, not part
     // of the Next.js app's TS project.
     "supabase/functions/**",
+    // Optional local ML environments/artifacts are not application source.
+    "ml/.venv/**",
+    "ml/data/**",
+    "ml/runs/**",
   ]),
 ]);
 

@@ -22,13 +22,24 @@ Base IDs and immutable Hugging Face revisions are pinned in `recipes/*.json`.
 | Hebrew meal text | Food identities, explicit/estimated amounts and nutrition JSON | Mistral-7B-Instruct-v0.2, Apache 2.0 | Recipe and inference/evaluation code; not trained |
 | Meal image | Food/portion/nutrition JSON from a retained meal image | Llama-3.2-11B-Vision-Instruct, Meta Llama 3.2 terms | Recipe; license acceptance and suitable GPU required |
 | Program creation | Full Body/AB/ABC/custom structured catalog program | Separate Mistral adapter | Recipe; expert-reviewed program examples required |
-| Portion calibration | Grams from fixed visual feature vectors | Our log-ridge regression head | CPU smoke training verified on synthetic numerical features only |
+| Portion calibration | Grams from fixed visual feature vectors | Our log-ridge regression head | Synthetic numerical tests; public RGB total-mass research candidate also trained, see below |
 
 The portion head is **not** an image encoder or proof of food-recognition accuracy.
 Its feature space must be fixed and validated before integration. The vision LoRA is
 the actual image-to-food training path. Coaching adjustments currently continue on
 the hosted path; owned-only mode rejects adjustments until a separately evaluated
 adjustment recipe exists. The current coach recipe trains program creation only.
+
+## Public RGB portion candidate trained on CPU
+
+An actual image-to-**total plate mass** research candidate has now been trained on
+900 public Nutrition5k RGB images, tuned on 150 validation images and evaluated
+on 250 held-out images. It learns a log-ridge head on a frozen MobileNet V3 Small
+image encoder. Test MAE is 54.23 g versus 107.26 g for the training-median baseline;
+test mean absolute percentage error is 40.99%. This is not a comparison with the
+app's hosted vision pipeline, not ingredient-mass accuracy, and not a production
+model. No user photos were used. See the reproducible commands, exclusions,
+provenance and limitations in [the experiment report](../docs/public-portion-model-v1.md).
 
 ## Data ownership and collection
 
