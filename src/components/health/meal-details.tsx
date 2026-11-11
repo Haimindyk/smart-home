@@ -1,11 +1,12 @@
 "use client";
 import { displayedMealTitle } from "@/lib/health/meal-presentation";
-import { Utensils } from "lucide-react";
+import { Utensils, PencilLine } from "lucide-react";
 import { useRef, useState } from "react";
 import { useHealthStore } from "@/lib/health/store";
 import { correctSavedMeal } from "@/lib/health/wellness-api";
 import { useHealthText } from "@/lib/health/i18n";
 import { HealthSheet } from "./health-sheet";
+import { MealPortion } from "./meal-portion";
 import { AiConsent, useWellnessAvailability } from "./ai-consent";
 import { mealNutrients, scaleNutrients } from "@/lib/health/calculations";
 import { Disclosure, round } from "./shared";
@@ -23,6 +24,7 @@ export function MealDetails({
     row = useHealthStore((s) => s.data.meals.find((m) => m.id === id)),
     availability = useWellnessAvailability();
   const [text, setText] = useState(""),
+    [portionId, setPortionId] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
   const lock = useRef(false),
@@ -89,13 +91,14 @@ export function MealDetails({
                 <span className="health-ingredient-icon" aria-hidden="true">
                   <Utensils size={19} />
                 </span>
-                <div className="health-ingredient-copy">
+                <button type="button" disabled={busy} className="health-ingredient-copy text-start" aria-label={`${h("עדכון כמות", "Update amount")}: ${i.food.name}`} onClick={() => setPortionId(i.id)}>
                   <strong>{i.food.name}</strong>
-                  <span>
+                  <span className="flex items-center gap-2">
                     {round(i.quantity)}{" "}
                     {i.food.basis === "g" ? h("גרם", "g") : h("מ״ל", "ml")}
+                    <PencilLine size={13} aria-hidden="true" />
                   </span>
-                </div>
+                </button>
                 <span className="health-ingredient-energy">
                   <strong>{round(nutrients.kcal)}</strong>
                   <small>{h("קל׳", "kcal")}</small>
@@ -104,6 +107,7 @@ export function MealDetails({
             );
           })}
         </ul>
+        {portionId && row.data.items.find((i) => i.id === portionId) && <MealPortion key={`${portionId}:${row.version}`} meal={row} item={row.data.items.find((i) => i.id === portionId)!} onDone={() => setPortionId(null)} />}
         {row.data.items.some((i) => i.quantityRange || i.assumption) && (
           <Disclosure title={h("על ההערכה", "About this estimate")}>
             {row.data.items
@@ -144,7 +148,7 @@ export function MealDetails({
             </label>
             <Button
               className="health-primary-action"
-              disabled={busy || !availability.ready || !text.trim()}
+              disabled={busy || !!portionId || !availability.ready || !text.trim()}
               onClick={() => void correct()}
             >
               {busy
@@ -154,7 +158,7 @@ export function MealDetails({
             <p role="status">{message}</p>
           </>
         )}
-        <Button variant="outline" disabled={busy} onClick={onEdit}>
+        <Button variant="outline" disabled={busy || !!portionId} onClick={onEdit}>
           {h("עריכה ידנית", "Edit manually")}
         </Button>
       </div>

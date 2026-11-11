@@ -5,6 +5,7 @@ import { useHealthStore } from "@/lib/health/store";
 import { useHealthText } from "@/lib/health/i18n";
 import type { HealthRow } from "@/lib/health/model";
 import { Field, Panel, ErrorText, Empty } from "./shared";
+import { FoodUnitWeight } from "./food-unit-weight";
 export function FoodLibrary() {
   const h = useHealthText(),
     data = useHealthStore((s) => s.data),
@@ -61,7 +62,7 @@ export function FoodLibrary() {
               key={f.id}
               className="flex items-center justify-between gap-2 text-sm"
             >
-              <span>{f.data.name}</span>
+              <div><span>{f.data.name}</span><FoodUnitWeight row={f} /></div>
               <Button
                 size="sm"
                 variant="ghost"

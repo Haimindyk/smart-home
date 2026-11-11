@@ -13,6 +13,7 @@ import { mealNutrients, scaleNutrients } from "@/lib/health/calculations";
 import { lookupFood } from "@/lib/health/api";
 import { useHealthText } from "@/lib/health/i18n";
 import { BarcodeCamera } from "./barcode-camera";
+import { foodPickerItem } from "@/lib/health/food-portions";
 import { Field, ErrorText, SelectField } from "./shared";
 const roundValue = (v: number) => Math.round(v * 10) / 10;
 export function FoodPicker({ onAdd, initialMode }: { onAdd: (item: MealItem) => void; initialMode?: "search"|"saved"|"manual" }) {
@@ -182,11 +183,7 @@ export function FoodPicker({ onAdd, initialMode }: { onAdd: (item: MealItem) => 
             type="button"
             key={f.id}
             onClick={() =>
-              onAdd({
-                id: crypto.randomUUID(),
-                food: f,
-                quantity: f.servingSize ?? 100,
-              })
+              onAdd(foodPickerItem(f))
             }
             className="food-result flex w-full items-center justify-between gap-3 text-start text-sm hover:bg-accent"
           >
@@ -194,6 +191,7 @@ export function FoodPicker({ onAdd, initialMode }: { onAdd: (item: MealItem) => 
               {f.name}
               <span className="block text-xs text-muted-foreground">
                 {Math.round(f.per100.kcal)} kcal / 100 {f.basis} · P {roundValue(f.per100.protein)} / C {roundValue(f.per100.carbs)} / F {roundValue(f.per100.fat)}
+                {f.unitWeight && <span className="block">{f.unitWeight.low}–{f.unitWeight.high} {f.basis} · {h("ליחידה", "per unit")}</span>}
               </span>
             </span>
             <span aria-hidden className="food-result-add">＋</span>

@@ -588,6 +588,36 @@ try {
     savedMealId,
     "adding a missing ingredient updates the same meal",
   );
+  const beforePortionAI = (await actions(photo)).filter((c) => c.action === "nutrition" || c.action === "correct_meal").length;
+  await photo.getByRole("button", { name: "Update amount: דג", exact: true }).click();
+  await photo.getByLabel("Amount (g)", { exact: true }).fill("50");
+  await photo.getByText("Weight range or save product", { exact: true }).click();
+  await photo.getByLabel("Up to (g)", { exact: true }).fill("60");
+  await photo.getByLabel("Save this weight for one unit of a specific product", { exact: true }).check();
+  await photo.getByLabel("Specific product name", { exact: true }).fill("Test fish product");
+  await photo.getByRole("button", { name: "Update", exact: true }).click();
+  await photo.getByRole("button", { name: "Update amount: Test fish product", exact: true }).waitFor();
+  const remembered = await photo.evaluate(() => ({ food: window.wellnessFixture.foods().at(-1), meal: window.wellnessFixture.meals().at(-1) }));
+  assert.deepEqual(remembered.food.data.unitWeight, { low: 50, high: 60 });
+  assert.equal(remembered.food.data.source, "ai", "confirming grams does not verify AI nutrient values");
+  assert.equal(remembered.meal.data.items[0].quantity, 55);
+  assert.deepEqual(remembered.meal.data.items[0].quantityRange, { low: 50, high: 60 });
+  assert.equal(remembered.meal.data.items[1].quantity, 15, "other ingredients are never scaled to fit the anchor");
+  await photo.getByRole("button", { name: "Update amount: Test fish product", exact: true }).click();
+  await photo.getByLabel("Saved product", { exact: true }).selectOption(remembered.food.id);
+  await photo.getByLabel("Number of units", { exact: true }).fill("2");
+  await photo.getByRole("button", { name: "Update", exact: true }).click();
+  await photo.getByLabel("Number of units", { exact: true }).waitFor({ state: "hidden" });
+  assert.equal(await photo.evaluate(() => window.wellnessFixture.meals().at(-1).data.items[0].quantity), 110);
+  assert.equal((await actions(photo)).filter((c) => c.action === "nutrition" || c.action === "correct_meal").length, beforePortionAI, "saved-unit corrections never call AI");
+  await photo.getByRole("button", { name: "Close", exact: true }).click();
+  await photo.getByText("My foods & favorites", { exact: true }).click();
+  await photo.getByRole("button", { name: "50–60 g · per unit", exact: true }).click();
+  await photo.getByLabel("From (g)", { exact: true }).fill("55");
+  await photo.getByLabel("To (g)", { exact: true }).fill("65");
+  await photo.getByRole("button", { name: "Save", exact: true }).click();
+  await photo.getByRole("button", { name: "55–65 g · per unit", exact: true }).waitFor();
+  assert.equal(await photo.evaluate(() => window.wellnessFixture.meals().at(-1).data.items[0].quantity), 110, "editing a product never rewrites logged meals");
   await photo.close();
   for (const scenario of ["photo-empty", "photo-retry", "save-retry"]) {
     const p = await browser.newPage({ viewport: { width: 390, height: 844 } });

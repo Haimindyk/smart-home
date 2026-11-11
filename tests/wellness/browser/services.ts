@@ -355,6 +355,7 @@ Object.assign(window, {
     calls,
     prepareImage,
     meals: () => useHealthStore.getState().data.meals,
+    foods: () => useHealthStore.getState().data.personal_foods,
     clear: () => {
       calls.length = 0;
     },
