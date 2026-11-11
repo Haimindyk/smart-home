@@ -69,7 +69,8 @@ same 1800-pixel long-edge limit used by upload preparation.
 
 Vision explicitly inspects exposed fillings/seams for visible spreads, retaining
 uncertain condiment candidates rather than silently dropping them. Hidden mayo,
-oil or flour type must not be invented. Wrapped food is decomposed into one outer
+oil or flour type must not be claimed as visually observed. A narrowly scoped
+recipe assumption can account for cooking oil as described below. Wrapped food is decomposed into one outer
 sheet and separate fillings, not the entire wrap volume counted for each item.
 Occlusion/unknown scale call for broad ranges, not forced competitor weights or a
 blanket reduction. Prompt changes do not establish a calibrated weight estimate;
@@ -109,3 +110,42 @@ browser-to-Edge-to-provider test remain required before broad AI enablement.
   the verbose contract. This is a single diagnostic comparison, not an end-to-end
   latency guarantee or accuracy benchmark. Faster Qwen probes were rejected for
   omissions/translation errors; the production photo model remains Llama 3.3.
+
+## Cooking oil inferred from a recognized recipe
+
+The compact photo contract `meal-candidates-v3-recipe-fat` distinguishes visible
+ingredients from a recipe assumption. Initially supported named dishes are
+shakshuka and Moroccan fish. Plain eggs/fish or an uncertain cuisine are not enough.
+Vision still must not claim to see hidden oil. The normalizer can estimate oil
+for the portion eaten, with a gram range, rather than assume oil for a whole pot
+or use one constant quantity for all servings. Hidden mayonnaise is not inferred
+by this exception. User oil-free preparation and explicit oil amounts override
+recipe defaults; contradictory output is rejected.
+
+Fat accounting is emitted before ingredient nutrients. Prefer decomposed foods
+with nutrients excluding added oil (intrinsic egg/fish fat stays), plus one
+server-created `שמן בישול — הערכת מתכון` row. Its generic fat energy factor is
+approximately 9 kcal/g, source AI, not a verified oil product/database record.
+If a complete dish/sauce already includes cooking fat, no extra oil row is added.
+Contradictory flags, an existing oil row, impossible ranges and a claimed included
+oil mass exceeding the corresponding declared total fat are rejected. This checks
+structural/numerical consistency, not whether the model's nutrient estimates are
+correct. Same-name catalog substitutions are skipped for these recipe estimates
+because they could reintroduce oil that component estimates excluded.
+
+The source assumption is visible in the oil's name and the existing estimate
+disclosure. Automatic photo save still asks no questions. The exact correction
+`לא היה שמן`, `ללא שמן`, `בלי שמן`, `no oil` or `without oil` removes only the
+explicitly inferred AI oil row without another model call, and preserves other
+items and label/manual foods. An oil-inclusive prepared dish requires an ordinary
+preparation/nutrient correction; its unknown oil cannot safely be subtracted from
+a nutrient record. No training data or independently trained model is involved.
+
+Unit tests include fat-accounting contradictions, explicit user overrides,
+non-recipe meals, no-oil corrections and two actual hosted normalizer responses
+to synthetic text observations. These probes demonstrate contract handling, not
+weighed nutrition accuracy or end-to-end photo recognition. The initial live
+probe incorrectly declared low-fat tomato sauce to contain 10 g of oil; the new
+numeric guard rejects that result. Reordering the recipe plan before food fields
+resolved a later contradictory-flag probe. Model mistakes can still be rejected;
+no single probe is a reliability guarantee.

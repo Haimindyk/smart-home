@@ -1,0 +1,135 @@
+{
+  "note": "Actual hosted normalizer responses to synthetic text observations, not real-photo or nutrition-accuracy ground truth.",
+  "cases": [
+    {
+      "name": "shakshuka",
+      "description": "מנת שקשוקה עם שתי ביצים",
+      "visualObservations": "Clearly recognizable shakshuka: two poached eggs in cooked tomato and pepper sauce, about 300 g for the eaten serving. No separately visible oil. No bread shown.",
+      "output": {
+        "recipeEstimate": {
+          "dish": "shakshuka",
+          "accounting": "separate",
+          "oilGrams": [
+            10,
+            5,
+            20
+          ]
+        },
+        "foods": [
+          {
+            "nameEn": "egg",
+            "cookingFatIncluded": false,
+            "nameHe": "ביצה",
+            "certainty": "likely",
+            "alternatives": [],
+            "basis": "g",
+            "portion": [
+              120,
+              100,
+              140
+            ],
+            "per100": [
+              155,
+              12.6,
+              0.7,
+              10.6,
+              null,
+              null,
+              3.3,
+              null
+            ]
+          },
+          {
+            "nameEn": "tomato and pepper sauce",
+            "cookingFatIncluded": false,
+            "nameHe": "רוטב שקשוקה",
+            "certainty": "likely",
+            "alternatives": [],
+            "basis": "g",
+            "portion": [
+              180,
+              150,
+              210
+            ],
+            "per100": [
+              35,
+              1.2,
+              7.2,
+              0.2,
+              2.1,
+              4.5,
+              null,
+              10
+            ]
+          }
+        ],
+        "question": "האם אכלתם לחם או מזון אחר עם השקשוקה?"
+      }
+    },
+    {
+      "name": "moroccan_fish",
+      "description": "מנת דג מרוקאי",
+      "visualObservations": "Recognizable Moroccan fish dish: cooked white fish fillet about 150-200 g with tomato and red pepper sauce about 80-120 g. No separately visible oil. One eaten serving; no sides.",
+      "output": {
+        "foods": [
+          {
+            "nameEn": "white fish fillet",
+            "cookingFatIncluded": false,
+            "nameHe": "פילה דג לבן",
+            "certainty": "likely",
+            "alternatives": [],
+            "basis": "g",
+            "portion": [
+              175,
+              150,
+              200
+            ],
+            "per100": [
+              140,
+              20,
+              0,
+              3,
+              null,
+              null,
+              null,
+              null
+            ]
+          },
+          {
+            "nameEn": "tomato and red pepper sauce",
+            "cookingFatIncluded": false,
+            "nameHe": "רוטב עגבניות ופלפל אדום",
+            "certainty": "likely",
+            "alternatives": [],
+            "basis": "g",
+            "portion": [
+              100,
+              80,
+              120
+            ],
+            "per100": [
+              40,
+              2,
+              10,
+              0,
+              null,
+              null,
+              null,
+              null
+            ]
+          }
+        ],
+        "question": "האם המנה הייתה עם שמן?",
+        "recipeEstimate": {
+          "dish": "moroccan_fish",
+          "accounting": "separate",
+          "oilGrams": [
+            10,
+            5,
+            15
+          ]
+        }
+      }
+    }
+  ]
+}

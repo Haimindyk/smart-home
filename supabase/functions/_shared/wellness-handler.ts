@@ -41,12 +41,13 @@ import {
   nutritionPrompt,
   nutritionSchema,
   observationPrompt,
-  compactMealPrompt,
+  recipeAwareMealPrompt,
   compactMealSchema,
   normalizeCompactMeal,
   normalizeFoodEstimate,
   assertEstimatedFoodMode,
 } from "./wellness-food.ts";
+import { hasRecipeOilEstimate, removeInferredRecipeOil } from "./recipe-oil.ts";
 
 import {
   correctionContext,
@@ -344,7 +345,8 @@ export async function handleWellness(req: Request, env: Environment) {
     let result: Record<string, unknown>;
     if (input.action === "correct_meal") {
       const context = correctionContext(correctionMeal.data.items);
-      const corrected = await provider.structured(
+      const withoutInferredOil = removeInferredRecipeOil(correctionMeal.data.items, description);
+      const corrected = withoutInferredOil ? null : await provider.structured(
         correctionPrompt +
           "\nSchema: " +
           JSON.stringify(correctionSchema(context)),
@@ -354,7 +356,7 @@ export async function handleWellness(req: Request, env: Environment) {
         correctionSchema(context),
       );
       result = {
-        items: applyFoodCorrection(
+        items: withoutInferredOil ?? applyFoodCorrection(
           corrected,
           correctionMeal.data.items,
           description,
@@ -384,7 +386,7 @@ export async function handleWellness(req: Request, env: Environment) {
       }
       const raw = await provider.structured(
         imagePath
-          ? compactMealPrompt +
+          ? recipeAwareMealPrompt +
               "\nSchema: " +
               JSON.stringify(compactMealSchema())
           : nutritionPrompt,
@@ -395,11 +397,11 @@ export async function handleWellness(req: Request, env: Environment) {
         !!imagePath,
       );
       const estimate = imagePath
-        ? normalizeCompactMeal(raw, input.automatic === true)
+        ? normalizeCompactMeal(raw, input.automatic === true, { visualObservations, description })
         : normalizeFoodEstimate(raw);
       // Exact catalog names/basis only: no silent raw/cooked or g/ml mismatches.
       const names = estimate.items.map((i) => i.name);
-      if (names.length) {
+      if (names.length && !hasRecipeOilEstimate(raw)) {
         const [catalogResponse, personalResponse] = await Promise.all([
           admin.from("food_catalog").select("data").in("data->>name", names),
           admin
