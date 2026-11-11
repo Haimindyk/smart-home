@@ -345,7 +345,9 @@ export async function handleWellness(req: Request, env: Environment) {
     if (input.action === "correct_meal") {
       const context = correctionContext(correctionMeal.data.items);
       const corrected = await provider.structured(
-        correctionPrompt,
+        correctionPrompt +
+          "\nSchema: " +
+          JSON.stringify(correctionSchema(context)),
         { correction: description, items: context },
         1800,
         "nutrition_text",

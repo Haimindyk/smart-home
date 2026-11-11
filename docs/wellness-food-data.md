@@ -58,6 +58,31 @@ automatic title updates it while preserving custom titles. Nutrients remain AI
 estimates unless an exact, basis-matched catalog record supplies them. Photos do
 not establish actual weights, hidden oil or preparation.
 
+## Framing, wraps and visible condiments
+
+Gallery preparation preserves the original aspect ratio and both image edges;
+it never crops to the camera guide. Camera and captured-photo previews now use
+contain inside a dedicated area clear of controls, so the display matches the
+full frame that is analyzed. The fixed square guide is removed. Native capture
+requests HD resolution when available and preserves its aspect ratio up to the
+same 1800-pixel long-edge limit used by upload preparation.
+
+Vision explicitly inspects exposed fillings/seams for visible spreads, retaining
+uncertain condiment candidates rather than silently dropping them. Hidden mayo,
+oil or flour type must not be invented. Wrapped food is decomposed into one outer
+sheet and separate fillings, not the entire wrap volume counted for each item.
+Occlusion/unknown scale call for broad ranges, not forced competitor weights or a
+blanket reduction. Prompt changes do not establish a calibrated weight estimate;
+the reported wrap image was not available to independently inspect.
+
+Saved-meal corrections can add a user-mentioned missing ingredient. Unmentioned,
+negated and duplicate additions are rejected; unrelated foods and verified values
+are preserved. New foods are marked as AI estimates, never database/label values.
+Explicit nearby gram/ml amounts and units must match the output. Corrections that
+only change a portion preserve that food's nutrient data and provenance. A live
+synthetic correction probe exercised addition of mayonnaise; its nutrient values
+remain estimates, not a verified product label or evidence of visual recognition.
+
 ## Validation
 
 - The original public mixed-meal photo that returned invalid cups/pieces/ounces

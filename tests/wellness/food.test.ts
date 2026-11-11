@@ -329,3 +329,31 @@ describe("compact photo normalization", () => {
     );
   });
 });
+
+it("keeps a visible ambiguous condiment as an estimate in automatic capture", () => {
+  const result = normalizeCompactMeal(
+    {
+      foods: [
+        {
+          nameEn: "creamy white sauce",
+          nameHe: "רוטב לבן",
+          certainty: "uncertain",
+          alternatives: ["mayonnaise", "yogurt"],
+          basis: "g",
+          portion: [12, 5, 25],
+          per100: [500, 1, 2, 54, null, null, null, null],
+        },
+      ],
+      question: "",
+    },
+    true,
+  );
+  expect(result.items).toHaveLength(1);
+  expect(result.items[0]).toMatchObject({
+    name: "רוטב לבן",
+    quantity: 12,
+    quantityLow: 5,
+    quantityHigh: 25,
+  });
+  expect(result.items[0].assumption).toContain("הזיהוי אינו ודאי");
+});

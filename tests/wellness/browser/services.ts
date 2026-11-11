@@ -1,3 +1,5 @@
+import { prepareImage } from "../../../src/lib/health/api";
+import { applyFoodCorrection } from "../../../supabase/functions/_shared/wellness-food-correction";
 import { create } from "zustand";
 import { profileSchema, payloadSchemas } from "../../../src/lib/health/model";
 import {
@@ -279,6 +281,30 @@ export async function healthFunction(
       .data.meals.find(
         (m: unknown) => (m as { id: string }).id === input.mealId,
       ) as { data: { items: { food: Record<string, unknown> }[] } };
+    if (String(input.description).includes("מיונז"))
+      return {
+        mealId: input.mealId,
+        expectedVersion: input.expectedVersion,
+        items: applyFoodCorrection(
+          {
+            changes: [],
+            additions: [
+              {
+                mentionedText: "מיונז",
+                name: "מיונז",
+                basis: "g",
+                quantity: 15,
+                quantityLow: 15,
+                quantityHigh: 15,
+                per100: { kcal: 680, protein: 1, carbs: 1, fat: 74 },
+                assumption: "לפי התיקון שלך",
+              },
+            ],
+          },
+          row.data.items,
+          String(input.description),
+        ),
+      };
     return {
       mealId: input.mealId,
       expectedVersion: input.expectedVersion,
@@ -327,6 +353,7 @@ export async function healthFunction(
 Object.assign(window, {
   wellnessFixture: {
     calls,
+    prepareImage,
     meals: () => useHealthStore.getState().data.meals,
     clear: () => {
       calls.length = 0;

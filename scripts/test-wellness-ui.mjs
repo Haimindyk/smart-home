@@ -70,15 +70,15 @@ try {
     }
 
     if (req.url === "/fixture.js") {
-      res.setHeader("Content-Type", "text/javascript");
+      res.setHeader("Content-Type", "text/javascript; charset=utf-8");
       res.end(js);
     } else if (req.url === "/styles.css") {
-      res.setHeader("Content-Type", "text/css");
+      res.setHeader("Content-Type", "text/css; charset=utf-8");
       res.end(css);
     } else {
       const he = req.url.includes("he");
       res.end(
-        `<html dir="${he ? "rtl" : "ltr"}" lang="${he ? "he" : "en"}"><head><style>:root{--font-heebo:${css.match(/--font-heebo:([^;}]+)/)?.[1] ?? "Arial,sans-serif"};font-family:var(--font-heebo),Arial,sans-serif}</style><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"></head><body><div id="root"></div><script src="/fixture.js"></script></body></html>`,
+        `<html dir="${he ? "rtl" : "ltr"}" lang="${he ? "he" : "en"}"><head><meta charset="utf-8"><style>:root{--font-heebo:${css.match(/--font-heebo:([^;}]+)/)?.[1] ?? "Arial,sans-serif"};font-family:var(--font-heebo),Arial,sans-serif}</style><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"></head><body><div id="root"></div><script src="/fixture.js"></script></body></html>`,
       );
     }
   });
@@ -570,6 +570,24 @@ try {
     savedMealId,
     "correction preserves meal identity",
   );
+  await photo.getByLabel("What should change?").fill("יש גם מיונז 15 גרם");
+  await photo.getByRole("button", { name: "Update meal", exact: true }).click();
+  await photo
+    .getByRole("list", { name: "Meal ingredients", exact: true })
+    .getByText("מיונז", { exact: true })
+    .waitFor();
+  assert.equal(
+    await photo.evaluate(
+      () => window.wellnessFixture.meals().at(-1).data.items[1].quantity,
+    ),
+    15,
+    "explicit missing ingredient amount is retained",
+  );
+  assert.equal(
+    await photo.evaluate(() => window.wellnessFixture.meals().at(-1).id),
+    savedMealId,
+    "adding a missing ingredient updates the same meal",
+  );
   await photo.close();
   for (const scenario of ["photo-empty", "photo-retry", "save-retry"]) {
     const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -730,6 +748,105 @@ try {
       });
     await progress.close();
   }
+  const framing = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+  });
+  await framing.goto(base + "/?photo-progress=1");
+  const preserved = await framing.evaluate(async () => {
+    const results = [];
+    for (const [w, h] of [
+      [3000, 1000],
+      [1000, 3000],
+    ]) {
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#f00000";
+      ctx.fillRect(0, 0, w / 3, h);
+      ctx.fillStyle = "#00c000";
+      ctx.fillRect(w / 3, 0, w / 3, h);
+      ctx.fillStyle = "#0000f0";
+      ctx.fillRect((w * 2) / 3, 0, w / 3, h);
+      const raw = await new Promise((resolve) =>
+        c.toBlob(resolve, "image/png"),
+      );
+      const blob = await window.wellnessFixture.prepareImage(
+        new File([raw], "frame.png", { type: "image/png" }),
+      );
+      const bitmap = await createImageBitmap(blob),
+        out = document.createElement("canvas");
+      out.width = bitmap.width;
+      out.height = bitmap.height;
+      const draw = out.getContext("2d");
+      draw.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      results.push({
+        w: out.width,
+        h: out.height,
+        left: [...draw.getImageData(5, Math.floor(out.height / 2), 1, 1).data],
+        right: [
+          ...draw.getImageData(out.width - 6, Math.floor(out.height / 2), 1, 1)
+            .data,
+        ],
+      });
+    }
+    return results;
+  });
+  assert.deepEqual(
+    preserved.map((r) => [r.w, r.h]),
+    [
+      [1800, 600],
+      [600, 1800],
+    ],
+    "upload resizing preserves wide and tall aspect ratios",
+  );
+  for (const r of preserved) {
+    assert(
+      r.left[0] > 180 && r.left[2] < 60 && r.right[2] > 180 && r.right[0] < 60,
+      "both original photo edges survive upload preparation",
+    );
+  }
+  await framing.getByRole("button", { name: "Add meal", exact: true }).click();
+  await framing
+    .getByRole("button", { name: "Photograph a meal", exact: true })
+    .click();
+  const wide = await framing.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = 1200;
+    c.height = 400;
+    const x = c.getContext("2d");
+    x.fillStyle = "#eb4238";
+    x.fillRect(0, 0, 400, 400);
+    x.fillStyle = "#59c36a";
+    x.fillRect(400, 0, 400, 400);
+    x.fillStyle = "#3988ee";
+    x.fillRect(800, 0, 400, 400);
+    return c.toDataURL("image/png").split(",")[1];
+  });
+  await framing.locator('input[type="file"]').setInputFiles({
+    name: "wide.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(wide, "base64"),
+  });
+  await framing.getByAltText("Captured meal", { exact: true }).waitFor();
+  assert.equal(
+    await framing
+      .getByAltText("Captured meal", { exact: true })
+      .evaluate((el) => getComputedStyle(el).objectFit),
+    "contain",
+    "the displayed whole photo matches the uploaded frame",
+  );
+  if (process.env.WELLNESS_SCREENSHOTS_DIR)
+    await framing.screenshot({
+      path: join(
+        process.env.WELLNESS_SCREENSHOTS_DIR,
+        "whole-landscape-photo.png",
+      ),
+      animations: "disabled",
+    });
+  await framing.getByRole("dialog").waitFor({ state: "hidden" });
+  await framing.close();
   const noAI = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await noAI.goto(base + "/?ai-off=1");
   await noAI.getByRole("button", { name: "Add meal", exact: true }).click();
