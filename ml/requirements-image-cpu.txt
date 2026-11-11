@@ -1,0 +1,5 @@
+# Separate optional CPU image-encoder environment; not needed for app or base ML tests.
+numpy==2.3.4
+pillow==12.0.0
+torch==2.9.1+cpu
+torchvision==0.24.1+cpu

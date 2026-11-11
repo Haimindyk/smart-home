@@ -4,20 +4,41 @@ import argparse
 import csv
 import hashlib
 import json
+import math
+import re
 from pathlib import Path
+
+
+def parse_metadata(values):
+    """Public files omit num_ingrs despite the README's documented column.
+
+    Accept both layouts, validating the entire ingredient tail rather than
+    shifting the first ingredient into a count or silently truncating a row.
+    """
+    if len(values) < 13 or not re.fullmatch(r"dish_\d{10}", values[0]):
+        raise ValueError("invalid_nutrition5k_row")
+    start = 6 if values[6].startswith("ingr_") else 7
+    tail = values[start:]
+    if len(tail) % 7 or (start == 7 and int(values[6]) != len(tail) // 7):
+        raise ValueError("invalid_nutrition5k_row")
+    for i in range(0, len(tail), 7):
+        if not tail[i].startswith("ingr_") or not tail[i + 1].strip():
+            raise ValueError("invalid_nutrition5k_ingredient")
+        if any(not math.isfinite(float(v)) or float(v) < 0 for v in tail[i + 2:i + 7]):
+            raise ValueError("invalid_nutrition5k_values")
+    mass = float(values[2])
+    if not math.isfinite(mass) or not 0 < mass <= 10000:
+        raise ValueError("invalid_nutrition5k_mass")
+    return values[0], mass, [tail[i:i + 7] for i in range(0, len(tail), 7)]
 
 
 def records(metadata, image_root):
     for values in csv.reader(Path(metadata).open()):
         if not values or values[0] == "dish_id":
             continue
-        dish = values[0]
-        count = int(values[6])
+        dish, _, parts = parse_metadata(values)
         ingredients = []
-        if len(values) < 7 + count * 7:
-            raise ValueError("invalid_nutrition5k_row")
-        for i in range(count):
-            _, name, mass, kcal, fat, carbs, protein = values[7 + i * 7 : 14 + i * 7]
+        for _, name, mass, kcal, fat, carbs, protein in parts:
             mass = float(mass)
             if mass <= 0:
                 continue
