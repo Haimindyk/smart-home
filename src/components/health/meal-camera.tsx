@@ -57,7 +57,11 @@ export function MealCamera({
     }
     void navigator.mediaDevices
       .getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
         audio: false,
       })
       .then((s) => {
@@ -163,7 +167,7 @@ export function MealCamera({
       return;
     capturing.current = true;
     const c = document.createElement("canvas"),
-      scale = Math.min(1, 1536 / v.videoWidth);
+      scale = Math.min(1, 1800 / Math.max(v.videoWidth, v.videoHeight));
     c.width = v.videoWidth * scale;
     c.height = v.videoHeight * scale;
     c.getContext("2d")?.drawImage(v, 0, 0, c.width, c.height);
@@ -203,30 +207,32 @@ export function MealCamera({
         blurOverlay={false}
         showCloseButton={false}
       >
-        <video
-          style={{ zIndex: 0, display: preview ? "none" : undefined }}
-          ref={video}
-          autoPlay
-          playsInline
-          muted
-          onLoadedData={() => setCameraReady(true)}
-          aria-label={h("תצוגת מצלמה", "Camera preview")}
-        />
-        {preview && (
-          <Image
-            src={preview}
-            alt={h("הארוחה שצולמה", "Captured meal")}
-            fill
-            sizes="100vw"
-            unoptimized
-            className="health-capture-preview"
+        <div className="health-camera-media">
+          <video
+            style={{ zIndex: 0, display: preview ? "none" : undefined }}
+            ref={video}
+            autoPlay
+            playsInline
+            muted
+            onLoadedData={() => setCameraReady(true)}
+            aria-label={h("תצוגת מצלמה", "Camera preview")}
           />
-        )}
-        {preview && busy && (
-          <div className="health-capture-scan" aria-hidden="true">
-            <span />
-          </div>
-        )}
+          {preview && (
+            <Image
+              src={preview}
+              alt={h("הארוחה שצולמה", "Captured meal")}
+              fill
+              sizes="100vw"
+              unoptimized
+              className="health-capture-preview"
+            />
+          )}
+          {preview && busy && (
+            <div className="health-capture-scan" aria-hidden="true">
+              <span />
+            </div>
+          )}
+        </div>
         <header style={{ zIndex: 1 }}>
           <button
             disabled={busy}
@@ -241,12 +247,6 @@ export function MealCamera({
               : h("צילום ארוחה", "Photograph meal")}
           </DialogTitle>
         </header>
-        <div
-          hidden={!!preview}
-          className="health-camera-frame"
-          style={{ zIndex: 1 }}
-          aria-hidden="true"
-        />
         <footer style={{ zIndex: 1 }}>
           {noCamera && (
             <p>
@@ -321,8 +321,8 @@ export function MealCamera({
           {!busy && (
             <p>
               {h(
-                "הארוחה תתווסף כהערכה. אפשר לתקן ביומן.",
-                "Added as an estimate. Correct it in your diary.",
+                "כל התמונה תנותח והארוחה תתווסף כהערכה.",
+                "The full photo is analyzed and added as an estimate.",
               )}
             </p>
           )}

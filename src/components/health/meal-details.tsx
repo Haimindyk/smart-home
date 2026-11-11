@@ -123,8 +123,8 @@ export function MealDetails({
           <>
             <p>
               {h(
-                "הערכת AI · אפשר לתקן זיהוי וכמות",
-                "AI estimate · Correct food and portions",
+                "הערכת AI · אפשר לתקן או להוסיף מרכיב",
+                "AI estimate · Correct or add an ingredient",
               )}
             </p>
             <AiConsent />
@@ -137,8 +137,8 @@ export function MealDetails({
                 onChange={(e) => setText(e.target.value)}
                 maxLength={2000}
                 placeholder={h(
-                  "למשל: זה דג ולא חזה עוף",
-                  "For example: this is fish, not chicken breast",
+                  "למשל: יש גם מיונז 15 גרם",
+                  "For example: also add 15 g of mayonnaise",
                 )}
               />
             </label>

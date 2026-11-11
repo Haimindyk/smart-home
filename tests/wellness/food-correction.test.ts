@@ -84,3 +84,147 @@ describe("saved meal correction", () => {
     ).toBe(200);
   });
 });
+
+const mayonnaise = {
+  mentionedText: "מיונז",
+  name: "מיונז",
+  basis: "g",
+  quantity: 15,
+  quantityLow: 15,
+  quantityHigh: 15,
+  per100: { ...per100, kcal: 680, protein: 1, carbs: 1, fat: 74 },
+  assumption: "כמות לפי התיקון של המשתמש",
+};
+it("adds an explicitly mentioned missing condiment while preserving existing foods", () => {
+  const result = applyFoodCorrection(
+    { changes: [], additions: [mayonnaise] },
+    [chicken, rice],
+    "יש גם מיונז 15 גרם",
+  );
+  expect(result).toHaveLength(3);
+  expect(result[0]).toEqual(chicken);
+  expect(result[1]).toEqual(rice);
+  expect(result[2]).toMatchObject({
+    quantity: 15,
+    quantityRange: { low: 15, high: 15 },
+    food: { name: "מיונז", source: "ai", basis: "g" },
+  });
+  expect(result[2].food).not.toHaveProperty("sourceId");
+});
+it("does not invent a missing sauce during a portion-only correction or a negated ingredient", () => {
+  expect(() =>
+    applyFoodCorrection(
+      { changes: [], additions: [mayonnaise] },
+      [chicken],
+      "העוף 110 גרם",
+    ),
+  ).toThrow("invalid_output");
+  expect(() =>
+    applyFoodCorrection(
+      { changes: [], additions: [mayonnaise] },
+      [chicken],
+      "תוסיף חסה בלי מיונז",
+    ),
+  ).toThrow("invalid_output");
+  expect(() =>
+    applyFoodCorrection(
+      { changes: [], additions: [mayonnaise] },
+      [chicken],
+      "לא חסר מיונז",
+    ),
+  ).toThrow("invalid_output");
+  expect(() =>
+    applyFoodCorrection(
+      { changes: [], additions: [mayonnaise] },
+      [chicken],
+      "תוסיף טחינה",
+    ),
+  ).toThrow("invalid_output");
+  expect(() =>
+    applyFoodCorrection(
+      { changes: [], additions: [mayonnaise] },
+      [rice],
+      "יש גם מיונז 15 גרם",
+    ),
+  ).toThrow("invalid_output");
+});
+it("keeps addition amounts visibly estimated when the user does not know a weight", () => {
+  const result = applyFoodCorrection(
+    {
+      changes: [],
+      additions: [{ ...mayonnaise, quantityLow: 5, quantityHigh: 25 }],
+    },
+    [chicken],
+    "יש גם מיונז",
+  );
+  expect(result[1]).toMatchObject({
+    quantity: 15,
+    quantityRange: { low: 5, high: 25 },
+  });
+  expect(() =>
+    applyFoodCorrection(
+      { changes: [], additions: [{ ...mayonnaise, quantityLow: 30 }] },
+      [chicken],
+      "יש גם מיונז",
+    ),
+  ).toThrow("invalid_output");
+});
+
+it("preserves the amount and unit explicitly supplied for an added food", () => {
+  for (const patch of [
+    { quantity: 30, quantityLow: 30, quantityHigh: 30 },
+    { basis: "ml" },
+    { quantityLow: 5, quantityHigh: 25 },
+  ])
+    expect(() =>
+      applyFoodCorrection(
+        { changes: [], additions: [{ ...mayonnaise, ...patch }] },
+        [chicken],
+        "יש גם מיונז 15 גרם",
+      ),
+    ).toThrow("invalid_output");
+  expect(
+    applyFoodCorrection(
+      { changes: [], additions: [mayonnaise] },
+      [chicken],
+      "הוסף 15 גרם מיונז",
+    )[1].quantity,
+  ).toBe(15);
+});
+
+it("changes a portion without replacing the existing nutrient data or provenance", () => {
+  const result = applyFoodCorrection(
+    {
+      changes: [
+        {
+          ...change,
+          name: chicken.food.name,
+          newQuantity: 110,
+          per100: { ...per100, kcal: 999 },
+        },
+      ],
+    },
+    [chicken, rice],
+    "חזה עוף 110 גרם",
+  );
+  expect(result[0].quantity).toBe(110);
+  expect(result[0].food).toEqual(chicken.food);
+  expect(result[1]).toEqual(rice);
+});
+
+it("accepts a concise ingredient correction but rejects an explicitly absent ingredient", () => {
+  expect(
+    applyFoodCorrection(
+      { changes: [], additions: [mayonnaise] },
+      [chicken],
+      "מיונז 15 גרם",
+    ),
+  ).toHaveLength(2);
+  expect(() =>
+    applyFoodCorrection(
+      { changes: [], additions: [mayonnaise] },
+      [chicken],
+      "מיונז לא היה שם",
+    ),
+  ).toThrow("invalid_output");
+});
