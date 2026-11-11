@@ -1,5 +1,10 @@
 # Wellness owned models
 
+For hosted photo pipeline comparison and product-specific confirmed weights, see
+[meal-photo-benchmark.md](../docs/meal-photo-benchmark.md). The standalone
+`wellness.photo_benchmark` reports ingredient omissions, gram/calorie errors and
+latency without changing this owned-model promotion process.
+
 This directory implements training, not just prompts. It contains data preparation,
 three LoRA training recipes, local inference, held-out evaluation, version manifests,
 revocation lineage and a small CPU-trainable portion head. **No production adapter

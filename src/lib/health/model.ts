@@ -12,6 +12,10 @@ export const nutrientsSchema = z.object({
   sodium: z.number().finite().min(0).nullable().default(null),
 });
 export type Nutrients = z.infer<typeof nutrientsSchema>;
+export const unitWeightSchema = z.object({
+  low: z.number().finite().positive().max(10000),
+  high: z.number().finite().positive().max(10000),
+}).refine((v) => v.low <= v.high, "invalid_weight_range");
 export const foodSchema = z.object({
   id: z.string(),
   name: z.string().trim().min(1).max(200),
@@ -23,6 +27,9 @@ export const foodSchema = z.object({
   per100: nutrientsSchema,
   basis: z.enum(["g", "ml"]).default("g"),
   servingSize: z.number().positive().optional(),
+  // A user-confirmed weight for ONE unit of this specific product, never a
+  // category-wide photo heuristic. Ranges remain ranges, not measured facts.
+  unitWeight: unitWeightSchema.optional(),
   source: z.enum(["usda", "openfoodfacts", "label", "manual", "ai", "recipe"]),
   sourceId: z.string().optional(),
 });
