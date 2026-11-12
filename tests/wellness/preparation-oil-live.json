@@ -1,0 +1,107 @@
+{
+  "note": "Actual hosted v4 normalizer responses to synthetic text observations, not real-photo or nutrition-accuracy ground truth.",
+  "cases": [
+    {
+      "name": "stir_fried_tofu",
+      "description": "טופו עם ירקות מוקפצים",
+      "visualObservations": "Stir-fried tofu cubes and vegetables in a wok-style dish, one serving roughly 300 g. No separate oil is visible.",
+      "output": {
+        "recipeEstimate": {
+          "dish": "טופו עם ירקות מוקפצים",
+          "method": "stir_fried",
+          "evidence": "Stir-fried tofu cubes and vegetables in a wok-style dish",
+          "rationale": "טופו וירקות מוקפצים בווק עשויים להכיל שמן מוסף",
+          "accounting": "separate",
+          "oilGrams": [
+            10,
+            5,
+            15
+          ]
+        },
+        "foods": [
+          {
+            "nameEn": "tofu",
+            "cookingFatIncluded": false,
+            "nameHe": "טופו",
+            "certainty": "likely",
+            "alternatives": [],
+            "basis": "g",
+            "portion": [
+              100,
+              80,
+              120
+            ],
+            "per100": [
+              145,
+              20,
+              5,
+              8,
+              null,
+              null,
+              null,
+              null
+            ]
+          },
+          {
+            "nameEn": "mixed vegetables",
+            "cookingFatIncluded": false,
+            "nameHe": "ירקות מעורבים",
+            "certainty": "likely",
+            "alternatives": [],
+            "basis": "g",
+            "portion": [
+              200,
+              150,
+              250
+            ],
+            "per100": [
+              45,
+              2,
+              10,
+              0,
+              2,
+              5,
+              null,
+              null
+            ]
+          }
+        ],
+        "question": "האם המנה הזו הכילה שמן מוסף?"
+      }
+    },
+    {
+      "name": "steamed_broccoli",
+      "description": "ברוקולי מאודה",
+      "visualObservations": "Plain steamed broccoli, roughly 150 g. No sauce, dressing or frying is visible.",
+      "output": {
+        "recipeEstimate": null,
+        "foods": [
+          {
+            "nameEn": "broccoli",
+            "cookingFatIncluded": false,
+            "nameHe": "ברוקולי מבושל",
+            "certainty": "likely",
+            "alternatives": [],
+            "basis": "g",
+            "portion": [
+              150,
+              120,
+              180
+            ],
+            "per100": [
+              34,
+              2.8,
+              7.2,
+              0.6,
+              2.6,
+              1.7,
+              0.1,
+              55
+            ]
+          }
+        ],
+        "question": "האם זהו המצב הסופי של הארוחה?"
+      }
+    }
+  ]
+}

@@ -113,9 +113,15 @@ browser-to-Edge-to-provider test remain required before broad AI enablement.
 
 ## Cooking oil inferred from a recognized recipe
 
-The compact photo contract `meal-candidates-v3-recipe-fat` distinguishes visible
-ingredients from a recipe assumption. Initially supported named dishes are
-shakshuka and Moroccan fish. Plain eggs/fish or an uncertain cuisine are not enough.
+The compact photo contract `meal-candidates-v4-preparation-fat` distinguishes visible
+ingredients from a recipe assumption for any identified prepared dish or cooking
+method, without a list of supported dish names. Each estimate carries a Hebrew
+dish label, a cooking method, an exact quote from the observations/user input and
+a short Hebrew rationale for expecting added oil. Unsupported evidence and
+ambiguous preparation are rejected; raw foods and plain boiled/steamed foods do
+not receive an automatic oil addition. A nearby fresh side does not invalidate a
+separately identified fried or roasted component. Shakshuka and Moroccan fish are
+examples, not special cases.
 Vision still must not claim to see hidden oil. The normalizer can estimate oil
 for the portion eaten, with a gram range, rather than assume oil for a whole pot
 or use one constant quantity for all servings. Hidden mayonnaise is not inferred
@@ -142,8 +148,10 @@ preparation/nutrient correction; its unknown oil cannot safely be subtracted fro
 a nutrient record. No training data or independently trained model is involved.
 
 Unit tests include fat-accounting contradictions, explicit user overrides,
-non-recipe meals, no-oil corrections and two actual hosted normalizer responses
-to synthetic text observations. These probes demonstrate contract handling, not
+multiple cuisines and cooking methods, ungrounded evidence, raw/steamed foods,
+no-oil corrections and actual hosted normalizer responses to synthetic stir-fry
+and steamed-broccoli observations. Archived v3 probes remain explicitly separate
+and cannot be presented as v4 verification. These probes demonstrate contract handling, not
 weighed nutrition accuracy or end-to-end photo recognition. The initial live
 probe incorrectly declared low-fat tomato sauce to contain 10 g of oil; the new
 numeric guard rejects that result. Reordering the recipe plan before food fields

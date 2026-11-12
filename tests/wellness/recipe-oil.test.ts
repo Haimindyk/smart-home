@@ -1,10 +1,11 @@
 import { expect, it } from "vitest";
 import { normalizeCompactMeal, compactMealSchema, recipeAwareMealPrompt } from "../../supabase/functions/_shared/wellness-food";
 import live from "./recipe-oil-live.json";
+import preparationLive from "./preparation-oil-live.json";
 import { removeInferredRecipeOil } from "../../supabase/functions/_shared/recipe-oil";
 
 const food = (included = false) => ({ nameEn: "poached eggs in tomato sauce", nameHe: "ביצים ברוטב עגבניות", certainty: "likely", alternatives: [], basis: "g", portion: [250, 200, 300], per100: [110, 8, 5, 6, 1, null, null, null], cookingFatIncluded: included });
-const recipe = (accounting = "separate", dish = "shakshuka") => ({ dish, accounting, oilGrams: [10, 4, 20] });
+const recipe = (accounting = "separate", dish = "שקשוקה", evidence = "shakshuka", method = "stewed") => ({ dish, method, evidence, rationale: "אופן ההכנה המקובל עשוי לכלול שמן", accounting, oilGrams: [10, 4, 20] });
 const context = { visualObservations: "Recognizable shakshuka: eggs in tomato sauce. No oil separately visible." };
 
 it("accounts for recipe oil separately without pretending it was seen or verified", () => {
@@ -44,10 +45,9 @@ it("never overrides oil-free preparation, measured oil amounts or a rejected dis
   }
 });
 
-it("requires named recipe evidence and supports Moroccan fish without inferring hidden mayonnaise", () => {
+it("requires quoted preparation evidence but does not restrict dish identities", () => {
   expect(() => normalizeCompactMeal({ foods: [food()], recipeEstimate: recipe() }, true, { visualObservations: "eggs on toast" })).toThrow("unsupported_recipe_estimate");
-  expect(() => normalizeCompactMeal({ foods: [food()], recipeEstimate: recipe("separate", "sandwich") }, true, context)).toThrow("unsupported_recipe_estimate");
-  const result = normalizeCompactMeal({ foods: [food()], recipeEstimate: recipe("separate", "moroccan_fish") }, true, { description: "דג מרוקאי" });
+  const result = normalizeCompactMeal({ foods: [food()], recipeEstimate: recipe("separate", "דג מרוקאי", "דג מרוקאי") }, true, { description: "דג מרוקאי" });
   expect(result.items[1].assumption).toContain("דג מרוקאי");
   expect(result.items.some((i) => /מיונז/.test(i.name))).toBe(false);
 });
@@ -58,13 +58,49 @@ it("keeps legacy/non-recipe estimates unchanged and makes the new contract expli
   expect(recipeAwareMealPrompt).toContain("NOT the entire cooking pot");
 });
 
-it("accepts actual hosted recipe outputs without asking before automatic save", () => {
+it("keeps archived v3 probes visibly distinct from the generalized contract", () => {
   for (const sample of live.cases) {
-    const result = normalizeCompactMeal(sample.output, true, sample);
-    expect(result.items.at(-1)?.name).toBe("שמן בישול — הערכת מתכון");
-    expect(result.items.at(-1)?.quantity).toBe(sample.output.recipeEstimate.oilGrams[0]);
-    expect(result.question).toBe("");
+    expect(() => normalizeCompactMeal(sample.output, true, sample)).toThrow();
   }
+});
+
+it("supports unrelated cuisines and cooking methods without adding named dishes to code", () => {
+  for (const [dish, evidence, method] of [
+    ["טופו מוקפץ", "stir-fried tofu", "stir_fried"],
+    ["קציצות ברוטב", "meatballs in tomato stew", "stewed"],
+    ["תפוחי אדמה בתנור", "roasted potatoes", "roasted"],
+    ["דג במחבת", "pan-fried fish", "pan_fried"],
+    ["פטריות בתנור", "פטריות בתנור", "baked"],
+  ]) {
+    const result = normalizeCompactMeal({ foods: [food()], recipeEstimate: recipe("separate", dish, evidence, method) }, true, { visualObservations: evidence });
+    expect(result.items.at(-1)?.assumption).toContain(dish);
+    expect(result.items.at(-1)?.quantity).toBe(10);
+  }
+  expect(recipeAwareMealPrompt).toContain("without a whitelist");
+});
+
+it("does not manufacture preparation evidence or add oil to raw/steamed food", () => {
+  for (const [dish, evidence] of [["תפוח", "raw apple"], ["ברוקולי", "steamed broccoli"]]) {
+    expect(() => normalizeCompactMeal({ foods: [food()], recipeEstimate: recipe("separate", dish, evidence) }, true, { visualObservations: evidence })).toThrow("unsupported_recipe_estimate");
+  }
+  expect(() => normalizeCompactMeal({ foods: [food()], recipeEstimate: recipe("separate", "טופו", "fried tofu") }, true, { visualObservations: "tofu" })).toThrow("unsupported_recipe_estimate");
+  expect(normalizeCompactMeal({ foods: [food()], recipeEstimate: null }, true, { visualObservations: "raw apple" }).items).toHaveLength(1);
+});
+
+it("does not reject an actually cooked component because of a nearby fresh side", () => {
+  const result = normalizeCompactMeal({ foods: [food()], recipeEstimate: recipe("separate", "טופו מוקפץ", "stir-fried tofu", "stir_fried") }, true, { visualObservations: "fresh salad alongside stir-fried tofu" });
+  expect(result.items.at(-1)?.quantity).toBe(10);
+});
+
+it("normalizes actual generalized hosted outputs: oil for a stir-fry, none for steamed vegetables", () => {
+  const stirFry = normalizeCompactMeal(preparationLive.cases[0].output, true, preparationLive.cases[0]);
+  expect(stirFry.items.at(-1)?.name).toBe("שמן בישול — הערכת מתכון");
+  expect(stirFry.items.at(-1)?.quantity).toBe(10);
+  const steamed = normalizeCompactMeal(preparationLive.cases[1].output, true, preparationLive.cases[1]);
+  expect(steamed.items).toHaveLength(1);
+  expect(steamed.items.some((i) => i.name.includes("שמן"))).toBe(false);
+  expect(stirFry.question).toBe("");
+  expect(steamed.question).toBe("");
 });
 
 it("removes only the inferred oil on an explicit no-oil correction, preserving sources and other foods", () => {
