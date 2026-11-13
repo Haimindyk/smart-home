@@ -97,7 +97,7 @@ export function createProvider(
             ...(task === "nutrition_photo"
               ? {
                   normalizer: MODELS.mealText,
-                  contract: "meal-candidates-v2-compact",
+                  contract: "meal-candidates-v4-preparation-fat",
                 }
               : {}),
           };
