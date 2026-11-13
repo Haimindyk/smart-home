@@ -113,7 +113,7 @@ browser-to-Edge-to-provider test remain required before broad AI enablement.
 
 ## Cooking oil inferred from a recognized recipe
 
-The compact photo contract `meal-candidates-v4-preparation-fat` distinguishes visible
+The compact photo contract `meal-candidates-v5-prepared-food-names` distinguishes visible
 ingredients from a recipe assumption for any identified prepared dish or cooking
 method, without a list of supported dish names. Each estimate carries a Hebrew
 dish label, a cooking method, an exact quote from the observations/user input and
@@ -157,3 +157,33 @@ probe incorrectly declared low-fat tomato sauce to contain 10 g of oil; the new
 numeric guard rejects that result. Reordering the recipe plan before food fields
 resolved a later contradictory-flag probe. Model mistakes can still be rejected;
 no single probe is a reliability guarantee.
+
+
+## Prepared foods and breaded cutlets
+
+Vision inspects breadcrumb/batter crust and visible seeds, distinguishes breaded
+cutlets/strips from unbreaded browned meat and nuggets, and does not infer meat
+species from crust alone. Hebrew translation uses schnitzel terminology only for
+observed breaded chicken/turkey cutlets/strips or an explicitly named schnitzel.
+Generic fried chicken, breaded fish/tofu and nuggets are not renamed as chicken
+schnitzel. Visible sesame and explicit baking/air-frying/deep-frying qualifiers
+are preserved when supplied in the food identity. A canonical generic identity
+no longer overwrites compatible Hebrew preparation detail; inconsistent identity
+translations still fall back to the canonical food.
+
+Prepared-food nutrients should account for coating and absorbed frying fat once,
+not substitute plain-meat nutrition or add oil/coating already included in a whole
+prepared-food entry. Name normalization does not change quantity, quantity bounds
+or nutrient numbers. An explicit saved-meal identity correction can update the
+prepared-food estimate while preserving the logged weight unless the user gives
+a new amount. Existing diary rows are not retrospectively reanalysed or renamed.
+
+The screenshot observation prompt ignores dimmed duplicate backgrounds/interface
+elements and treats a central food image as one view. It differentiates a real
+visible sauce layer/spread from incidental crumbs, onion slivers or plate glare.
+An owner-provided screenshot was probed on the existing hosted vision/normalizer
+path, without feeding it a target name or gram amount. The final probe returned
+a single schnitzel entry. A prior probe proposed an unsupported creamy condiment;
+the trace-vs-sauce instruction was tightened. This is diagnostic evidence, not a
+recognition/weight/nutrition accuracy benchmark. No private photo, raw response
+or actual meal quantity is committed or used as training data.
