@@ -1,6 +1,6 @@
 "use client";
 import { useHealthStore } from "./store";
-import { type HealthRow, type MealItem, payloadSchemas } from "./model";
+import { type HealthRow, type MealItem, type Payload, payloadSchemas } from "./model";
 import { isAutomaticMealTitle, mealTitle } from "./meal-presentation";
 
 export function editedMealData(row: HealthRow<"meals">, items: MealItem[]) {
@@ -13,11 +13,18 @@ export function editedMealData(row: HealthRow<"meals">, items: MealItem[]) {
 }
 
 export async function saveMealItems(row: HealthRow<"meals">, items: MealItem[]) {
+  return saveMealData(row, editedMealData(row, items));
+}
+
+export async function saveMealFavorite(row: HealthRow<"meals">, favorite: boolean) {
+  return saveMealData(row, payloadSchemas.meals.parse({ ...row.data, favorite }));
+}
+
+async function saveMealData(row: HealthRow<"meals">, data: Payload<"meals">) {
   const state = useHealthStore.getState();
   const current = state.data.meals.find((m) => m.id === row.id);
   if (!state.owner || row.owner_user_id !== state.owner || (current && current.owner_user_id !== state.owner)) throw new Error("session_mismatch");
   if (!current || current.version !== row.version) throw new Error("version_conflict");
-  const data = editedMealData(current, items);
   // Existing offline queue/expectedVersion handling remains authoritative.
   try { return await state.save("meals", data, current); }
   catch (error) {

@@ -9,10 +9,12 @@ export function HealthSheet({
   title,
   onClose,
   children,
+  action,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  action?: ReactNode;
 }) {
   const h = useHealthText();
   return (
@@ -29,6 +31,7 @@ export function HealthSheet({
         <div className="health-sheet-heading">
           <span className="health-sheet-handle" aria-hidden="true" />
           <div>
+            {action && <span className="health-sheet-action">{action}</span>}
             <DialogTitle style={{ fontFamily: "inherit" }}>{title}</DialogTitle>
             <Button
               variant="ghost"

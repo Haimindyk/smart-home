@@ -136,6 +136,7 @@ export const payloadSchemas = {
     date: dateSchema,
     kind: z.enum(["breakfast", "lunch", "dinner", "snack"]),
     name: z.string().max(200).default(""),
+    favorite: z.boolean().optional(),
     items: z.array(mealItemSchema).min(1).max(100),
     imagePath: z.string().max(500).nullable().default(null),
     aiEstimate: z.object({ analysisId:z.string().uuid(), lastCorrectionId:z.string().uuid().optional() }).optional(),

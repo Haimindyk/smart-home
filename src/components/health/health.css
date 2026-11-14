@@ -74,3 +74,4 @@
 
 .health-ingredient-remove{flex-shrink:0;color:#8b8e95;border-radius:50%;width:34px;height:34px}.health-ingredient-remove:hover{color:#b23b3b;background:#fff1f1}
 .health-camera-hint{display:grid;gap:10px;text-align:start;max-width:420px;margin:14px auto}.health-camera-hint label{font-size:14px}.health-camera-hint input{background:#fff;color:#171717;border-color:#ddd;border-radius:16px}.health-camera-hint-submit{border-radius:24px;background:#fff;color:#171717;padding:12px;font-weight:600}.health-camera-hint-submit:disabled{opacity:.45}
+.health-sheet-action{grid-column:1;grid-row:1}

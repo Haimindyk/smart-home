@@ -1,6 +1,6 @@
 "use client";
 import { displayedMealTitle } from "@/lib/health/meal-presentation";
-import { Utensils, PencilLine, Plus, Trash2, Undo2 } from "lucide-react";
+import { Bookmark, Utensils, PencilLine, Plus, Trash2, Undo2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useHealthStore } from "@/lib/health/store";
 import { correctSavedMeal } from "@/lib/health/wellness-api";
@@ -9,7 +9,7 @@ import { HealthSheet } from "./health-sheet";
 import { MealImage } from "./meal-image";
 import { MealPortion } from "./meal-portion";
 import { FoodPicker } from "./food-picker";
-import { saveMealItems } from "@/lib/health/meal-editing";
+import { saveMealItems, saveMealFavorite } from "@/lib/health/meal-editing";
 import { type HealthRow, type MealItem } from "@/lib/health/model";
 import { AiConsent, useWellnessAvailability } from "./ai-consent";
 import { mealNutrients, scaleNutrients } from "@/lib/health/calculations";
@@ -94,6 +94,15 @@ export function MealDetails({
     } catch (e) { const code = e instanceof Error ? e.message : "failed"; setError(code === "version_conflict" ? "meal_changed" : code); }
     finally { lock.current = false; setBusy(false); }
   }
+  async function favorite() {
+    if (lock.current) return;
+    lock.current = true; setBusy(true); setError(null); setMessage(""); setUndo(null);
+    try {
+      await saveMealFavorite(meal, !meal.data.favorite);
+      setMessage(meal.data.favorite ? h("הוסרה מהמועדפות", "Removed from favorites") : h("נשמרה במועדפות", "Saved to favorites"));
+    } catch (e) { const code = e instanceof Error ? e.message : "failed"; setError(code === "version_conflict" ? "meal_changed" : code); }
+    finally { lock.current = false; setBusy(false); }
+  }
   if (adding) return <HealthSheet title={h("הוספת רכיב לארוחה", "Add an ingredient to this meal")} onClose={() => { if (!busy) setAdding(false); }}>
     <div className="grid gap-4">
       <fieldset disabled={busy} className="min-w-0"><FoodPicker key={meal.owner_user_id} showHeading={false} onAdd={(item) => { setPendingAddition(item); void editItems([...meal.data.items, item]); }} /></fieldset>
@@ -106,6 +115,7 @@ export function MealDetails({
     <HealthSheet
       title={displayedMealTitle(row.data, h("הארוחה שלי", "My meal"))}
       onClose={onClose}
+      action={<Button size="icon" variant="ghost" disabled={busy || !!portionId} aria-pressed={!!row.data.favorite} aria-label={row.data.favorite ? h("הסרה מהמועדפות", "Remove from favorites") : h("שמירה במועדפות", "Save to favorites")} onClick={() => void favorite()}><Bookmark size={20} fill={row.data.favorite ? "currentColor" : "none"}/></Button>}
     >
       <div className="grid gap-5">
         {hasAiFood && (

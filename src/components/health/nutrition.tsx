@@ -90,7 +90,7 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
     }
   }
   async function deleteMeal(row: HealthRow<"meals">) {
-    if (!window.confirm(h("למחוק את הארוחה?", "Delete this meal?"))) return;
+    if (!window.confirm(row.data.favorite ? h("למחוק את הארוחה? היא תוסר גם מהמועדפות.", "Delete this meal? It will also be removed from favorites.") : h("למחוק את הארוחה?", "Delete this meal?"))) return;
     try {
       await remove("meals", row);
     } catch (e) {
