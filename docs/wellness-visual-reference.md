@@ -52,3 +52,21 @@ dismissal stay disabled while a save/analysis is pending. Description entry has 
 large text area and a black pill action; secondary precision tips stay collapsed.
 Product scanning continues to open directly, with camera/manual barcode and real
 package values. This visual change does not alter confirmation or diary writes.
+
+## Favorites access
+
+The add sheet keeps saved foods as a separate destination and also provides a
+direct Favorite meals action. Favorites opens the bookmarked meal list without
+requiring the user to discover it inside Previous meal. Its empty state explains
+bookmarking briefly and offers one action to browse recent meals. No diary write
+or AI call is needed to browse either list.
+
+## Figma design
+
+[Editable wellness design](https://www.figma.com/design/3aF3x3dYm9D7nlfmoJKSq0)
+contains eight Hebrew screen concepts (daily overview, adding food, description,
+barcode, camera, correction, chat and workouts), using Heebo and reusable assets.
+The board uses illustrative data, not production diary entries. The code remains
+in GitHub; Figma is the visual planning/reference artifact. Prototype navigation
+and the final post-refinement visual review are pending the Figma Starter MCP
+allowance. Do not treat the file as a tested live app or claim complete parity.

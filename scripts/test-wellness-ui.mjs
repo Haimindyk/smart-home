@@ -151,6 +151,17 @@ try {
         exact: true,
       })
       .click();
+    const writesBeforeFavorites = (await actions(page)).filter(c=>c.table === "meals").length;
+    await page.getByRole("button", { name:he ? "ארוחות מועדפות" : "Favorite meals", exact:true }).click();
+    await page.getByRole("heading", { name:he ? "ארוחות מועדפות" : "Favorite meals", exact:true }).waitFor();
+    assert.equal(await page.getByRole("button", { name:he ? "מועדפות" : "Favorites",exact:true }).getAttribute("aria-pressed"), "true", "favorite meals opens the correct list directly");
+    await page.getByRole("heading", { name:he ? "עוד אין ארוחות מועדפות" : "No favorite meals yet", exact:true }).waitFor();
+    if (process.env.WELLNESS_SCREENSHOTS_DIR) await page.screenshot({ path:join(process.env.WELLNESS_SCREENSHOTS_DIR,language+"-empty-favorites.png"),animations:"disabled" });
+    await page.getByRole("button", { name:he ? "לארוחות האחרונות" : "Browse recent meals",exact:true }).click();
+    await page.getByLabel(he ? "חיפוש ארוחה" : "Search meals",{exact:true}).waitFor();
+    assert.equal((await actions(page)).filter(c=>c.table === "meals").length,writesBeforeFavorites,"browsing favorites and recent meals does not change the diary");
+    await page.getByRole("button", { name:he ? "סגירה" : "Close",exact:true }).click();
+    await page.getByRole("button", { name:he ? "הוספת ארוחה" : "Add meal",exact:true }).click();
     await page
       .getByRole("button", {
         name: he ? "כתבו מה אכלתם" : "Describe your meal",
