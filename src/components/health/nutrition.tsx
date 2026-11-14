@@ -48,6 +48,7 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
   const [foodMode,setFoodMode]=useState<"search"|"saved"|"manual"|"text"|"product">("search");
   const [cameraOpen,setCameraOpen]=useState(false),[detailsId,setDetailsId]=useState<string|null>(null);
   const [recentOpen, setRecentOpen] = useState(false);
+  const [recentMode, setRecentMode] = useState<"recent"|"favorites">("recent");
   function openEntry(mode: "photo"|"search"|"saved"|"manual"|"text"|"product") {closeAdd();if(mode==="photo"){setCameraOpen(true);return;}setEditing(null);setCapture(false);setFoodMode(mode);setEditor(true)}
   const [capture, setCapture] = useState(false);
   const [editing, setEditing] = useState<HealthRow<"meals"> | null>(null),
@@ -102,7 +103,7 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
     <div className="health-daily-nutrition grid gap-5">
       <ErrorText error={error} />
       {cameraOpen&&<MealCamera date={date} onClose={()=>setCameraOpen(false)}/>}
-      {recentOpen&&<RecentMeals key={`${owner}-${date}`} date={date} onClose={()=>setRecentOpen(false)}/>}
+      {recentOpen&&<RecentMeals key={`${owner}-${date}`} date={date} initialMode={recentMode} onClose={()=>setRecentOpen(false)}/>}
       {detailsId&&<MealDetails id={detailsId} onClose={()=>setDetailsId(null)} onEdit={()=>{setEditing(data.meals.find(m=>m.id===detailsId)??null);setDetailsId(null);setEditor(true)}}/>}
       <div className="health-summary"><Panel
         title={h("התזונה שלי היום", "My nutrition today")}
@@ -147,9 +148,9 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
         <button onClick={()=>openEntry("product")}><span><ScanBarcode/></span>{h("מוצר ארוז", "Packaged product")}</button>
         <button onClick={()=>openEntry("text")}><span><PenLine/></span>{h("כתבו מה אכלתם", "Describe your meal")}</button>
         <button onClick={()=>openEntry("search")}><span><Search/></span>{h("מאגר מזון", "Food database")}</button>
-        <button onClick={()=>{closeAdd();setRecentOpen(true)}}><span><Utensils/></span>{h("ארוחה קודמת", "Previous meal")}</button>
+        <button onClick={()=>{closeAdd();setRecentMode("recent");setRecentOpen(true)}}><span><Utensils/></span>{h("ארוחה קודמת", "Previous meal")}</button>
         <button onClick={()=>openEntry("saved")}><span><Bookmark/></span>{h("שמורים", "Saved foods")}</button>
-      </div><div className="meal-action-footer"><Button variant="ghost" onClick={()=>openEntry("manual")}>{h("הזנה ידנית", "Manual entry")}</Button><Button variant="ghost" onClick={closeAdd}>{h("סגירה", "Close")}</Button></div></DialogContent></Dialog>
+      </div><div className="meal-action-footer"><Button variant="ghost" onClick={()=>openEntry("manual")}>{h("הזנה ידנית", "Manual entry")}</Button><Button variant="ghost" onClick={()=>{closeAdd();setRecentMode("favorites");setRecentOpen(true)}}>{h("ארוחות מועדפות", "Favorite meals")}</Button><Button variant="ghost" onClick={closeAdd}>{h("סגירה", "Close")}</Button></div></DialogContent></Dialog>
       {editor && (
         <MealEditor
           capture={capture}
