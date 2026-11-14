@@ -30,10 +30,13 @@ import { ProductLabel } from "./product-label";
 import { MealCamera } from "./meal-camera";
 import { MealDetails } from "./meal-details";
 import { MealImage } from "./meal-image";
+import { RecentMeals } from "./recent-meals";
+import { repeatedMealData } from "@/lib/health/meal-editing";
 const kinds = ["breakfast", "lunch", "dinner", "snack"] as const;
 export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }: { date: string; initialAdd?:boolean; addRequest?:number; onAddClosed?:()=>void }) {
   const h = useHealthText();
   const data = useHealthStore((s) => s.data),
+    owner = useHealthStore((s) => s.owner),
     save = useHealthStore((s) => s.save),
     remove = useHealthStore((s) => s.remove);
   const profile = data.health_profiles[0]?.data ?? profileSchema.parse({});
@@ -43,6 +46,7 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
   function closeAdd(){setAddMenu(false);onAddClosed?.()}
   const [foodMode,setFoodMode]=useState<"search"|"saved"|"manual"|"text"|"product">("search");
   const [cameraOpen,setCameraOpen]=useState(false),[detailsId,setDetailsId]=useState<string|null>(null);
+  const [recentOpen, setRecentOpen] = useState(false);
   function openEntry(mode: "photo"|"search"|"saved"|"manual"|"text"|"product") {closeAdd();if(mode==="photo"){setCameraOpen(true);return;}setEditing(null);setCapture(false);setFoodMode(mode);setEditor(true)}
   const [capture, setCapture] = useState(false);
   const [editing, setEditing] = useState<HealthRow<"meals"> | null>(null),
@@ -97,6 +101,7 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
     <div className="grid gap-5">
       <ErrorText error={error} />
       {cameraOpen&&<MealCamera date={date} onClose={()=>setCameraOpen(false)}/>}
+      {recentOpen&&<RecentMeals key={`${owner}-${date}`} date={date} onClose={()=>setRecentOpen(false)}/>}
       {detailsId&&<MealDetails id={detailsId} onClose={()=>setDetailsId(null)} onEdit={()=>{setEditing(data.meals.find(m=>m.id===detailsId)??null);setDetailsId(null);setEditor(true)}}/>}
       <div className="health-summary"><Panel
         title={h("התזונה שלי היום", "My nutrition today")}
@@ -175,6 +180,8 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
       <button className="health-scan" onClick={()=>openEntry("photo")}><span><Camera size={25}/></span><span className="flex-1"><strong>{h("מצלמים. הארוחה ביומן.", "Snap. Logged.")}</strong><small>{h("צילום, זיהוי והוספה ליומן", "Photograph, recognize and add to diary")}</small></span><ArrowUpLeft size={19}/></button>
       <Dialog open={addMenu} onOpenChange={open=>{if(open)setAddMenu(true);else closeAdd()}}><DialogContent className="health-app meal-actions start-0 top-auto bottom-0 translate-x-0 translate-y-0 rtl:translate-x-0" showCloseButton={false}><DialogTitle>{h("מה מוסיפים?", "What would you like to add?")}</DialogTitle><div className="meal-action-grid">
 
+        <button onClick={()=>{closeAdd();setRecentOpen(true)}}><span><Utensils/></span>{h("ארוחה קודמת", "Previous meal")}</button>
+
         <button onClick={()=>openEntry("search")}><span className="amber"><Search/></span>{h("מאגר מזון", "Food database")}</button>
         <button onClick={()=>openEntry("saved")}><span className="pink"><Bookmark/></span>{h("שמורים", "Saved foods")}</button>
         <button onClick={()=>openEntry("photo")}><span><Camera/></span>{h("צלם ארוחה", "Photograph a meal")}</button>
@@ -235,7 +242,7 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            setEditing({ ...m, id: "", version: 0 });
+                            setEditing({ ...m, data: repeatedMealData(m, date), id: "", version: 0 });
                             setEditor(true);
                           }}
                         >

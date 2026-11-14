@@ -30,3 +30,34 @@ export async function saveMealItems(row: HealthRow<"meals">, items: MealItem[]) 
     throw error;
   }
 }
+
+export function repeatedMealData(row: HealthRow<"meals">, date: string) {
+  // A new meal has its own item IDs. Keep source values/units and assumptions,
+  // but never attach another entry's image or AI correction identity.
+  return payloadSchemas.meals.parse({
+    date, kind: row.data.kind, name: isAutomaticMealTitle(row.data) || !row.data.name.trim() ? mealTitle(row.data.items) : row.data.name,
+    items: row.data.items.map((item) => ({ ...item, id: crypto.randomUUID() })),
+    imagePath: null,
+  });
+}
+
+export async function saveRepeatedMeal(row: HealthRow<"meals">, data: ReturnType<typeof repeatedMealData>, id: string) {
+  const state = useHealthStore.getState();
+  if (!state.owner || row.owner_user_id !== state.owner) throw new Error("session_mismatch");
+  const sameEntry = (candidate: HealthRow<"meals"> | undefined) => candidate?.owner_user_id === row.owner_user_id && JSON.stringify(candidate.data) === JSON.stringify(data);
+  const accepted = state.data.meals.find((m) => m.id === id);
+  if (accepted) {
+    if (sameEntry(accepted)) return accepted;
+    throw new Error("version_conflict");
+  }
+  const source = state.data.meals.find((m) => m.id === row.id);
+  if (!source || source.version !== row.version) throw new Error("version_conflict");
+  if (source.owner_user_id !== state.owner) throw new Error("session_mismatch");
+  try { return await state.save("meals", data, undefined, id); }
+  catch (error) {
+    const latest = useHealthStore.getState();
+    const saved = latest.data.meals.find((m) => m.id === id);
+    if (latest.owner === row.owner_user_id && sameEntry(saved)) return saved!;
+    throw error;
+  }
+}
