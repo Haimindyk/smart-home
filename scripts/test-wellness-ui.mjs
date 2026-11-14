@@ -390,6 +390,7 @@ try {
     await page.waitForFunction(() => window.wellnessFixture.trainingExamples().length === 2);
     const measuredExample = await page.evaluate(() => window.wellnessFixture.trainingExamples().at(-1));
     assert.equal(measuredExample.label_quality, "weighed");
+    assert.deepEqual(measuredExample.measurement_provenance, { version: 1, method: "user_reported_grams", source_version: 1 });
     assert.equal(measuredExample.items[0].quantity, 80);
     assert.equal(await page.evaluate(() => window.wellnessFixture.meals()[0].data.items[0].quantity), 100, "training measurements do not rewrite the diary");
     await page

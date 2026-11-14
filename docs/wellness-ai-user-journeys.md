@@ -202,7 +202,11 @@ available without pretending volumes are grams. A status capability gates the
 new measured form so an older server cannot silently ignore explicit weights
 during a rolling release. No database schema or training-consent policy changes.
 
-These remain self-reported measurements, stored as **unreviewed** examples. Weighing
-quantities does not verify AI nutrient values; original nutrient sources are
+These remain self-reported measurements, stored as **unreviewed** examples. Measured
+examples carry a server-authored `measurement_provenance` marker (version 1,
+user-reported grams and source record version). Legacy checkbox-only examples do
+not gain that marker retroactively and still require independent review. This raw
+collection metadata is not a model input or a substitute for reviewer approval.
+Weighing quantities does not verify AI nutrient values; original nutrient sources are
 retained and independent review is still required before training/evaluation.
 No model is automatically trained, promoted or claimed more accurate by this change.

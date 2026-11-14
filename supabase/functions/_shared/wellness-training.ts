@@ -193,6 +193,7 @@ export async function handleTraining(req: Request) {
       }
       example = {
         label_quality: input.weighed === true ? "weighed" : "user_corrected",
+        ...(input.weighed === true ? { measurement_provenance: { version: 1, method: "user_reported_grams", source_version: sourceMeal.version } } : {}),
         input: {
           description,
           mode: input.task === "nutrition_text" ? "text" : "meal",

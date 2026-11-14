@@ -242,7 +242,7 @@ export async function healthFunction(
       if (String(input.task).startsWith("nutrition_")) {
         const row = useHealthStore.getState().data.meals.find((m) => (m as {id:string}).id === input.sourceId) as {version:number;data:{items:Parameters<typeof nutritionTrainingItems>[0]}};
         if (input.weighed === true && (input.measurementVersion !== 1 || row.version !== input.sourceVersion)) throw new Error("training_source_changed");
-        trainingExamples.push({ label_quality: input.weighed === true ? "weighed" : "user_corrected", items: nutritionTrainingItems(row.data.items, input.weighed === true, input.measurements) });
+        trainingExamples.push({ label_quality: input.weighed === true ? "weighed" : "user_corrected", ...(input.weighed === true ? { measurement_provenance: { version: 1, method: "user_reported_grams", source_version: row.version } } : {}), items: nutritionTrainingItems(row.data.items, input.weighed === true, input.measurements) });
       }
       contributions++;
       return { id: "fixture", reviewed: false };
