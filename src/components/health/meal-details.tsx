@@ -31,7 +31,7 @@ export function MealDetails({
     [adding, setAdding] = useState(false),
     [pendingAddition, setPendingAddition] = useState<MealItem | null>(null),
     [undo, setUndo] = useState<{ row: HealthRow<"meals">; items: MealItem[] } | null>(null),
-    [portionId, setPortionId] = useState<string | null>(null),
+    [portion, setPortion] = useState<{ meal: HealthRow<"meals">; item: MealItem } | null>(null),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
     [error, setError] = useState<string | null>(null);
@@ -41,6 +41,7 @@ export function MealDetails({
     );
   if (!row) return null;
   const meal = row,
+    portionId = portion?.item.id ?? null,
     totals = mealNutrients(row.data.items),
     hasAiFood = row.data.items.some((i) => ["ai", "usda"].includes(i.food.source));
   async function correct() {
@@ -103,6 +104,7 @@ export function MealDetails({
     } catch (e) { const code = e instanceof Error ? e.message : "failed"; setError(code === "version_conflict" ? "meal_changed" : code); }
     finally { lock.current = false; setBusy(false); }
   }
+  if (portion) return <MealPortion key={portion.item.id} meal={portion.meal} item={portion.item} onDone={() => setPortion(null)} />;
   if (adding) return <HealthSheet title={h("הוספת רכיב לארוחה", "Add an ingredient to this meal")} onClose={() => { if (!busy) setAdding(false); }}>
     <div className="grid gap-4">
       <fieldset disabled={busy} className="min-w-0"><FoodPicker key={meal.owner_user_id} showHeading={false} onAdd={(item) => { setPendingAddition(item); void editItems([...meal.data.items, item]); }} /></fieldset>
@@ -173,7 +175,7 @@ export function MealDetails({
                 <span className="health-ingredient-icon" aria-hidden="true">
                   <Utensils size={19} />
                 </span>
-                <button type="button" disabled={busy} className="health-ingredient-copy text-start" aria-label={`${h("עדכון כמות", "Update amount")}: ${i.food.name}`} onClick={() => setPortionId(i.id)}>
+                <button type="button" disabled={busy} className="health-ingredient-copy text-start" aria-label={`${h("עדכון כמות", "Update amount")}: ${i.food.name}`} onClick={() => setPortion({ meal: row, item: i })}>
                   <strong>{i.food.name}</strong>
                   <span className="flex items-center gap-2">
                     {round(i.quantity)}{" "}
@@ -191,7 +193,6 @@ export function MealDetails({
           })}
         </ul>
         <Button variant="outline" disabled={busy || !!portionId || row.data.items.length >= 100} onClick={() => { setAdding(true); setError(null); }}><Plus size={18} />{h("הוספת רכיב", "Add ingredient")}</Button>
-        {portionId && row.data.items.find((i) => i.id === portionId) && <MealPortion key={`${portionId}:${row.version}`} meal={row} item={row.data.items.find((i) => i.id === portionId)!} onDone={() => setPortionId(null)} />}
         {row.data.items.some((i) => i.quantityRange || i.assumption) && (
           <Disclosure title={h("על ההערכה", "About this estimate")}>
             {row.data.items

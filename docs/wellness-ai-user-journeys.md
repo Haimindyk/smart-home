@@ -176,3 +176,13 @@ Favorite state uses the existing meal JSON payload/offline queue and version gua
 not a gram-only recipe conversion or local-only preference. Legacy rows without a
 flag remain valid. A read-only live validator query accepted legacy, favorite and
 unfavorite synthetic payloads; no production diary rows were changed by that check.
+
+### Focused portion editing
+
+Tap an ingredient's amount to open a dedicated amount sheet. The numeric field is
+immediately visible, with a local calorie preview; saved-product selection and
+unit-weight saving are optional disclosures. Cancel returns to the same meal.
+Only the chosen ingredient changes, with no AI call or changes to other portions.
+The editor retains the original meal/version snapshot while saving, so a local
+store update does not remount it or discard the draft. Concurrent edits require
+reopening; an exactly accepted queued save is recognized after a later cache error.
