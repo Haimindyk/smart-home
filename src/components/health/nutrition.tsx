@@ -3,6 +3,7 @@ import { displayedMealTitle } from "@/lib/health/meal-presentation";
 import { useState } from "react";
 import { Camera, Flame, Beef, Wheat, Droplet, Plus, Search, Bookmark, PenLine, ScanBarcode, Utensils } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { HealthSheet } from "./health-sheet";
 import { Button } from "@/components/ui/button";
 import { useHealthStore } from "@/lib/health/store";
 import {
@@ -465,16 +466,9 @@ function MealEditor({
   const totals = mealNutrients(meal.items);
   const foodPicker=<FoodPicker key={owner} initialMode={foodMode==="text"||foodMode==="product"?"search":foodMode} onAdd={item=>setMeal(m=>({...m,items:[...m.items,item]}))}/>;
   return (
-    <Dialog open onOpenChange={(open)=>{if(!open&&!busy)onClose()}}>
-    <DialogContent blurOverlay={mode!=="label"} className="health-app meal-composer start-0 top-auto bottom-0 translate-x-0 translate-y-0 rtl:translate-x-0" showCloseButton={false}>
-    <DialogTitle className="sr-only">{h("הוספת ארוחה", "Add meal")}</DialogTitle>
+    <HealthSheet title={existing ? h("עריכת ארוחה", "Meal editor") : foodMode==="product" ? h("מוצר ארוז", "Packaged product") : foodMode==="text" ? h("תיאור ארוחה", "Describe your meal") : h("מה אוכלים היום?", "What’s on your plate?")} onClose={onClose} closeDisabled={busy} blurOverlay={mode!=="label"} className="meal-composer">
     <Panel
       title={existing ? h("עריכת ארוחה", "Meal editor") : foodMode==="product" ? h("מוצר ארוז", "Packaged product") : foodMode==="text" ? h("תיאור ארוחה", "Describe your meal") : h("מה אוכלים היום?", "What’s on your plate?")}
-      action={
-        <Button variant="ghost" disabled={busy} onClick={onClose}>
-          {h("סגירה", "Close")}
-        </Button>
-      }
     >
       <div className="grid gap-4">
         <ErrorText error={error} />
@@ -517,7 +511,7 @@ function MealEditor({
           onChange={(e) => setMeal((m) => ({ ...m, name: e.target.value }))}
         />
         </details>}
-        {foodMode==="product"?<ProductLabel key={owner} autoScan onAdd={item=>setMeal(m=>({...m,items:[...m.items,item]}))}/>: (capture||foodMode==="text")&&<section className="meal-photo-entry rounded-xl border p-4" aria-label={h("הערכת ארוחה עם AI","AI meal estimate")}>
+        {foodMode==="product"?<ProductLabel key={owner} autoScan onAdd={item=>setMeal(m=>({...m,items:[...m.items,item]}))}/>: (capture||foodMode==="text")&&<section className={`meal-photo-entry rounded-xl border p-4 ${foodMode==="text"?"meal-text-entry":""}`} aria-label={h("הערכת ארוחה עם AI","AI meal estimate")}>
           {foodMode!=="text"&&<h3 className="font-semibold">{h("מוסיפים לארוחה","Add to your meal")}</h3>}
           <div className="mt-3 grid gap-3">
             {foodMode!=="text"&&<ChoiceTabs label={h("דרך הוספה", "Entry method")} value={mode} onChange={next=>{setMode(next);setMeal(m=>({...m,imagePath:null}));setSecondPhoto(null);setRequestId(crypto.randomUUID());}} options={[{value:"meal",label:h("צילום", "Photo")},{value:"text",label:h("תיאור", "Describe")},{value:"label",label:h("מוצר", "Product")}]} />}
@@ -528,7 +522,7 @@ function MealEditor({
             <label className="grid gap-2 text-sm"><span>{mode==="text"?h("מה אכלתם וכמה?","What did you eat, and how much?"):h("הסבר על המרכיבים והכמות","Food and portion details")}</span><textarea className="min-h-24 rounded-xl border bg-background p-3 text-foreground" maxLength={2500} value={description} placeholder={h("למשל: שתי ביצים, חצי פיתה ושתי כפות קוטג׳","For example: two eggs, half a pita and two tablespoons of cottage cheese")} onChange={e=>{setDescription(e.target.value);setRequestId(crypto.randomUUID());}}/></label>
             <p className="text-xs text-muted-foreground">{h("הערכת AI. אפשר לתקן לפני השמירה.", "AI estimate. Edit before saving.")}</p>
             <Disclosure className="health-help" title={h("לשיפור הדיוק", "For a better estimate")}><p>{h("ציינו משקל וכמויות ידועים ואופן הכנה. הניתוח מחליף את פריטי הטיוטה; מזונות שלא זוהו בביטחון דורשים השלמה.", "Include known weights, quantities and preparation. Analysis replaces draft items; add any ingredients that could not be identified reliably.")}</p></Disclosure>
-            <Button variant="outline" disabled={busy||!availability.ready||(mode==="text"?!description.trim():!photo)} onClick={()=>void analyze()}>{busy?h("מכין הערכה…","Estimating…"):h("הצגת הערכה","Show estimate")}</Button>
+            <Button className="health-primary-action" disabled={busy||!availability.ready||(mode==="text"?!description.trim():!photo)} onClick={()=>void analyze()}>{busy?h("מכין הערכה…","Estimating…"):h("הצגת הערכה","Show estimate")}</Button>
             {question&&<p role="status" className="rounded-xl bg-amber-500/10 p-3 text-sm">{question}</p>}
             </>}
             {mode !== "label" && meal.imagePath&&<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={keepPhoto} onChange={e=>setKeepPhoto(e.target.checked)}/>{h("שמירת התמונה ביומן (אחרת תימחק לאחר 24 שעות)","Keep the photo in my diary (otherwise removed after 24 hours)")}</label>}
@@ -687,7 +681,6 @@ function MealEditor({
         )}
       </div>
     </Panel>
-    </DialogContent>
-    </Dialog>
+    </HealthSheet>
   );
 }
