@@ -368,6 +368,31 @@ try {
           : "Saved for review. This is not yet a verified training label.",
       )
       .waitFor();
+    const weighed = page.getByLabel(he ? "כל כמויות המרכיבים נמדדו במשקל, ולא הוערכו" : "All ingredient amounts were weighed, not estimated", { exact: true });
+    await weighed.check();
+    const measuredLabel = he ? "Synthetic apple (גרם שנמדד)" : "Synthetic apple (measured g)";
+    assert.equal(await page.getByLabel(measuredLabel, { exact: true }).inputValue(), "", "AI quantities are never prefilled as measured weights");
+    await page.getByLabel(measuredLabel, { exact: true }).fill("80");
+    const sourcePicker = page.getByLabel(he ? "בחירת רשומה מהיומן שלי" : "Choose a saved record");
+    await sourcePicker.selectOption(await page.evaluate(() => window.wellnessFixture.meals().at(-1).id));
+    assert(!(await weighed.isChecked()), "measurement claims reset when the selected meal changes");
+    await sourcePicker.selectOption("00000000-0000-4000-8000-000000000001");
+    await page.getByLabel(he ? "תיאור הבקשה המקורי, בלי מידע מזהה" : "Original request without identifying information").fill("I ate an apple");
+    await weighed.check();
+    assert.equal(await page.getByLabel(measuredLabel, { exact: true }).inputValue(), "");
+    const approveExample = page.getByLabel(he ? "בדקתי את הרשומה ואני מאשר/ת לשתף את הדוגמה הזו לצורך אימון." : "I reviewed this record and approve sharing this specific example for training.");
+    await approveExample.check();
+    assert(await contribute.isDisabled(), "approval without every measured weight cannot submit a weighed example");
+    await page.getByLabel(measuredLabel, { exact: true }).fill("80");
+    assert(!(await approveExample.isChecked()), "changing a measurement requires approval of the changed example");
+    await approveExample.check();
+    await contribute.click();
+    await page.waitForFunction(() => window.wellnessFixture.trainingExamples().length === 2);
+    const measuredExample = await page.evaluate(() => window.wellnessFixture.trainingExamples().at(-1));
+    assert.equal(measuredExample.label_quality, "weighed");
+    assert.deepEqual(measuredExample.measurement_provenance, { version: 1, method: "user_reported_grams", source_version: 1 });
+    assert.equal(measuredExample.items[0].quantity, 80);
+    assert.equal(await page.evaluate(() => window.wellnessFixture.meals()[0].data.items[0].quantity), 100, "training measurements do not rewrite the diary");
     await page
       .getByRole("button", {
         name: he

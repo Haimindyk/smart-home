@@ -186,3 +186,27 @@ Only the chosen ingredient changes, with no AI call or changes to other portions
 The editor retains the original meal/version snapshot while saving, so a local
 store update does not remount it or discard the draft. Concurrent edits require
 reopening; an exactly accepted queued save is recognized after a later cache error.
+
+### Explicit measured training examples
+
+Training participation and approval remain separate and optional. For a weighed
+nutrition example, the contributor enters a gram weight for every ingredient;
+fields start blank rather than copying model estimates. Changing the selected
+record/task clears the measurement claim and inputs, and changing a description
+or weight clears per-example approval. The diary itself is not modified.
+
+The server matches weights by ingredient ID, requires complete finite positive
+gram measurements and the selected source version, and rejects duplicates,
+unknown/missing ingredients and ml-based foods. Ordinary corrected examples stay
+available without pretending volumes are grams. A status capability gates the
+new measured form so an older server cannot silently ignore explicit weights
+during a rolling release. No database schema or training-consent policy changes.
+
+These remain self-reported measurements, stored as **unreviewed** examples. Measured
+examples carry a server-authored `measurement_provenance` marker (version 1,
+user-reported grams and source record version). Legacy checkbox-only examples do
+not gain that marker retroactively and still require independent review. This raw
+collection metadata is not a model input or a substitute for reviewer approval.
+Weighing quantities does not verify AI nutrient values; original nutrient sources are
+retained and independent review is still required before training/evaluation.
+No model is automatically trained, promoted or claimed more accurate by this change.
