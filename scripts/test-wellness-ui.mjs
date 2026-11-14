@@ -464,6 +464,7 @@ try {
       ),
       "chat fits mobile width",
     );
+    await page.locator(".health-chat-options > summary").click();
     page.once("dialog", (dialog) => dialog.accept());
     await page
       .getByRole("button", { name: he ? "מחיקת שיחה" : "Clear chat" })
@@ -473,6 +474,29 @@ try {
       .waitFor();
     assert.deepEqual(errors, []);
     await page.close();
+  }
+  for (const lang of ["he", "en"]) {
+    const mobile = await browser.newPage({ viewport: { width:390, height:844 } });
+    await mobile.goto(base + "/?preview=1&lang=" + lang);
+    await mobile.getByRole("tab", { name:lang === "he" ? "צ׳אט AI" : "AI chat", exact:true }).click();
+    const starter = mobile.getByRole("button", { name:lang === "he" ? "איך לחלק חלבון ביום?" : "How can I spread protein through the day?", exact:true });
+    await starter.click();
+    assert.equal(await mobile.getByLabel(lang === "he" ? "מה תרצו לשאול?" : "What would you like to ask?").inputValue(), await starter.textContent(), "conversation starters insert an editable draft");
+    assert.equal((await actions(mobile)).filter(c=>c.action === "send").length, 0, "choosing a starter never sends a message");
+    assert(!(await mobile.locator(".health-chat-options").evaluate(e=>e.open)), "secondary chat controls start collapsed");
+    for (const width of [390,320]) {
+      await mobile.setViewportSize({ width, height:844 });
+      await mobile.evaluate(async()=>{ await document.fonts.ready; window.scrollTo(0,0); });
+      const send = await mobile.locator(".health-chat-send").boundingBox();
+      const nav = await mobile.locator(".health-bottom-nav").boundingBox();
+      assert(send && nav && send.y+send.height < nav.y, "chat send action is visible above mobile navigation");
+      assert(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1), "chat has no horizontal page overflow");
+    }
+    await mobile.getByRole("tab", { name:lang === "he" ? "אימונים" : "Workouts", exact:true }).click();
+    const plan = await mobile.locator(".workout-plan-tile").first().boundingBox();
+    const planGrid = await mobile.locator(".workout-plan-grid").boundingBox();
+    assert(plan && planGrid && Math.abs(plan.width-planGrid.width)<2, "mobile workout plan fills its available row");
+    await mobile.close();
   }
   if (process.env.WELLNESS_SCREENSHOTS_DIR) {
     await mkdir(process.env.WELLNESS_SCREENSHOTS_DIR, { recursive: true });

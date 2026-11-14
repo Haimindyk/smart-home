@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ArrowUp, Sparkles } from "lucide-react";
 import { healthFunction } from "@/lib/health/api";
 import { useHealthStore } from "@/lib/health/store";
 import { useHealthText } from "@/lib/health/i18n";
@@ -225,6 +226,9 @@ export function CoachChat({
       title={h("השיחה שלך", "Your conversation")}
       className="health-coach"
       action={
+        <details className="health-chat-options"><summary>{h("אפשרויות שיחה", "Chat options")}</summary><div>
+          <span className="health-status">{state ? h(`${state.used}/${state.limit} הודעות היום`,`${state.used}/${state.limit} messages today`) : h("טוען שיחה…","Loading conversation…")}</span>
+          <Button size="sm" variant="ghost" disabled={busy || loading} onClick={()=>void refresh()}>{h("רענון שיחה", "Refresh chat")}</Button>
         <Button
           variant="ghost"
           disabled={busy || !state?.turns.length}
@@ -232,16 +236,24 @@ export function CoachChat({
         >
           {h("מחיקת שיחה", "Clear chat")}
         </Button>
+        </div>
+        {onNavigate && (
+          <Disclosure className="health-help" title={h("מעבר ליומן ולתוכניות", "Open diary or workout plans")}><div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => onNavigate("nutrition")}>
+              {h("יומן תזונה", "Nutrition diary")}
+            </Button>
+            <Button variant="outline" onClick={() => onNavigate("workouts")}>
+              {h("תוכניות אימון", "Workout plans")}
+            </Button>
+          </div></Disclosure>
+        )}
+        <Disclosure className="health-help" title={h("פרטיות, מכסה ומה נשמר", "Privacy, allowance and saved changes")}><p>{h("מידע כללי ב־AI, לא תחליף לתזונאי או לאיש מקצוע רפואי. השיחה פרטית ונשמרת עד 30 יום; רק ההודעות האחרונות נשלחות. סיכום יומן נשלח רק בסימון שלך, ללא תמונות, שם או הערות אישיות. המכסה כפופה גם לתקציב המשותף ומתאפסת בחצות UTC, ללא מעבר לתשלום. הצ׳אט לא משנה יומן או תוכנית; שינוי נשמר רק במסך המתאים לאחר אישור.", "General AI information, not a substitute for a licensed dietitian or clinician. Private history is retained for up to 30 days; only recent messages are sent. Diary summaries are opt-in and exclude photos, name and personal notes. A shared allowance also applies, resetting at midnight UTC without paid fallback. Chat does not edit your diary or plan; approve changes in the appropriate screen.")}</p></Disclosure>
+        </details>
       }
     >
       <div className="grid min-w-0 gap-4">
-        <p className="text-sm text-muted-foreground">{h("אוכל, אימונים וטכניקה — מה תרצו לדעת?", "Food, training or technique — what’s on your mind?")}</p>
         <AiConsent />
         <ErrorText error={error} />
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="health-status">{state ? h(`${state.used}/${state.limit} הודעות היום`,`${state.used}/${state.limit} messages today`) : h("טוען שיחה…","Loading conversation…")}</span>
-          <Button size="sm" variant="ghost" disabled={busy || loading} onClick={()=>void refresh()}>{h("רענון שיחה", "Refresh chat")}</Button>
-        </div>
         <div
           role="log"
           aria-label={h("השיחה עם המאמן", "Conversation with your coach")}
@@ -253,11 +265,11 @@ export function CoachChat({
             <p role="status">{h("טוען שיחה…", "Loading conversation…")}</p>
           )}
           {state && !state.turns.length && (
-            <div className="health-chat-empty"><strong>{h("על מה נדבר?", "What’s on your mind?")}</strong><div className="health-chat-prompts">{[h("איך לחלק חלבון ביום?","How can I spread protein through the day?"),h("מה ההבדל בין Full Body ל־AB?","Full Body or AB?"),h("איך לבצע סקוואט?","How do I squat?")].map(prompt=><button type="button" key={prompt} onClick={()=>setText(prompt)}>{prompt}</button>)}</div></div>
+            <div className="health-chat-empty"><span className="health-chat-avatar" aria-hidden="true"><Sparkles size={19}/></span><strong>{h("על מה נדבר?", "What’s on your mind?")}</strong><p>{h("אפשר לשאול אותי על אוכל, אימונים וטכניקה.", "Ask me about food, training or exercise technique.")}</p></div>
           )}
           {state?.turns.map((turn) => (
             <section key={turn.id} className="grid min-w-0 gap-2">
-              <div className="ms-6 rounded-2xl bg-primary/10 p-4">
+              <div className="health-chat-user ms-6 rounded-2xl bg-primary/10 p-4">
                 <p className="mb-1 text-xs font-semibold">{h("אני", "You")}</p>
                 <p className="whitespace-pre-wrap break-words text-sm leading-7 [overflow-wrap:anywhere]">
                   {turn.user_text}
@@ -268,7 +280,7 @@ export function CoachChat({
                   </small>
                 )}
               </div>
-              <div className="me-3 rounded-2xl border p-4">
+              <div className="health-chat-answer me-3 rounded-2xl border p-4">
                 <p className="mb-1 text-xs font-semibold">
                   {h("המאמן · AI", "Coach · AI")}
                 </p>
@@ -302,6 +314,7 @@ export function CoachChat({
           )}
           <div ref={last} />
         </div>
+        {state && !state.turns.length && <div className="health-chat-prompts" aria-label={h("הצעות לשיחה", "Conversation starters")}>{[h("איך לחלק חלבון ביום?","How can I spread protein through the day?"),h("מה ההבדל בין Full Body ל־AB?","Full Body or AB?"),h("איך לבצע סקוואט?","How do I squat?")].map(prompt=><button type="button" key={prompt} disabled={busy} onClick={()=>setText(prompt)}>{prompt}</button>)}</div>}
         <form
           className="health-coach-composer grid min-w-0 gap-3"
           onSubmit={(e) => {
@@ -309,20 +322,21 @@ export function CoachChat({
             void send();
           }}
         >
-          <label className="grid gap-2 text-sm">
-            <span>{h("מה תרצו לשאול?", "What would you like to ask?")}</span>
+          <div className="health-chat-input-row"><label className="grid min-w-0 flex-1 gap-2 text-sm">
+            <span className="sr-only">{h("מה תרצו לשאול?", "What would you like to ask?")}</span>
             <textarea
               maxLength={2000}
-              rows={2}
+              rows={1}
               value={text}
               onChange={(e) => setText(e.target.value)}
               className="min-w-0 resize-y rounded-xl border bg-background p-3"
               placeholder={h(
-                "למשל: איך לעשות סקוואט בצורה נכונה?",
-                "For example: how do I perform a squat correctly?",
+                "שאלו על אוכל או אימון…",
+                "Ask about food or training…",
               )}
             />
           </label>
+          <Button type="submit" className="health-chat-send" disabled={!canSend || !text.trim()} aria-label={h("שליחה למאמן", "Send to coach")}><ArrowUp size={22}/></Button></div>
           <label className="flex items-start gap-2 text-xs leading-6">
             <input
               type="checkbox"
@@ -330,27 +344,15 @@ export function CoachChat({
               checked={includeDiary}
               disabled={busy}
               onChange={(e) => setIncludeDiary(e.target.checked)}
+              aria-label={h("לצרף סיכום יומן: ערכי היום, היעד ואימונים אחרונים", "Include diary summary: today’s nutrients, target and recent workouts")}
             />
             {h(
-              "לצרף סיכום יומן: ערכי היום, היעד ואימונים אחרונים",
-              "Include diary summary: today’s nutrients, target and recent workouts",
+              "לצרף את היומן שלי",
+              "Include my diary",
             )}
           </label>
-          <Button type="submit" disabled={!canSend || !text.trim()}>
-            {h("שליחה למאמן", "Send to coach")}
-          </Button>
         </form>
-        {onNavigate && (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => onNavigate("nutrition")}>
-              {h("יומן תזונה", "Nutrition diary")}
-            </Button>
-            <Button variant="outline" onClick={() => onNavigate("workouts")}>
-              {h("תוכניות אימון", "Workout plans")}
-            </Button>
-          </div>
-        )}
-        <Disclosure className="health-help" title={h("פרטיות, מכסה ומה נשמר", "Privacy, allowance and saved changes")}><p>{h("מידע כללי ב־AI, לא תחליף לתזונאי או לאיש מקצוע רפואי. השיחה פרטית ונשמרת עד 30 יום; רק ההודעות האחרונות נשלחות. סיכום יומן נשלח רק בסימון שלך, ללא תמונות, שם או הערות אישיות. המכסה כפופה גם לתקציב המשותף ומתאפסת בחצות UTC, ללא מעבר לתשלום. הצ׳אט לא משנה יומן או תוכנית; שינוי נשמר רק במסך המתאים לאחר אישור.", "General AI information, not a substitute for a licensed dietitian or clinician. Private history is retained for up to 30 days; only recent messages are sent. Diary summaries are opt-in and exclude photos, name and personal notes. A shared allowance also applies, resetting at midnight UTC without paid fallback. Chat does not edit your diary or plan; approve changes in the appropriate screen.")}</p></Disclosure>
+
       </div>
     </Panel>
   );
