@@ -1,6 +1,8 @@
 import { prepareImage } from "../../../src/lib/health/api";
 import { applyFoodCorrection } from "../../../supabase/functions/_shared/wellness-food-correction";
 import { nutritionTrainingItems } from "../../../supabase/functions/_shared/training-measurements";
+import { useLocaleStore } from "../../../src/lib/i18n/store";
+import { localDate } from "../../../src/lib/health/calculations";
 import { create } from "zustand";
 import { profileSchema, payloadSchemas } from "../../../src/lib/health/model";
 import {
@@ -9,6 +11,7 @@ import {
 } from "../../../supabase/functions/_shared/wellness-core";
 const calls: { action: string; table?: string; diary?: boolean; requestId?: unknown; description?: unknown; imagePath?: unknown }[] = [];
 const trainingExamples: unknown[] = [];
+useLocaleStore.getState().setLocale(document.documentElement.lang === "he" ? "he" : "en");
 const profile = {
   id: crypto.randomUUID(),
   version: 1,
@@ -394,7 +397,20 @@ export const useAppStore = create(() => ({
   },
 }));
 if (new URLSearchParams(location.search).has("preview")) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDate(profile.data.timezone);
+  if (new URLSearchParams(location.search).has("daily-populated")) {
+    const he = document.documentElement.lang === "he";
+    data.meals = [{ id: crypto.randomUUID(), version: 1, owner_user_id: useHealthStore.getState().owner,
+      data: payloadSchemas.meals.parse({ date: today, kind: "lunch", name: he ? "עוף, אורז וסלט" : "Chicken, rice & salad", items: [
+        { id: crypto.randomUUID(), quantity: 120, food: { id: "test-chicken", name: he ? "חזה עוף צלוי" : "Grilled chicken", basis: "g", source: "manual", per100: { kcal: 165, protein: 31, carbs: 0, fat: 3.6 } } },
+        { id: crypto.randomUUID(), quantity: 180, food: { id: "test-rice", name: he ? "אורז מבושל" : "Cooked rice", basis: "g", source: "manual", per100: { kcal: 130, protein: 2.7, carbs: 28, fat: .3 } } },
+        { id: crypto.randomUUID(), quantity: 90, food: { id: "test-salad", name: he ? "סלט ירקות" : "Vegetable salad", basis: "g", source: "manual", per100: { kcal: 25, protein: 1, carbs: 4, fat: .2 } } },
+      ] }) }];
+    if (new URLSearchParams(location.search).has("daily-over")) {
+      const meal = data.meals[0] as {data:{items:{quantity:number}[]}};
+      meal.data.items.forEach((item)=>{ item.quantity *= 6; });
+    }
+  }
   data.nutrition_goals = [
     {
       id: crypto.randomUUID(),

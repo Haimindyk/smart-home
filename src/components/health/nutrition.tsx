@@ -1,7 +1,7 @@
 "use client";
 import { displayedMealTitle } from "@/lib/health/meal-presentation";
 import { useState } from "react";
-import { Camera, ArrowUpLeft, Flame, Beef, Wheat, Droplet, Plus, Search, Bookmark, PenLine, ScanBarcode, Utensils } from "lucide-react";
+import { Camera, Flame, Beef, Wheat, Droplet, Plus, Search, Bookmark, PenLine, ScanBarcode, Utensils } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useHealthStore } from "@/lib/health/store";
@@ -98,7 +98,7 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
     }
   }
   return (
-    <div className="grid gap-5">
+    <div className="health-daily-nutrition grid gap-5">
       <ErrorText error={error} />
       {cameraOpen&&<MealCamera date={date} onClose={()=>setCameraOpen(false)}/>}
       {recentOpen&&<RecentMeals key={`${owner}-${date}`} date={date} onClose={()=>setRecentOpen(false)}/>}
@@ -117,8 +117,8 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
           </Button>
         }
       >
-        <div className="health-energy">
-          <div><p className="health-eyebrow">{h("האנרגיה שלך היום", "YOUR DAILY ENERGY")}</p><p className="mt-2 text-3xl font-bold tabular-nums">{goal ? round(Math.max(0, goal.kcal-totals.kcal)) : round(totals.kcal)}</p><p className="mt-1 text-sm text-muted-foreground">{goal ? h("קלוריות נותרו ליעד", "calories to your goal") : h("קלוריות נרשמו", "calories logged")}</p><p className="mt-4 text-xs text-muted-foreground">{goal ? `${round(totals.kcal)} / ${round(goal.kcal)} kcal` : h("כל צעד קטן נחשב", "Every small step counts")}</p></div>
+        <div className="health-energy" data-over={!!goal && totals.kcal>goal.kcal}>
+          <div><p className="health-eyebrow">{h("האנרגיה שלך היום", "YOUR DAILY ENERGY")}</p><p className="mt-2 text-3xl font-bold tabular-nums">{round(goal ? Math.abs(goal.kcal-totals.kcal) : totals.kcal)}</p><p className="mt-1 text-sm text-muted-foreground">{goal ? totals.kcal>goal.kcal ? h("קלוריות מעל היעד", "calories over your goal") : h("קלוריות נותרו ליעד", "calories to your goal") : h("קלוריות נרשמו", "calories logged")}</p>{goal && <p dir="ltr" className="mt-4 text-xs text-muted-foreground">{round(totals.kcal)} / {round(goal.kcal)} {h("קל׳", "kcal")}</p>}</div>
           <div className="health-ring"><NutrientRing value={totals.kcal} target={goal?.kcal} label={h("קלוריות מול היעד", "Calories vs goal")} color="#f4a900" trackColor="#fff3ca"/><div className="health-ring-label" aria-hidden="true"><Flame size={42} fill="#f4a900" stroke="#f4a900"/></div></div>
         </div>
         <div className="health-macros grid grid-cols-3 gap-3">
@@ -128,67 +128,27 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
               ["carbs", h("פחמימות", "Carbs")],
               ["fat", h("שומן", "Fat")],
             ] as const
-          ).map(([k, label]) => (
-            <div key={k} className={`health-macro macro-${k}`}>
+          ).map(([k, label]) => {
+            const balance=goal ? goal[k]-totals[k] : totals[k], over=!!goal && balance<0;
+            return <div key={k} className={`health-macro macro-${k}${over ? " is-over" : ""}`}>
               <span className="health-macro-icon"><NutrientRing value={totals[k]} target={goal?.[k]} label={label}/><span aria-hidden="true">{k==="protein" ? <Beef size={23}/> : k==="carbs" ? <Wheat size={23}/> : <Droplet size={23}/>}</span></span>
-              <p className="mt-4 text-xl font-bold tabular-nums">{round(goal ? Math.max(0,goal[k]-totals[k]) : totals[k])}<small className="text-xs font-normal"> {h("גרם", "g")}</small></p>
-              <p className="mt-1 text-xs text-muted-foreground">{label} {goal ? h("נותרו", "left") : h("נרשמו", "logged")}</p>
+              <p className="mt-4 text-xl font-bold tabular-nums">{round(Math.abs(balance))}<small className="text-xs font-normal"> {h("גרם", "g")}</small></p>
+              <p className="mt-1 text-xs text-muted-foreground">{label} {over ? h("מעל היעד", "over goal") : goal ? h("נותרו", "left") : h("נרשמו", "logged")}</p>
             </div>
-          ))}
+          })}
         </div>
-        {!goal && (
-          <p className="mt-3 text-sm text-muted-foreground">
-            {h(
-              "אפשר להגדיר יעד בהגדרות. המעקב עובד גם ללא יעד.",
-              "Set a goal in Settings. Tracking works without one.",
-            )}
-          </p>
-        )}
-        {meals.length === 0 && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            {h(
-              "אין דיווחים ליום הזה; הסכום מתייחס לרישומים בלבד.",
-              "No entries for this day; totals reflect logged food only.",
-            )}
-          </p>
-        )}
-        <details className="mt-4 text-sm">
-          <summary>{h("ערכים נוספים", "More nutrients")}</summary>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {(
-              [
-                ["fiber", h("סיבים", "Fiber")],
-                ["sugar", h("סוכר", "Sugar")],
-                ["saturatedFat", h("שומן רווי", "Saturated fat")],
-                ["sodium", h("נתרן", "Sodium")],
-              ] as const
-            ).map(([k, n]) => (
-              <p key={k}>
-                {n}: {round(totals[k])} {k === "sodium" ? "mg" : "g"}
-              </p>
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {h(
-              "— פירושו שאין נתון מלא לכל המזונות שנרשמו.",
-              "— means data is incomplete for the logged foods.",
-            )}
-          </p>
-        </details>
+
       </Panel>
       </div>
-      <button className="health-scan" onClick={()=>openEntry("photo")}><span><Camera size={25}/></span><span className="flex-1"><strong>{h("מצלמים. הארוחה ביומן.", "Snap. Logged.")}</strong><small>{h("צילום, זיהוי והוספה ליומן", "Photograph, recognize and add to diary")}</small></span><ArrowUpLeft size={19}/></button>
+
       <Dialog open={addMenu} onOpenChange={open=>{if(open)setAddMenu(true);else closeAdd()}}><DialogContent className="health-app meal-actions start-0 top-auto bottom-0 translate-x-0 translate-y-0 rtl:translate-x-0" showCloseButton={false}><DialogTitle>{h("מה מוסיפים?", "What would you like to add?")}</DialogTitle><div className="meal-action-grid">
-
-        <button onClick={()=>{closeAdd();setRecentOpen(true)}}><span><Utensils/></span>{h("ארוחה קודמת", "Previous meal")}</button>
-
-        <button onClick={()=>openEntry("search")}><span className="amber"><Search/></span>{h("מאגר מזון", "Food database")}</button>
-        <button onClick={()=>openEntry("saved")}><span className="pink"><Bookmark/></span>{h("שמורים", "Saved foods")}</button>
         <button onClick={()=>openEntry("photo")}><span><Camera/></span>{h("צלם ארוחה", "Photograph a meal")}</button>
-        <button onClick={()=>openEntry("text")}><span className="amber"><PenLine/></span>{h("כתבו מה אכלתם", "Describe your meal")}</button>
-        <button onClick={()=>openEntry("product")}><span className="amber"><ScanBarcode/></span>{h("מוצר ארוז", "Packaged product")}</button>
-        <button onClick={()=>openEntry("manual")}><span className="green"><PenLine/></span>{h("הזנה ידנית", "Manual entry")}</button>
-      </div><Button variant="ghost" onClick={closeAdd}>{h("סגירה", "Close")}</Button></DialogContent></Dialog>
+        <button onClick={()=>openEntry("product")}><span><ScanBarcode/></span>{h("מוצר ארוז", "Packaged product")}</button>
+        <button onClick={()=>openEntry("text")}><span><PenLine/></span>{h("כתבו מה אכלתם", "Describe your meal")}</button>
+        <button onClick={()=>openEntry("search")}><span><Search/></span>{h("מאגר מזון", "Food database")}</button>
+        <button onClick={()=>{closeAdd();setRecentOpen(true)}}><span><Utensils/></span>{h("ארוחה קודמת", "Previous meal")}</button>
+        <button onClick={()=>openEntry("saved")}><span><Bookmark/></span>{h("שמורים", "Saved foods")}</button>
+      </div><div className="meal-action-footer"><Button variant="ghost" onClick={()=>openEntry("manual")}>{h("הזנה ידנית", "Manual entry")}</Button><Button variant="ghost" onClick={closeAdd}>{h("סגירה", "Close")}</Button></div></DialogContent></Dialog>
       {editor && (
         <MealEditor
           capture={capture}
@@ -203,7 +163,7 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
           }}
         />
       )}
-      <h2 className="mt-3 text-2xl font-bold">{h("הארוחות של היום", "Your meals today")}</h2>
+      <h2 className="health-diary-heading">{h("הארוחות של היום", "Your meals today")}</h2>
       {kinds.filter(kind=>meals.length===0 ? kind==="breakfast" : meals.some(m=>m.data.kind===kind)).map((kind) => (
         <Panel key={kind} title={label(kind) ?? kind} className="health-meal-group">
           {meals.filter((m) => m.data.kind === kind).length === 0 ? (
@@ -221,7 +181,7 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
                     <div className="health-meal-card-main">
                       {m.data.imagePath ? <MealImage path={m.data.imagePath} thumbnail onOpen={()=>setDetailsId(m.id)}/> : <span className="health-meal-thumb health-meal-placeholder" aria-hidden="true"><Utensils size={23}/></span>}
                       <div className="min-w-0 flex-1"><h3><button onClick={()=>setDetailsId(m.id)}>{displayedMealTitle(m.data,label(kind))}</button></h3><p className="health-meal-foods">{m.data.items.slice(0,2).map(i=>`${i.food.name} · ${i.quantity} ${i.food.basis === "ml" ? h("מ״ל","ml") : h("גרם","g")}`).join(" · ")}</p>{m.data.items.length>2&&<small>{h(`ועוד ${m.data.items.length-2} פריטים`,`+${m.data.items.length-2} more items`)}</small>}</div>
-                      <div className="health-meal-card-end"><strong>{round(n.kcal)} <small>kcal</small></strong><Button size="sm" variant="ghost" onClick={()=>{if(m.data.imagePath||m.data.aiEstimate||m.data.items.some(i=>i.food.source==="ai")){setDetailsId(m.id)}else{setEditing(m);setEditor(true)}}}>{m.data.imagePath||m.data.aiEstimate||m.data.items.some(i=>i.food.source==="ai")?h("תיקון זיהוי", "Correct recognition"):h("עריכה", "Edit")}</Button></div>
+                      <div className="health-meal-card-end"><strong>{round(n.kcal)} <small>{h("קל׳", "kcal")}</small></strong><Button size="sm" variant="ghost" onClick={()=>{if(m.data.imagePath||m.data.aiEstimate||m.data.items.some(i=>i.food.source==="ai")){setDetailsId(m.id)}else{setEditing(m);setEditor(true)}}}>{m.data.imagePath||m.data.aiEstimate||m.data.items.some(i=>i.food.source==="ai")?h("תיקון זיהוי", "Correct recognition"):h("עריכה", "Edit")}</Button></div>
                     </div>
                     <div className="health-meal-macros">{([["protein",h("חלבון","Protein"),Beef],["carbs",h("פחמימות","Carbs"),Wheat],["fat",h("שומן","Fat"),Droplet]] as const).map(([key,title,Icon])=><span key={key} className={`meal-macro-${key}`} aria-label={`${title}: ${round(n[key])} g`}><Icon size={13}/>{round(n[key])} {h("ג׳","g")}</span>)}</div>
                     <details className="mt-2 text-sm">
@@ -263,6 +223,44 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
           )}
         </Panel>
       ))}
+      <Disclosure title={h("ערכים נוספים", "More nutrients")}>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {(
+              [
+                ["fiber", h("סיבים", "Fiber")],
+                ["sugar", h("סוכר", "Sugar")],
+                ["saturatedFat", h("שומן רווי", "Saturated fat")],
+                ["sodium", h("נתרן", "Sodium")],
+              ] as const
+            ).map(([k, n]) => (
+              <p key={k}>
+                {n}: {round(totals[k])} {k === "sodium" ? "mg" : "g"}
+              </p>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {h(
+              "— פירושו שאין נתון מלא לכל המזונות שנרשמו.",
+              "— means data is incomplete for the logged foods.",
+            )}
+          </p>
+        {!goal && (
+          <p className="mt-3 text-sm text-muted-foreground">
+            {h(
+              "אפשר להגדיר יעד בהגדרות. המעקב עובד גם ללא יעד.",
+              "Set a goal in Settings. Tracking works without one.",
+            )}
+          </p>
+        )}
+        {meals.length === 0 && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            {h(
+              "אין דיווחים ליום הזה; הסכום מתייחס לרישומים בלבד.",
+              "No entries for this day; totals reflect logged food only.",
+            )}
+          </p>
+        )}
+      </Disclosure>
       <FoodLibrary />
       <Panel title={h("מים ומשקל", "Water & weight")}>
         <p className="mb-3 text-lg font-semibold">

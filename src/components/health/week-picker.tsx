@@ -7,7 +7,7 @@ import { useLocaleStore } from "@/lib/i18n/store";
 const DAY_MS = 86_400_000;
 const dateAtNoon = (value:string) => new Date(`${value}T12:00:00Z`);
 
-export function WeekPicker({date,today,onChange}:{date:string;today:string;onChange:(date:string)=>void}) {
+export function WeekPicker({date,today,onChange,activityDates=[]}:{date:string;today:string;onChange:(date:string)=>void;activityDates?:string[]}) {
   const h=useHealthText();
   const locale=useLocaleStore(s=>s.locale);
   const rail=useRef<HTMLDivElement>(null);
@@ -61,10 +61,11 @@ export function WeekPicker({date,today,onChange}:{date:string;today:string;onCha
   }
 
   const month=new Intl.DateTimeFormat(locale==="he"?"he-IL":"en-US",{month:"long",year:"numeric",timeZone:"UTC"}).format(dateAtNoon(visibleDate));
+  const logged = new Set(activityDates);
   return <section className="health-week-picker mb-6" aria-label={h("בחירת תאריך", "Date navigation")}>
     <div className="date-wheel-heading"><span aria-live="polite" aria-atomic="true">{month}</span>{date!==today&&<button className="week-today" onClick={()=>onChange(today)}>{h("חזרה להיום","Back to today")}</button>}</div>
     <div ref={rail} onScroll={updateVisibleDate} className="health-date-wheel" role="group" aria-label={h("גלילת תאריכים","Scroll through dates")}>
-      {days.map(d=><button type="button" key={d.date} data-date={d.date} onClick={()=>onChange(d.date)} aria-label={d.fullLabel} aria-pressed={date===d.date} className={date===d.date?"selected":""}><span>{d.label}</span><strong>{d.day}</strong><i/></button>)}
+      {days.map(d=><button type="button" key={d.date} data-date={d.date} data-future={d.date>today} onClick={()=>onChange(d.date)} aria-label={d.fullLabel+(logged.has(d.date)?h(" · יש רישומים"," · Entries logged"):"")} aria-pressed={date===d.date} className={date===d.date?"selected":""}><span>{d.label}</span><strong>{d.day}</strong><i data-logged={logged.has(d.date)}/></button>)}
     </div>
   </section>;
 }

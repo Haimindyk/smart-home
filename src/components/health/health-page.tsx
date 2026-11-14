@@ -105,7 +105,7 @@ export function HealthPage() {
         <div className="health-header-actions"><button id="health-settings-button" className="health-profile" onClick={()=>setTab("settings")} aria-label={h("הגדרות אישיות", "Personal settings")} aria-pressed={active==="settings"}><Settings2 size={21}/></button><Link href="/" className="health-back" aria-label={h("חזרה לבית", "Smart Home")}><ChevronRight size={20}/></Link></div>
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-5 pb-32 sm:px-8">
-        {active !== "settings" && active !== "coach" && !workoutFocus && <WeekPicker date={date} today={localDate(profile?.timezone??"Asia/Jerusalem")} onChange={setDate}/>}
+        {active !== "settings" && active !== "coach" && !workoutFocus && <WeekPicker date={date} today={localDate(profile?.timezone??"Asia/Jerusalem")} onChange={setDate} activityDates={(active === "nutrition" ? state.data.meals : active === "workouts" ? state.data.workout_sessions : [...state.data.meals,...state.data.workout_sessions]).map((row)=>row.data.date)}/>}
         {state.pending > 0 && (
           <p
             role="status"
