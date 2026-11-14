@@ -31,3 +31,15 @@ component boundary; they are not invented diary entries in production.
 The overall reference goal remains broader than this daily-view increment.
 Continue comparing chat, activity logging, text entry, product search, favorites,
 progress/settings and camera against the supplied references on real devices.
+
+## Conversation and workout cards
+
+- Chat starts with one short welcome bubble, horizontal draft suggestions and a
+  compact composer. Refresh, deletion, quota and navigation/help are available
+  under Chat options. AI consent and errors stay visible when action is needed.
+- Diary sharing stays off by default. Short visible copy retains its full
+  accessible label; selecting a suggestion only fills an editable draft.
+- At 390 px and 320 px, the initial send action remains above the fixed navigation
+  with no horizontal page overflow. These assertions run without screenshot flags.
+- Workout plan cards occupy a full row on phones and two columns above 600 px.
+  Scheduling information cannot overlap the day title; start/edit remain visible.
