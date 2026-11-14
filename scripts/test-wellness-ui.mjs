@@ -156,6 +156,11 @@ try {
         name: he ? "כתבו מה אכלתם" : "Describe your meal",
       })
       .click();
+    const descriptionSheet = page.getByRole("dialog", { name:he ? "תיאור ארוחה" : "Describe your meal", exact:true });
+    await descriptionSheet.getByRole("heading", { name:he ? "תיאור ארוחה" : "Describe your meal", exact:true }).waitFor();
+    assert.equal(await descriptionSheet.getByRole("button", { name:he ? "סגירה" : "Close", exact:true }).count(), 1, "meal entry has one shared close action");
+    const descriptionBox = await descriptionSheet.getByRole("textbox").boundingBox();
+    assert(descriptionBox && descriptionBox.height>=170, "meal description has a spacious text field");
     assert.equal(
       await page
         .getByRole("group", {

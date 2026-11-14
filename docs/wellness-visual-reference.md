@@ -43,3 +43,12 @@ progress/settings and camera against the supplied references on real devices.
   with no horizontal page overflow. These assertions run without screenshot flags.
 - Workout plan cards occupy a full row on phones and two columns above 600 px.
   Scheduling information cannot overlap the day title; start/edit remain visible.
+
+## Meal entry sheets
+
+Meal description, manual entry and packaged products use the shared white editor
+sheet, with a centered title, a handle and one accessible close action. Close and
+dismissal stay disabled while a save/analysis is pending. Description entry has a
+large text area and a black pill action; secondary precision tips stay collapsed.
+Product scanning continues to open directly, with camera/manual barcode and real
+package values. This visual change does not alter confirmation or diary writes.
