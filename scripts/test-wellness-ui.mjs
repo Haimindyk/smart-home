@@ -158,6 +158,7 @@ try {
     await page.getByRole("heading", { name:he ? "עוד אין ארוחות מועדפות" : "No favorite meals yet", exact:true }).waitFor();
     if (process.env.WELLNESS_SCREENSHOTS_DIR) await page.screenshot({ path:join(process.env.WELLNESS_SCREENSHOTS_DIR,language+"-empty-favorites.png"),animations:"disabled" });
     await page.getByRole("button", { name:he ? "לארוחות האחרונות" : "Browse recent meals",exact:true }).click();
+    await page.getByRole("heading", { name:he ? "ארוחות קודמות" : "Previous meals",exact:true }).waitFor();
     await page.getByLabel(he ? "חיפוש ארוחה" : "Search meals",{exact:true}).waitFor();
     assert.equal((await actions(page)).filter(c=>c.table === "meals").length,writesBeforeFavorites,"browsing favorites and recent meals does not change the diary");
     await page.getByRole("button", { name:he ? "סגירה" : "Close",exact:true }).click();
@@ -1179,7 +1180,7 @@ try {
   await foodBarcode.getByRole("button", { name: "Favorites", exact: true }).click();
   if (process.env.WELLNESS_SCREENSHOTS_DIR) await foodBarcode.screenshot({ path: join(process.env.WELLNESS_SCREENSHOTS_DIR, "favorite-meals.png") });
   await foodBarcode.getByRole("button", { name: "Add again: Synthetic packaged food", exact: true }).click();
-  await foodBarcode.getByRole("heading", { name: "Previous meals", exact: true }).waitFor({ state: "hidden" });
+  await foodBarcode.getByRole("heading", { name: "Favorite meals", exact: true }).waitFor({ state: "hidden" });
   const favoriteCopies = await foodBarcode.evaluate(() => structuredClone(window.wellnessFixture.meals()));
   assert.equal(favoriteCopies.length, countBeforeRepeat + 2);
   assert.equal(favoriteCopies.filter((m) => m.data.favorite).length, 1, "copies do not create extra favorites");

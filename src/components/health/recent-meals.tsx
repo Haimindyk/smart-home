@@ -44,7 +44,7 @@ export function RecentMeals({ date, onClose, initialMode="recent" }: { date: str
     catch (e) { const code = e instanceof Error ? e.message : "failed"; setError(code === "version_conflict" ? "meal_changed" : code); }
     finally { lock.current = false; setBusy(false); }
   }
-  return <HealthSheet title={initialMode === "favorites" ? h("ארוחות מועדפות", "Favorite meals") : h("ארוחות קודמות", "Previous meals")} onClose={onClose} closeDisabled={busy}>
+  return <HealthSheet title={mode === "favorites" ? h("ארוחות מועדפות", "Favorite meals") : h("ארוחות קודמות", "Previous meals")} onClose={onClose} closeDisabled={busy}>
     <div className="health-recent-meals grid gap-4">
       <ChoiceTabs label={h("הצגת ארוחות", "Show meals")} value={mode} onChange={setMode} options={[{value:"recent", label:h("אחרונות", "Recent")}, {value:"favorites", label:h("מועדפות", "Favorites")}]}/>
       {!emptyFavorites && <Field label={h("חיפוש ארוחה", "Search meals")} value={query} onChange={(e) => setQuery(e.target.value)} disabled={busy} />}
