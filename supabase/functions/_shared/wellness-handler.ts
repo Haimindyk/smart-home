@@ -48,6 +48,7 @@ import {
   assertEstimatedFoodMode,
 } from "./wellness-food.ts";
 import { hasRecipeOilEstimate, removeInferredRecipeOil } from "./recipe-oil.ts";
+import { PhotoPerformance } from "./photo-performance.ts";
 
 import {
   correctionContext,
@@ -64,6 +65,8 @@ export async function handleWellness(req: Request, env: Environment) {
     id: string;
     owner: string;
   } | null = null;
+  let photoPerformance: PhotoPerformance | undefined;
+  let photoProvenance: Record<string, unknown> | undefined;
   try {
     const { admin, user } = await requireUser(req),
       input = record(await body(req));
@@ -368,68 +371,94 @@ export async function handleWellness(req: Request, env: Environment) {
     } else if (input.action === "nutrition") {
       let visualObservations = "";
       if (imagePath) {
-        const downloaded = await admin.storage
-          .from("health-images")
-          .download(imagePath);
-        const file = downloaded.data;
-        if (
-          downloaded.error ||
-          !file ||
-          file.size > 5242880 ||
-          !["image/jpeg", "image/png", "image/webp"].includes(file.type)
-        )
-          throw new Error("invalid_image");
-        visualObservations = await provider.vision(
-          new Uint8Array(await file.arrayBuffer()),
-          observationPrompt,
+        photoProvenance = provider.provenance("nutrition_photo");
+        photoPerformance = new PhotoPerformance();
+        const image = await photoPerformance.measure("download", async () => {
+          const downloaded = await admin.storage
+            .from("health-images")
+            .download(imagePath);
+          const file = downloaded.data;
+          if (
+            downloaded.error ||
+            !file ||
+            file.size > 5242880 ||
+            !["image/jpeg", "image/png", "image/webp"].includes(file.type)
+          ) {
+            throw new Error("invalid_image");
+          }
+          return new Uint8Array(await file.arrayBuffer());
+        });
+        visualObservations = await photoPerformance.measure(
+          "vision",
+          () => provider.vision(image, observationPrompt),
         );
       }
-      const raw = await provider.structured(
-        imagePath
-          ? recipeAwareMealPrompt +
+      const normalize = async () => {
+        const raw = await provider.structured(
+          imagePath
+            ? recipeAwareMealPrompt +
               "\nSchema: " +
               JSON.stringify(compactMealSchema())
-          : nutritionPrompt,
-        { mode, description, ...(imagePath ? { visualObservations } : {}) },
-        imagePath ? 1800 : 2500,
-        "nutrition_text",
-        imagePath ? compactMealSchema() : nutritionSchema(),
-        !!imagePath,
-      );
-      const estimate = imagePath
-        ? normalizeCompactMeal(raw, input.automatic === true, { visualObservations, description })
-        : normalizeFoodEstimate(raw);
+            : nutritionPrompt,
+          { mode, description, ...(imagePath ? { visualObservations } : {}) },
+          imagePath ? 1800 : 2500,
+          "nutrition_text",
+          imagePath ? compactMealSchema() : nutritionSchema(),
+          !!imagePath,
+        );
+        const estimate = imagePath
+          ? normalizeCompactMeal(raw, input.automatic === true, {
+            visualObservations,
+            description,
+          })
+          : normalizeFoodEstimate(raw);
+        return { raw, estimate };
+      };
+      const { raw, estimate } = photoPerformance
+        ? await photoPerformance.measure("normalization", normalize)
+        : await normalize();
       // Exact catalog names/basis only: no silent raw/cooked or g/ml mismatches.
       const names = estimate.items.map((i) => i.name);
       if (names.length && !hasRecipeOilEstimate(raw)) {
-        const [catalogResponse, personalResponse] = await Promise.all([
-          admin.from("food_catalog").select("data").in("data->>name", names),
-          admin
-            .from("personal_foods")
-            .select("data")
-            .eq("owner_user_id", user.id)
-            .is("deleted_at", null)
-            .in("data->>name", names),
-        ]);
-        const catalogMatches = check(catalogResponse),
-          personal = check(personalResponse);
-        for (const item of estimate.items) {
-          const match = [...(personal ?? []), ...(catalogMatches ?? [])].find(
-            (m) => m.data.name === item.name && m.data.basis === item.basis,
-          )?.data;
-          if (match) {
-            const validated = parseNutrition({
-              items: [{ ...item, per100: match.per100 }],
-              needsClarification: false,
-              question: "",
-            }).items[0];
-            item.per100 = validated.per100;
-            item.source = match.source;
-            item.sourceId = match.sourceId ?? match.id;
+        const matchCatalog = async () => {
+          const [catalogResponse, personalResponse] = await Promise.all([
+            admin.from("food_catalog").select("data").in("data->>name", names),
+            admin
+              .from("personal_foods")
+              .select("data")
+              .eq("owner_user_id", user.id)
+              .is("deleted_at", null)
+              .in("data->>name", names),
+          ]);
+          const catalogMatches = check(catalogResponse),
+            personal = check(personalResponse);
+          for (const item of estimate.items) {
+            const match = [...(personal ?? []), ...(catalogMatches ?? [])].find(
+              (m) => m.data.name === item.name && m.data.basis === item.basis,
+            )?.data;
+            if (match) {
+              const validated = parseNutrition({
+                items: [{ ...item, per100: match.per100 }],
+                needsClarification: false,
+                question: "",
+              }).items[0];
+              item.per100 = validated.per100;
+              item.source = match.source;
+              item.sourceId = match.sourceId ?? match.id;
+            }
           }
-        }
+        };
+        if (photoPerformance) {
+          await photoPerformance.measure("catalog", matchCatalog);
+        } else await matchCatalog();
       }
-      result = { ...estimate, analysisId: id };
+      result = {
+        ...estimate,
+        analysisId: id,
+        ...(photoPerformance
+          ? { photoPerformance: photoPerformance.snapshot("complete") }
+          : {}),
+      };
     } else if (input.action === "program") {
       const startDate = typeof input.date === "string" ? input.date : today;
       if (
@@ -581,6 +610,14 @@ export async function handleWellness(req: Request, env: Environment) {
         .from("wellness_ai_jobs")
         .update({
           status: "failed",
+          ...(photoPerformance
+            ? {
+              result: {
+                photoPerformance: photoPerformance.snapshot("failed"),
+                modelProvenance: photoProvenance,
+              },
+            }
+            : {}),
           error_code: [
             "invalid_input",
             "invalid_output",

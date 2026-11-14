@@ -13,7 +13,7 @@ checked from entry to diary persistence. Code is released only via Git PR merges
 
 | Area | Current evidence | Next acceptance check |
 | --- | --- | --- |
-| Photo logging | Full-frame upload, captured-image progress, automatic single save, corrected prepared-food labels; mocked browser flows and selected live diagnostics | Representative real image/ingredient/weight evaluation; record p50/p95 end-to-end latency, failures and false ingredients |
+| Photo logging | Full-frame upload, captured-image progress, automatic single save, corrected prepared-food labels; per-stage server timing for subsequent attempts, including failed stages | Representative real image/ingredient/weight evaluation; analyze measured stages and record separate p50/p95 end-to-end latency, failures and false ingredients |
 | Text corrections | Visible at the top of meal details; diary photo/edit actions reach it; retries preserve text and version checks | Continue device/keyboard checks and mixed-source correction cases |
 | Manual ingredient fixes | Quick removal/undo and add-food flow in meal details in this increment | Add/remove/undo must update totals on the same meal, preserve source/amounts of other items, and never overwrite a later edit |
 | Product amount | g/ml or weighed units before adding, both barcode paths; exact source per100 preserved; AI-disabled browser checks | Expand verified local coverage and trustworthy unit metadata without guessing density or missing labels |
