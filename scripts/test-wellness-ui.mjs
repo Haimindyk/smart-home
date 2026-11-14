@@ -506,6 +506,9 @@ try {
           await document.fonts.ready;
           window.scrollTo(0, 0);
         });
+        if (screen === "nutrition") {
+          assert.deepEqual(await preview.locator(".health-summary [role=progressbar]").evaluateAll((rings) => rings.map((ring)=>Number(ring.getAttribute("aria-valuenow")))),[0,0,0,0],"empty daily rings are empty, never decorative half-filled circles");
+        }
         await preview.screenshot({
           path: join(
             process.env.WELLNESS_SCREENSHOTS_DIR,
@@ -515,6 +518,36 @@ try {
         });
       }
       await preview.close();
+      const daily = await browser.newPage({ viewport: { width: 390, height: 844 } });
+      await daily.goto(base + "/?preview=1&daily-populated=1&lang=" + lang);
+      await daily.getByRole("tab", { name: lang === "he" ? "היום" : "Today", exact: true }).click();
+      await daily.getByRole("heading", { name: lang === "he" ? "הארוחות של היום" : "Your meals today", exact: true }).waitFor();
+      await daily.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); });
+      const layout = await daily.evaluate(() => {
+        const box = (selector) => { const r = document.querySelector(selector).getBoundingClientRect(); return { x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom }; };
+        return { diary:box(".health-diary-heading"), card:box(".health-meal-card"), nav:box(".health-bottom-nav"), selected:box(".health-date-wheel [aria-pressed=true]"), viewport:innerWidth, overflow:document.documentElement.scrollWidth>innerWidth+1 };
+      });
+      assert(layout.diary.bottom < layout.nav.y, "daily meals heading is visible above navigation");
+      assert(layout.card.y < layout.nav.y, "first meal appears in the initial phone viewport");
+      assert(layout.selected.x >= 0 && layout.selected.x + layout.selected.width <= layout.viewport, "selected calendar date is visible and centered");
+      assert(!layout.overflow, "daily layout has no horizontal overflow");
+      await daily.screenshot({ path: join(process.env.WELLNESS_SCREENSHOTS_DIR, `${lang}-nutrition-populated.png`), animations:"disabled" });
+      await daily.setViewportSize({ width:320,height:740 });
+      assert(await daily.evaluate(() => document.documentElement.scrollWidth <= innerWidth+1), "compact daily screen fits a small phone");
+      await daily.screenshot({ path: join(process.env.WELLNESS_SCREENSHOTS_DIR, `${lang}-nutrition-small.png`), animations:"disabled" });
+      await daily.setViewportSize({ width:390,height:844 });
+      await daily.getByRole("button", { name:lang === "he" ? "הוספת ארוחה" : "Add meal",exact:true }).click();
+      await daily.getByRole("dialog").waitFor();
+      assert.equal(await daily.locator(".meal-action-grid>button").count(),6,"add menu has a balanced grid of six primary actions");
+      await daily.screenshot({ path:join(process.env.WELLNESS_SCREENSHOTS_DIR,`${lang}-add-menu.png`),animations:"disabled" });
+      await daily.getByRole("button",{name:lang === "he" ? "סגירה" : "Close",exact:true}).click();
+      await daily.goto(base+"/?preview=1&daily-populated=1&daily-over=1&lang="+lang);
+      await daily.getByRole("tab",{name:lang === "he" ? "היום" : "Today",exact:true}).click();
+      await daily.getByText(lang === "he" ? "קלוריות מעל היעד" : "calories over your goal",{exact:true}).waitFor();
+      assert.equal((await daily.locator(".health-energy[data-over=true]>div>p").nth(1).innerText()).replace(/\D/g,""),"727","over-goal calories are shown rather than clamped to zero");
+      assert.equal(await daily.locator(".health-macro.is-over").count(),2,"only exceeded macro goals are highlighted");
+      await daily.screenshot({path:join(process.env.WELLNESS_SCREENSHOTS_DIR,`${lang}-nutrition-over.png`),animations:"disabled"});
+      await daily.close();
     }
   }
   const minor = await browser.newPage();
