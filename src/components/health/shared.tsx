@@ -73,6 +73,7 @@ export function ErrorText({ error }: { error: string | null }) {
   const h = useHealthText();
   if (!error) return null;
   const messages: Record<string, string> = {
+    meal_changed: h("הרישום השתנה. פתחו אותו מחדש לפני שמירה נוספת.", "This record changed. Reopen it before saving again."),
     photo_review_required: h("יש לבדוק ולתקן את כל המרכיבים והכמויות לפני שמירת הערכת תמונה.", "Review and correct all ingredients and portions before saving a photo estimate."),
     label_lookup_required: h("ערכי תווית מתקבלים מברקוד או מהעתקת הנתונים המודפסים, ללא הערכת AI.", "Use a barcode or copy printed label values; AI label estimation is disabled."),
     label_confirmation_required: h("יש לבדוק ולאשר שהנתונים תואמים לאריזה.", "Check and confirm that the values match the package."),

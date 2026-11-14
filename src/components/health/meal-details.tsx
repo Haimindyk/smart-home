@@ -1,6 +1,6 @@
 "use client";
 import { displayedMealTitle } from "@/lib/health/meal-presentation";
-import { Utensils, PencilLine } from "lucide-react";
+import { Utensils, PencilLine, Plus, Trash2, Undo2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useHealthStore } from "@/lib/health/store";
 import { correctSavedMeal } from "@/lib/health/wellness-api";
@@ -8,6 +8,9 @@ import { useHealthText } from "@/lib/health/i18n";
 import { HealthSheet } from "./health-sheet";
 import { MealImage } from "./meal-image";
 import { MealPortion } from "./meal-portion";
+import { FoodPicker } from "./food-picker";
+import { saveMealItems } from "@/lib/health/meal-editing";
+import { type HealthRow, type MealItem } from "@/lib/health/model";
 import { AiConsent, useWellnessAvailability } from "./ai-consent";
 import { mealNutrients, scaleNutrients } from "@/lib/health/calculations";
 import { Disclosure, ErrorText, round } from "./shared";
@@ -25,6 +28,9 @@ export function MealDetails({
     row = useHealthStore((s) => s.data.meals.find((m) => m.id === id)),
     availability = useWellnessAvailability();
   const [text, setText] = useState(""),
+    [adding, setAdding] = useState(false),
+    [pendingAddition, setPendingAddition] = useState<MealItem | null>(null),
+    [undo, setUndo] = useState<{ row: HealthRow<"meals">; items: MealItem[] } | null>(null),
     [portionId, setPortionId] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
@@ -43,6 +49,7 @@ export function MealDetails({
     setBusy(true);
     setMessage("");
     setError(null);
+    setUndo(null);
     if (
       attempt.current?.text !== text ||
       attempt.current.version !== meal.version
@@ -64,6 +71,37 @@ export function MealDetails({
       setBusy(false);
     }
   }
+  async function editItems(items: MealItem[], removal = false) {
+    if (lock.current) return;
+    lock.current = true; setBusy(true); setError(null); setMessage(""); setUndo(null);
+    try {
+      const saved = await saveMealItems(meal, items);
+      if (removal) setUndo({ row: saved, items: meal.data.items });
+      setPendingAddition(null);
+      setAdding(false);
+      setMessage(removal ? h("הרכיב הוסר", "Ingredient removed") : h("הרכיב נוסף", "Ingredient added"));
+    } catch (e) {
+      const code = e instanceof Error ? e.message : "failed";
+      setError(code === "version_conflict" ? "meal_changed" : code);
+    } finally { lock.current = false; setBusy(false); }
+  }
+  async function undoRemoval() {
+    if (!undo || lock.current) return;
+    lock.current = true; setBusy(true); setError(null);
+    try {
+      await saveMealItems(undo.row, undo.items);
+      setUndo(null); setMessage(h("הרכיב הוחזר", "Ingredient restored"));
+    } catch (e) { const code = e instanceof Error ? e.message : "failed"; setError(code === "version_conflict" ? "meal_changed" : code); }
+    finally { lock.current = false; setBusy(false); }
+  }
+  if (adding) return <HealthSheet title={h("הוספת רכיב לארוחה", "Add an ingredient to this meal")} onClose={() => { if (!busy) setAdding(false); }}>
+    <div className="grid gap-4">
+      <fieldset disabled={busy} className="min-w-0"><FoodPicker key={meal.owner_user_id} showHeading={false} onAdd={(item) => { setPendingAddition(item); void editItems([...meal.data.items, item]); }} /></fieldset>
+      <ErrorText error={error} />
+      {pendingAddition && error && <Button disabled={busy} onClick={() => void editItems([...meal.data.items, pendingAddition])}>{h("ניסיון שמירה מחדש", "Retry saving")} · {pendingAddition.food.name}</Button>}
+      <Button variant="ghost" disabled={busy} onClick={() => setAdding(false)}>{h("חזרה לארוחה", "Back to meal")}</Button>
+    </div>
+  </HealthSheet>;
   return (
     <HealthSheet
       title={displayedMealTitle(row.data, h("הארוחה שלי", "My meal"))}
@@ -97,8 +135,6 @@ export function MealDetails({
                 ? h("מעדכן…", "Updating…")
                 : h("עדכון הארוחה", "Update meal")}
             </Button>
-            <ErrorText error={error} />
-            {message && <p role="status">{message}</p>}
           </section>
         )}
         {row.data.imagePath && <MealImage path={row.data.imagePath} preview />}
@@ -114,6 +150,8 @@ export function MealDetails({
             {round(totals.fat)}g
           </p>
         </div>
+        <ErrorText error={error} />
+        {message && <div className="flex items-center justify-between gap-2" role="status"><span>{message}</span>{undo && undo.row.version === row.version && <Button size="sm" variant="ghost" disabled={busy} onClick={() => void undoRemoval()}><Undo2 size={16} />{h("ביטול הסרה", "Undo removal")}</Button>}</div>}
         <ul
           className="health-ingredient-list"
           aria-label={h("מרכיבי הארוחה", "Meal ingredients")}
@@ -137,10 +175,12 @@ export function MealDetails({
                   <strong>{round(nutrients.kcal)}</strong>
                   <small>{h("קל׳", "kcal")}</small>
                 </span>
+                {row.data.items.length > 1 && <Button size="icon" variant="ghost" className="health-ingredient-remove" disabled={busy || !!portionId} aria-label={`${h("הסרת רכיב", "Remove ingredient")}: ${i.food.name}`} onClick={() => void editItems(meal.data.items.filter((item) => item.id !== i.id), true)}><Trash2 size={17} /></Button>}
               </li>
             );
           })}
         </ul>
+        <Button variant="outline" disabled={busy || !!portionId || row.data.items.length >= 100} onClick={() => { setAdding(true); setError(null); }}><Plus size={18} />{h("הוספת רכיב", "Add ingredient")}</Button>
         {portionId && row.data.items.find((i) => i.id === portionId) && <MealPortion key={`${portionId}:${row.version}`} meal={row} item={row.data.items.find((i) => i.id === portionId)!} onDone={() => setPortionId(null)} />}
         {row.data.items.some((i) => i.quantityRange || i.assumption) && (
           <Disclosure title={h("על ההערכה", "About this estimate")}>

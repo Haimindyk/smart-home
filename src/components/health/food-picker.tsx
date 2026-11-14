@@ -6,6 +6,7 @@ import { useHealthStore } from "@/lib/health/store";
 import {
   emptyNutrients,
   foodSchema,
+  mealItemSchema,
   type Food,
   type MealItem,
 } from "@/lib/health/model";
@@ -17,7 +18,7 @@ import { defaultProductAmount, productAmount, productAmountItem } from "@/lib/he
 import { ProductAmountInput } from "./product-amount";
 import { Field, ErrorText, SelectField } from "./shared";
 const roundValue = (v: number) => Math.round(v * 10) / 10;
-export function FoodPicker({ onAdd, initialMode }: { onAdd: (item: MealItem) => void; initialMode?: "search"|"saved"|"manual" }) {
+export function FoodPicker({ onAdd, initialMode, showHeading = true }: { onAdd: (item: MealItem) => void; initialMode?: "search"|"saved"|"manual"; showHeading?: boolean }) {
   const h = useHealthText();
   const data = useHealthStore((s) => s.data);
   const [lookupMode,setLookupMode]=useState<"search"|"barcode">("search");
@@ -63,10 +64,10 @@ export function FoodPicker({ onAdd, initialMode }: { onAdd: (item: MealItem) => 
         ...food,
         barcode: barcode || undefined,
       });
-      if (quantity <= 0) throw new Error("invalid_input");
+      const item = mealItemSchema.parse({ id: crypto.randomUUID(), food: parsed, quantity });
       if (favorite)
         await useHealthStore.getState().save("personal_foods", parsed);
-      onAdd({ id: crypto.randomUUID(), food: parsed, quantity });
+      onAdd(item);
       setManual(false);
       setFood({
         id: crypto.randomUUID(),
@@ -104,7 +105,7 @@ export function FoodPicker({ onAdd, initialMode }: { onAdd: (item: MealItem) => 
   try { if (selected) { productAmount(selected, selection); validSelection = true; } } catch { /* Incomplete unit size. */ }
   return (
     <div className="food-picker grid gap-4">
-      <h3 className="font-medium">{h("הוספת מזון", "Add food")}</h3>
+      {showHeading && <h3 className="font-medium">{h("הוספת מזון", "Add food")}</h3>}
       <div className="food-methods">
         <button type="button" aria-pressed={!manual&&lookupMode==="search"} onClick={()=>{setManual(false);setLookupMode("search");setCamera(false)}}><Search size={19}/>{h("מאגר ומועדפים", "Foods & favorites")}</button>
         <button type="button" aria-pressed={!manual&&lookupMode==="barcode"} onClick={()=>{setManual(false);setLookupMode("barcode")}}><ScanBarcode size={19}/>{h("ברקוד", "Barcode")}</button>
