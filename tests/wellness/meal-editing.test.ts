@@ -2,7 +2,7 @@ import { expect, it, vi, beforeEach } from "vitest";
 import { mealItemSchema, payloadSchemas, type HealthRow } from "../../src/lib/health/model";
 const mock = vi.hoisted(() => ({ state: {} as Record<string, unknown>, save: vi.fn() }));
 vi.mock("../../src/lib/health/store", () => ({ useHealthStore: { getState: () => mock.state } }));
-import { editedMealData, saveMealItems, repeatedMealData, saveRepeatedMeal } from "../../src/lib/health/meal-editing";
+import { editedMealData, saveMealItems, repeatedMealData, saveRepeatedMeal, saveMealFavorite } from "../../src/lib/health/meal-editing";
 
 const item = (id: string, name: string) => mealItemSchema.parse({ id, quantity: 50, food: { id: name, name, basis: "g", source: "label", sourceId: "printed-confirmed", per100: { kcal: 200, protein: 10, carbs: 20, fat: 5 } } });
 const first = item("11111111-1111-4111-8111-111111111111", "אורז"), second = item("22222222-2222-4222-8222-222222222222", "דג");
@@ -91,5 +91,24 @@ it("refuses repetition from stale or foreign rows and never overwrites an ID col
   await expect(saveRepeatedMeal({ ...row, owner_user_id: "other" }, data, id)).rejects.toThrow("session_mismatch");
   mock.state = { ...mock.state, data: { meals: [row, { ...row, id }] } };
   await expect(saveRepeatedMeal(row, data, id)).rejects.toThrow("version_conflict");
+  expect(mock.save).not.toHaveBeenCalled();
+});
+
+it("favorites a legacy meal without changing quantities, sources, photo or AI metadata", async () => {
+  await saveMealFavorite(row, true);
+  expect(mock.save).toHaveBeenCalledWith("meals", { ...row.data, favorite: true }, row);
+  expect(row.data.favorite).toBeUndefined();
+  expect(editedMealData({ ...row, data: { ...row.data, favorite: true } }, [first]).favorite).toBe(true);
+  expect(repeatedMealData({ ...row, data: { ...row.data, favorite: true } }, "2026-11-15").favorite).toBeUndefined();
+  expect(() => payloadSchemas.meals.parse({ ...row.data, favorite: "true" })).toThrow();
+});
+
+it("unfavorites without removing the diary entry and rejects stale favorite changes", async () => {
+  const favorite = { ...row, data: { ...row.data, favorite: true } };
+  mock.state = { ...mock.state, data: { meals: [favorite] } };
+  await saveMealFavorite(favorite, false);
+  expect(mock.save).toHaveBeenCalledWith("meals", { ...row.data, favorite: false }, favorite);
+  mock.save.mockClear();
+  await expect(saveMealFavorite({ ...favorite, version: 3 }, false)).rejects.toThrow("version_conflict");
   expect(mock.save).not.toHaveBeenCalled();
 });

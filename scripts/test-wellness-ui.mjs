@@ -668,6 +668,11 @@ try {
   assert.equal(manuallyEdited.data.items[2].quantity, 25);
   assert.equal(manuallyEdited.data.items[2].food.source, "openfoodfacts");
   assert.equal((await actions(photo)).filter((c) => ["nutrition", "correct_meal"].includes(c.action)).length, aiCallsBeforeManualEdits, "manual corrections do not use AI");
+  await photo.getByRole("button", { name: "Save to favorites", exact: true }).click();
+  await photo.getByText("Saved to favorites", { exact: true }).waitFor();
+  assert.deepEqual(await photo.evaluate(() => window.wellnessFixture.meals().at(-1).data.items), manuallyEdited.data.items, "header bookmark preserves corrected ingredients");
+  await photo.getByRole("button", { name: "Remove from favorites", exact: true }).click();
+  await photo.getByText("Removed from favorites", { exact: true }).waitFor();
   await photo.close();
   for (const scenario of ["photo-empty", "photo-retry", "save-retry"]) {
     const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -1036,6 +1041,32 @@ try {
   assert.equal(repeated.data.imagePath, null);
   assert.equal(repeated.data.aiEstimate, undefined);
   assert(!(await actions(foodBarcode)).some((c) => c.action === "nutrition" || c.action === "correct_meal"), "repeat meals do not call AI");
+  await foodBarcode.getByRole("button", { name: "Add meal", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: "Previous meal", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: "Favorites", exact: true }).click();
+  await foodBarcode.getByText("Bookmark a meal to find it here", { exact: true }).waitFor();
+  await foodBarcode.getByRole("button", { name: "Recent", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: "Save to favorites: Synthetic packaged food", exact: true }).first().click();
+  const favoriteRow = await foodBarcode.evaluate(() => structuredClone(window.wellnessFixture.meals().find((m) => m.data.favorite)));
+  assert.deepEqual(favoriteRow.data.items, originalRepeat.data.items.map((item, index) => ({ ...item, id: favoriteRow.data.items[index].id })), "bookmark preserves exact food amounts and values");
+  await foodBarcode.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: "Add meal", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: "Previous meal", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: "Favorites", exact: true }).click();
+  if (process.env.WELLNESS_SCREENSHOTS_DIR) await foodBarcode.screenshot({ path: join(process.env.WELLNESS_SCREENSHOTS_DIR, "favorite-meals.png") });
+  await foodBarcode.getByRole("button", { name: "Add again: Synthetic packaged food", exact: true }).click();
+  await foodBarcode.getByRole("heading", { name: "Previous meals", exact: true }).waitFor({ state: "hidden" });
+  const favoriteCopies = await foodBarcode.evaluate(() => structuredClone(window.wellnessFixture.meals()));
+  assert.equal(favoriteCopies.length, countBeforeRepeat + 2);
+  assert.equal(favoriteCopies.filter((m) => m.data.favorite).length, 1, "copies do not create extra favorites");
+  assert.deepEqual(favoriteCopies.find((m) => m.id === favoriteRow.id), favoriteRow, "favorite source is unchanged by reuse");
+  await foodBarcode.getByRole("button", { name: "Add meal", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: "Previous meal", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: "Favorites", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: "Remove from favorites: Synthetic packaged food", exact: true }).click();
+  await foodBarcode.getByText("Bookmark a meal to find it here", { exact: true }).waitFor();
+  assert.equal(await foodBarcode.evaluate(() => window.wellnessFixture.meals().length), favoriteCopies.length, "unfavorite never deletes diary history");
+  assert(!(await actions(foodBarcode)).some((c) => c.action === "nutrition" || c.action === "correct_meal"), "favorites work with AI disabled");
   await foodBarcode.close();
 
   console.log(

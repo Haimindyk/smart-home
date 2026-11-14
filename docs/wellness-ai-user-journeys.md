@@ -164,3 +164,15 @@ description. An unchanged empty result cannot be submitted again blindly. A
 successful recovery still adds the meal automatically exactly once. The normal
 photo path has no new confirmation step. Browser verification uses synthetic
 empty and connection-failure responses; it is not a live model accuracy result.
+
+### Favorite meals
+
+Bookmark a diary meal from its details header or Previous meals list. The Favorites
+tab reuses that exact owner-scoped meal with its corrected food snapshots, including
+mixed g/ml quantities, without AI. The new diary entry is separate and is not
+automatically bookmarked. Removing a bookmark keeps diary history; deleting the
+source entry removes its bookmark too, stated in the existing delete confirmation.
+Favorite state uses the existing meal JSON payload/offline queue and version guard,
+not a gram-only recipe conversion or local-only preference. Legacy rows without a
+flag remain valid. A read-only live validator query accepted legacy, favorite and
+unfavorite synthetic payloads; no production diary rows were changed by that check.
