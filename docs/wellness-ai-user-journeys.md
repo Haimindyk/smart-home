@@ -154,3 +154,13 @@ first viewport, updates the same meal, and does not open a raw-image tab; two
 food-search barcode path persists its chosen grams, unknown unit sizes cannot
 be added, and product logging works with AI disabled. This does not claim a live
 authenticated production-device or camera recognition accuracy benchmark.
+
+### Recovering an empty photo estimate
+
+An empty result keeps the captured photo on screen. The owner can supply a short
+description and analyze that same private upload again. The changed description
+starts a new analysis ID; a connection or save retry retains that ID and the
+description. An unchanged empty result cannot be submitted again blindly. A
+successful recovery still adds the meal automatically exactly once. The normal
+photo path has no new confirmation step. Browser verification uses synthetic
+empty and connection-failure responses; it is not a live model accuracy result.

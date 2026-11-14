@@ -704,7 +704,7 @@ try {
         .waitFor();
     if (scenario === "photo-empty") {
       await p
-        .getByText("No food identified. Try a clearer, closer photo.", {
+        .getByText("No food identified. Add a short description or choose another photo.", {
           exact: true,
         })
         .waitFor();
@@ -713,6 +713,24 @@ try {
         0,
         "no repeat quota spend on the same empty result",
       );
+      const withHint = p.getByRole("button", { name: "Analyze with description", exact: true });
+      assert(await withHint.isDisabled(), "empty clarification cannot repeat an unchanged empty analysis");
+      await p.getByLabel("What's in the photo?", { exact: true }).fill("טורטייה עם עוף וחסה");
+      if (process.env.WELLNESS_SCREENSHOTS_DIR) await p.screenshot({ path: join(process.env.WELLNESS_SCREENSHOTS_DIR, "photo-empty-hint.png") });
+      await p.evaluate(() => history.replaceState(null, "", "/?photo-empty=1&hint-retry=1"));
+      await withHint.click();
+      await p.getByRole("button", { name: "Retry", exact: true }).waitFor();
+      await p.getByRole("button", { name: "Retry", exact: true }).click();
+      await p.getByRole("dialog").waitFor({ state: "hidden" });
+      const hintRequests = (await actions(p)).filter((c) => c.action === "nutrition");
+      assert.equal(hintRequests.length, 3, "empty analysis, clarified analysis and its transport retry");
+      assert.notEqual(hintRequests[0].requestId, hintRequests[1].requestId, "changed description starts a fresh analysis");
+      assert.equal(hintRequests[1].requestId, hintRequests[2].requestId, "transport retry keeps the clarified analysis ID");
+      assert.equal(hintRequests[1].description, "טורטייה עם עוף וחסה");
+      assert.equal(hintRequests[2].description, hintRequests[1].description);
+      assert.equal(hintRequests[1].imagePath, hintRequests[0].imagePath, "clarification reuses the original private upload");
+      assert.equal((await actions(p)).filter((c) => c.action === "upload_photo").length, 1);
+      assert.equal((await actions(p)).filter((c) => c.table === "meals").length, 1, "clarified success saves one meal automatically");
     } else {
       await p.getByRole("button", { name: "Retry", exact: true }).click();
       await p.getByRole("dialog").waitFor({ state: "hidden" });

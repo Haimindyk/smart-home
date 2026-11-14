@@ -2,7 +2,7 @@
 import Image from "next/image";
 import { Check, LoaderCircle } from "lucide-react";
 import { mealTitle } from "@/lib/health/meal-presentation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useHealthStore } from "@/lib/health/store";
 import { uploadMealImage } from "@/lib/health/api";
@@ -10,6 +10,7 @@ import { estimateMeal } from "@/lib/health/wellness-api";
 import { useHealthText } from "@/lib/health/i18n";
 import { ErrorText } from "./shared";
 import { AiConsent, useWellnessAvailability } from "./ai-consent";
+import { Input } from "@/components/ui/input";
 export function MealCamera({
   date,
   onClose,
@@ -18,6 +19,7 @@ export function MealCamera({
   onClose: () => void;
 }) {
   const h = useHealthText(),
+    hintId = useId(),
     availability = useWellnessAvailability(),
     video = useRef<HTMLVideoElement>(null),
     gallery = useRef<HTMLInputElement>(null),
@@ -27,6 +29,7 @@ export function MealCamera({
   const attempt = useRef<{
     id: string;
     file: File;
+    description: string;
     path?: string;
     result?: Awaited<ReturnType<typeof estimateMeal>>;
   } | null>(null);
@@ -36,6 +39,8 @@ export function MealCamera({
     [noFood, setNoFood] = useState(false),
     [cameraReady, setCameraReady] = useState(false),
     [preview, setPreview] = useState<string | null>(null),
+    [hint, setHint] = useState(""),
+    [submittedHint, setSubmittedHint] = useState(""),
     [phase, setPhase] = useState<"upload" | "analysis" | "save">("upload");
   useEffect(
     () => () => {
@@ -78,14 +83,26 @@ export function MealCamera({
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, [preview]);
-  async function submit(file?: File) {
+  async function submit(file?: File, description?: string) {
     if (lock.current || finished.current || !availability.ready) return;
     if (file) {
-      attempt.current = { id: crypto.randomUUID(), file };
+      attempt.current = { id: crypto.randomUUID(), file, description: "" };
+      setHint("");
+      setSubmittedHint("");
       setPreview(URL.createObjectURL(file));
     }
     const job = attempt.current;
     if (!job) return;
+    if (description !== undefined) {
+      const next = description.trim();
+      if (!next || next === job.description || job.result?.items.length) return;
+      // A changed hint is a new analysis of the existing upload. Transport/save
+      // retries keep this ID so the server's cached result remains idempotent.
+      job.id = crypto.randomUUID();
+      job.description = next;
+      setSubmittedHint(next);
+      job.result = undefined;
+    }
     lock.current = true;
     setBusy(true);
     setError("");
@@ -93,6 +110,7 @@ export function MealCamera({
     const owner = useHealthStore.getState().owner;
     let stage = "upload";
     try {
+      if (!owner) throw Error("session_required");
       if (!job.path) {
         setPhase("upload");
         job.path = await uploadMealImage(job.file, owner!);
@@ -102,7 +120,7 @@ export function MealCamera({
       job.result ??= await estimateMeal({
         requestId: job.id,
         mode: "meal",
-        description: "",
+        description: job.description,
         imagePath: job.path,
         automatic: true,
       });
@@ -248,7 +266,7 @@ export function MealCamera({
           </DialogTitle>
         </header>
         <footer style={{ zIndex: 1 }}>
-          {noCamera && (
+          {noCamera && !preview && (
             <p>
               {h(
                 "המצלמה אינה זמינה. אפשר לבחור תמונה.",
@@ -318,7 +336,7 @@ export function MealCamera({
             </div>
           )}
 
-          {!busy && (
+          {!busy && !preview && (
             <p>
               {h(
                 "כל התמונה תנותח והארוחה תתווסף כהערכה.",
@@ -326,7 +344,7 @@ export function MealCamera({
               )}
             </p>
           )}
-          {!busy && (
+          {!busy && !preview && (
             <p>
               {h(
                 "התמונה תישמר ביומן האישי עם הארוחה.",
@@ -339,13 +357,18 @@ export function MealCamera({
               {noFood ? (
                 <p role="alert">
                   {h(
-                    "לא זוהה אוכל בתמונה. נסו צילום קרוב וברור יותר.",
-                    "No food identified. Try a clearer, closer photo.",
+                    "לא זוהה אוכל. אפשר להוסיף תיאור קצר או לבחור תמונה אחרת.",
+                    "No food identified. Add a short description or choose another photo.",
                   )}
                 </p>
               ) : (
                 <ErrorText error={error} />
               )}
+              {noFood && !busy && <div className="health-camera-hint">
+                <label htmlFor={hintId}>{h("מה יש בתמונה?", "What's in the photo?")}</label>
+                <Input id={hintId} value={hint} maxLength={1000} placeholder={h("למשל: טורטייה עם עוף וחסה", "For example: chicken and lettuce wrap")} onChange={(e) => setHint(e.target.value)} />
+                <button className="health-camera-hint-submit" disabled={!availability.ready || !hint.trim() || hint.trim() === submittedHint} onClick={() => void submit(undefined, hint)}>{h("ניתוח עם התיאור", "Analyze with description")}</button>
+              </div>}
               {!noFood && (
                 <button disabled={busy} onClick={() => void submit()}>
                   {h("ניסיון נוסף", "Retry")}
@@ -368,6 +391,8 @@ export function MealCamera({
                     setCameraReady(false);
                     setError("");
                     setNoFood(false);
+                    setHint("");
+                    setSubmittedHint("");
                     attempt.current = null;
                   }}
                 >
