@@ -23,6 +23,10 @@ handling are reused; there is no new table or deployment secret.
 
 ## Hosted-pipeline benchmark
 
+For a guarded inference runner and an initial live two-image diagnostic, see
+[meal-photo-model-comparison.md](meal-photo-model-comparison.md). The runner does
+not change production routing or replace the qualification checks below.
+
 The existing `wellness.evaluate` qualifies owned adapters and remains unchanged.
 The new `wellness.photo_benchmark` compares complete photo pipelines offline,
 including hosted models. It does not train, change runtime routing, call providers,
