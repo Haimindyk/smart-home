@@ -6,7 +6,7 @@ import {
   makeProgram,
   parsePreferences,
 } from "../../../supabase/functions/_shared/wellness-core";
-const calls: { action: string; table?: string; diary?: boolean }[] = [];
+const calls: { action: string; table?: string; diary?: boolean; requestId?: unknown; description?: unknown; imagePath?: unknown }[] = [];
 const profile = {
   id: crypto.randomUUID(),
   version: 1,
@@ -135,6 +135,7 @@ export const lookupFood = async (
     : { foods: [], needsLabel: true, name: "" };
 };
 export const uploadMealImage = async () => {
+  calls.push({ action: "upload_photo" });
   if (new URLSearchParams(location.search).has("photo-progress"))
     await new Promise((r) => setTimeout(r, 350));
   return `${useHealthStore.getState().owner}/test.jpg`;
@@ -174,6 +175,7 @@ export async function healthFunction(
 ) {
   calls.push({
     action: String(input.action),
+    ...(input.action === "nutrition" ? { requestId: input.requestId, description: input.description, imagePath: input.imagePath } : {}),
     ...(name === "wellness-chat"
       ? { diary: input.includeDiary as boolean }
       : {}),
@@ -318,13 +320,17 @@ export async function healthFunction(
   if (input.action === "nutrition") {
     if (new URLSearchParams(location.search).has("photo-progress"))
       await new Promise((r) => setTimeout(r, 1800));
-    if (new URLSearchParams(location.search).has("photo-empty"))
+    if (new URLSearchParams(location.search).has("photo-empty") && !String(input.description ?? "").trim())
       return {
         analysisId: input.requestId,
         items: [],
         needsClarification: false,
         question: "",
       };
+    if (
+      new URLSearchParams(location.search).has("hint-retry") &&
+      calls.filter((c) => c.action === "nutrition").length === 2
+    ) throw new Error("temporary_failure");
     if (
       new URLSearchParams(location.search).has("photo-retry") &&
       calls.filter((c) => c.action === "nutrition").length === 1
