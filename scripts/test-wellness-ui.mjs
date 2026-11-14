@@ -997,6 +997,27 @@ try {
   await foodBarcode.getByRole("button", { name: "Save to diary", exact: true }).click();
   assert.equal(await foodBarcode.evaluate(() => window.wellnessFixture.meals().at(-1).data.items[0].quantity), 25);
   assert(!(await actions(foodBarcode)).some((c) => c.action === "nutrition"), "food-search barcode quantity never calls AI");
+  const originalRepeat = await foodBarcode.evaluate(() => structuredClone(window.wellnessFixture.meals().at(-1)));
+  const countBeforeRepeat = await foodBarcode.evaluate(() => window.wellnessFixture.meals().length);
+  await foodBarcode.getByRole("button", { name: "Add meal", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: "Previous meal", exact: true }).click();
+  await foodBarcode.getByRole("heading", { name: "Previous meals", exact: true }).waitFor();
+  await foodBarcode.getByLabel("Search meals", { exact: true }).fill("missing meal");
+  await foodBarcode.getByText("No previous meals found", { exact: true }).waitFor();
+  await foodBarcode.getByLabel("Search meals", { exact: true }).fill("Synthetic packaged");
+  if (process.env.WELLNESS_SCREENSHOTS_DIR) await foodBarcode.screenshot({ path: join(process.env.WELLNESS_SCREENSHOTS_DIR, "previous-meals.png") });
+  await foodBarcode.getByRole("button", { name: "Add again: Synthetic packaged food", exact: true }).click();
+  await foodBarcode.getByRole("heading", { name: "Previous meals", exact: true }).waitFor({ state: "hidden" });
+  const afterRepeat = await foodBarcode.evaluate(() => structuredClone(window.wellnessFixture.meals()));
+  assert.equal(afterRepeat.length, countBeforeRepeat + 1, "one repeated meal is saved");
+  assert.deepEqual(afterRepeat.find((m) => m.id === originalRepeat.id), originalRepeat, "repetition leaves the original diary record unchanged");
+  const repeated = afterRepeat.at(-1);
+  assert.notEqual(repeated.id, originalRepeat.id);
+  assert.notEqual(repeated.data.items[0].id, originalRepeat.data.items[0].id);
+  assert.deepEqual({ ...repeated.data.items[0], id: originalRepeat.data.items[0].id }, originalRepeat.data.items[0]);
+  assert.equal(repeated.data.imagePath, null);
+  assert.equal(repeated.data.aiEstimate, undefined);
+  assert(!(await actions(foodBarcode)).some((c) => c.action === "nutrition" || c.action === "correct_meal"), "repeat meals do not call AI");
   await foodBarcode.close();
 
   console.log(
