@@ -1,6 +1,7 @@
 import { body, cors, failure, json, requireUser } from "./health-http.ts";
 import { adult, parsePreferences, text } from "./wellness-core.ts";
 import { resolveCatalogExercise } from "./exercise-catalog.ts";
+import { nutritionTrainingItems } from "./training-measurements.ts";
 const uuid = (v: unknown) => {
   if (typeof v !== "string" || !/^[-a-f0-9]{36}$/i.test(v))
     throw new Error("invalid_input");
@@ -27,6 +28,7 @@ export async function handleTraining(req: Request) {
       return json({
         enabled: consent?.enabled === true,
         policy: "wellness-training-v1",
+        measurementVersion: 1,
         count:
           checked(
             await admin
@@ -163,16 +165,20 @@ export async function handleTraining(req: Request) {
     let example: Record<string, unknown>,
       image: string | null = null;
     if (input.task.startsWith("nutrition_")) {
-      const meal = checked(
+      const sourceMeal = checked(
         await admin
           .from("meals")
-          .select("data")
+          .select("data,version")
           .eq("id", source)
           .eq("owner_user_id", user.id)
           .is("deleted_at", null)
           .maybeSingle(),
-      )?.data;
+      );
+      const meal = sourceMeal?.data;
       if (!meal) throw new Error("not_found");
+      if (input.weighed === true && (input.measurementVersion !== 1 || input.sourceVersion !== sourceMeal.version))
+        throw new Error("training_source_changed");
+      const items = nutritionTrainingItems(meal.items, input.weighed === true, input.measurements);
       if (input.task === "nutrition_text" && !description)
         throw new Error("invalid_input");
       if (input.task === "nutrition_photo") {
@@ -192,23 +198,7 @@ export async function handleTraining(req: Request) {
           mode: input.task === "nutrition_text" ? "text" : "meal",
         },
         target: {
-          items: meal.items.map(
-            (i: {
-              food: {
-                name: string;
-                basis: string;
-                per100: unknown;
-                source: string;
-              };
-              quantity: number;
-            }) => ({
-              name: i.food.name,
-              basis: i.food.basis,
-              per100: i.food.per100,
-              quantity: i.quantity,
-              source: i.food.source,
-            }),
-          ),
+          items,
         },
       };
     } else {
@@ -287,6 +277,8 @@ export async function handleTraining(req: Request) {
         "training_limit",
         "exercise_clarification_required",
         "adult_profile_required",
+        "training_weights_required",
+        "training_source_changed",
       ].includes(code)
     )
       return json({ error: code }, 400);

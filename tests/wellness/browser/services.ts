@@ -1,5 +1,6 @@
 import { prepareImage } from "../../../src/lib/health/api";
 import { applyFoodCorrection } from "../../../supabase/functions/_shared/wellness-food-correction";
+import { nutritionTrainingItems } from "../../../supabase/functions/_shared/training-measurements";
 import { create } from "zustand";
 import { profileSchema, payloadSchemas } from "../../../src/lib/health/model";
 import {
@@ -7,6 +8,7 @@ import {
   parsePreferences,
 } from "../../../supabase/functions/_shared/wellness-core";
 const calls: { action: string; table?: string; diary?: boolean; requestId?: unknown; description?: unknown; imagePath?: unknown }[] = [];
+const trainingExamples: unknown[] = [];
 const profile = {
   id: crypto.randomUUID(),
   version: 1,
@@ -228,15 +230,20 @@ export async function healthFunction(
   }
   if (name === "wellness-training") {
     if (input.action === "status")
-      return { enabled: consent, count: contributions };
+      return { enabled: consent, count: contributions, measurementVersion: 1 };
     if (input.action === "consent") {
       consent = Boolean(input.enabled);
-      if (!consent) contributions = 0;
+      if (!consent) { contributions = 0; trainingExamples.length = 0; }
       return { ok: true };
     }
     if (input.action === "submit") {
       if (!consent || input.confirmShare !== true)
         throw new Error("training_consent_required");
+      if (String(input.task).startsWith("nutrition_")) {
+        const row = useHealthStore.getState().data.meals.find((m) => (m as {id:string}).id === input.sourceId) as {version:number;data:{items:Parameters<typeof nutritionTrainingItems>[0]}};
+        if (input.weighed === true && (input.measurementVersion !== 1 || row.version !== input.sourceVersion)) throw new Error("training_source_changed");
+        trainingExamples.push({ label_quality: input.weighed === true ? "weighed" : "user_corrected", items: nutritionTrainingItems(row.data.items, input.weighed === true, input.measurements) });
+      }
       contributions++;
       return { id: "fixture", reviewed: false };
     }
@@ -366,6 +373,7 @@ Object.assign(window, {
     calls,
     prepareImage,
     meals: () => useHealthStore.getState().data.meals,
+    trainingExamples: () => trainingExamples,
     advanceMealVersion: (id: string) => useHealthStore.setState((s) => ({ data: { ...s.data, meals: s.data.meals.map((m) => {
       const row = m as { id: string; version: number };
       return row.id === id ? { ...row, version: row.version + 1 } : row;
