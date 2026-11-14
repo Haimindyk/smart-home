@@ -97,6 +97,10 @@ export const useHealthStore = create(() => ({
         ],
       },
     }));
+    if (table === "meals" && new URLSearchParams(location.search).has("portion-cache-failure")) {
+      await new Promise((r) => setTimeout(r, 400));
+      throw new Error("cache_failed_after_queue");
+    }
     return row;
   },
   remove: async () => {},
@@ -362,6 +366,10 @@ Object.assign(window, {
     calls,
     prepareImage,
     meals: () => useHealthStore.getState().data.meals,
+    advanceMealVersion: (id: string) => useHealthStore.setState((s) => ({ data: { ...s.data, meals: s.data.meals.map((m) => {
+      const row = m as { id: string; version: number };
+      return row.id === id ? { ...row, version: row.version + 1 } : row;
+    }) } })),
     foods: () => useHealthStore.getState().data.personal_foods,
     clear: () => {
       calls.length = 0;

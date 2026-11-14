@@ -5,8 +5,10 @@ import { useHealthStore } from "@/lib/health/store";
 import { useHealthText } from "@/lib/health/i18n";
 import { productPortion } from "@/lib/health/food-portions";
 import { foodSchema, mealItemSchema, unitWeightSchema, type HealthRow, type MealItem } from "@/lib/health/model";
-import { isAutomaticMealTitle, mealTitle } from "@/lib/health/meal-presentation";
-import { Field, SelectField } from "./shared";
+import { saveMealItems } from "@/lib/health/meal-editing";
+import { ErrorText, Field, SelectField, round } from "./shared";
+import { HealthSheet } from "./health-sheet";
+import { scaleNutrients } from "@/lib/health/calculations";
 
 // The user selects the exact product AND unit count. A visual category match
 // alone cannot establish a brand, portion count or package weight.
@@ -28,7 +30,8 @@ export function MealPortion({ meal, item, onDone }: { meal: HealthRow<"meals">; 
     try {
       const state = useHealthStore.getState();
       const latest = state.data.meals.find((m) => m.id === meal.id);
-      if (state.owner !== meal.owner_user_id || !latest || latest.version !== meal.version)
+      if (state.owner !== meal.owner_user_id) throw new Error("session_mismatch");
+      if (!latest || latest.version !== meal.version)
         throw new Error("version_conflict");
       let product = state.data.personal_foods.find((f) => f.id === productId)?.data;
       if (productId && (!product?.unitWeight || product.basis !== item.food.basis))
@@ -39,7 +42,8 @@ export function MealPortion({ meal, item, onDone }: { meal: HealthRow<"meals">; 
         const existing = state.data.personal_foods.find((f) => f.data.id === product!.id);
         await state.save("personal_foods", product, existing, savedProductId.current);
         const current = useHealthStore.getState();
-        if (current.owner !== meal.owner_user_id || current.data.meals.find((m) => m.id === meal.id)?.version !== meal.version)
+        if (current.owner !== meal.owner_user_id) throw new Error("session_mismatch");
+        if (current.data.meals.find((m) => m.id === meal.id)?.version !== meal.version)
           throw new Error("version_conflict");
       }
       const replacement = mealItemSchema.parse({
@@ -51,20 +55,25 @@ export function MealPortion({ meal, item, onDone }: { meal: HealthRow<"meals">; 
         }),
       });
       const items = latest.data.items.map((i) => i.id === item.id ? replacement : i);
-      await state.save("meals", { ...latest.data, items, name: isAutomaticMealTitle(latest.data) ? mealTitle(items) : latest.data.name }, latest);
+      await saveMealItems(latest, items);
       onDone();
-    } catch {
-      setError(h("לא נשמר. בדקו את הכמות ופתחו את הארוחה מחדש אם עודכנה.", "Not saved. Check the amount; reopen the meal if it changed."));
+    } catch (e) {
+      const code = e instanceof Error ? e.message : "failed";
+      setError(code === "version_conflict" ? "meal_changed" : code === "product_unavailable" ? "invalid_input" : code);
     } finally { lock.current = false; setBusy(false); }
   }
-  return <div className="grid gap-3 rounded-2xl border p-4">
+  const selected = candidates.find((f) => f.id === productId)?.data;
+  let preview: { quantity: number; kcal: number } | null = null;
+  try {
+    if (productId && !selected) throw new Error("product_unavailable");
+    const range = selected?.unitWeight ?? unitWeightSchema.parse({ low: Number(amount), high: Number(upper || amount) });
+    const portion = selected ? productPortion(selected, Number(units)) : { quantity: (range.low + range.high) / 2, food: item.food };
+    preview = { quantity: portion.quantity, kcal: scaleNutrients(portion.food.per100, portion.quantity).kcal };
+  } catch { /* Invalid drafts stay editable without displaying invented totals. */ }
+  return <HealthSheet title={h("עדכון כמות", "Update amount")} onClose={() => { if (!busy) onDone(); }}><div className="grid gap-4">
     <strong>{item.food.name}</strong>
-    {candidates.length > 0 && <SelectField label={h("מוצר שמור", "Saved product")} value={productId} disabled={busy} onChange={(e) => setProductId(e.target.value)}>
-      <option value="">{h("הזנת כמות", "Enter amount")}</option>
-      {candidates.map((f) => <option key={f.id} value={f.id}>{f.data.name} · {f.data.unitWeight!.low}–{f.data.unitWeight!.high} {f.data.basis}</option>)}
-    </SelectField>}
     {productId ? <Field label={h("מספר יחידות", "Number of units")} type="number" min="0.1" step="0.1" disabled={busy} value={units} onChange={(e) => setUnits(e.target.value)} /> : <>
-      <Field label={`${h("כמות", "Amount")} (${item.food.basis})`} type="number" min="0.1" max="10000" step="0.1" disabled={busy} value={amount} onChange={(e) => setAmount(e.target.value)} />
+      <Field autoFocus label={`${h("כמות", "Amount")} (${item.food.basis})`} type="number" min="0.1" max="10000" step="0.1" disabled={busy} value={amount} onChange={(e) => setAmount(e.target.value)} />
       <details><summary className="text-sm">{h("טווח משקל או שמירת מוצר", "Weight range or save product")}</summary>
         <div className="mt-3 grid gap-3">
           <Field label={`${h("עד", "Up to")} (${item.food.basis})`} type="number" min="0.1" max="10000" step="0.1" disabled={busy} value={upper} placeholder={amount} onChange={(e) => setUpper(e.target.value)} />
@@ -73,10 +82,15 @@ export function MealPortion({ meal, item, onDone }: { meal: HealthRow<"meals">; 
         </div>
       </details>
     </>}
-    <div className="flex gap-2">
-      <Button disabled={busy} onClick={() => void save()}>{h("עדכון", "Update")}</Button>
+    {candidates.length > 0 && <details><summary className="text-sm">{h("בחירה ממוצר שמור", "Choose a saved product")}</summary><div className="mt-3"><SelectField label={h("מוצר שמור", "Saved product")} value={productId} disabled={busy} onChange={(e) => setProductId(e.target.value)}>
+      <option value="">{h("הזנת כמות", "Enter amount")}</option>
+      {candidates.map((f) => <option key={f.id} value={f.id}>{f.data.name} · {f.data.unitWeight!.low}–{f.data.unitWeight!.high} {f.data.basis}</option>)}
+    </SelectField></div></details>}
+    {preview && <p className="rounded-2xl bg-muted p-4 text-center" aria-live="polite"><strong>{round(preview.kcal)} {h("קל׳", "kcal")}</strong><span className="ms-2 text-sm text-muted-foreground">· {round(preview.quantity)} {item.food.basis === "ml" ? h("מ״ל", "ml") : h("גרם", "g")}</span></p>}
+    <div className="flex items-center gap-2">
+      <Button className="health-primary-action flex-1" disabled={busy || !preview} onClick={() => void save()}>{busy ? h("שומר…", "Saving…") : h("עדכון", "Update")}</Button>
       <Button disabled={busy} variant="ghost" onClick={onDone}>{h("ביטול", "Cancel")}</Button>
     </div>
-    {error && <p role="alert" className="text-sm">{error}</p>}
-  </div>;
+    <ErrorText error={error || null}/>
+  </div></HealthSheet>;
 }
