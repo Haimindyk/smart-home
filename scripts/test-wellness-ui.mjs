@@ -28,7 +28,7 @@ try {
             (args) => {
               if (
                 args.path.startsWith(".") &&
-                !args.importer.endsWith("/wellness-api.ts")
+                !/\/(?:wellness-api|meal-editing)\.ts$/.test(args.importer)
               )
                 return;
               return {
@@ -642,6 +642,32 @@ try {
   await photo.getByRole("button", { name: "Save", exact: true }).click();
   await photo.getByRole("button", { name: "55–65 g · per unit", exact: true }).waitFor();
   assert.equal(await photo.evaluate(() => window.wellnessFixture.meals().at(-1).data.items[0].quantity), 110, "editing a product never rewrites logged meals");
+  await photo.getByRole("button", { name: "Correct recognition", exact: true }).click();
+  const beforeManualEdits = await photo.evaluate(() => structuredClone(window.wellnessFixture.meals().at(-1)));
+  const aiCallsBeforeManualEdits = (await actions(photo)).filter((c) => ["nutrition", "correct_meal"].includes(c.action)).length;
+  await photo.getByRole("button", { name: "Remove ingredient: מיונז", exact: true }).click();
+  await photo.getByText("Ingredient removed", { exact: true }).waitFor();
+  assert.equal(await photo.evaluate(() => window.wellnessFixture.meals().at(-1).data.items.length), 1);
+  assert.equal(await photo.getByRole("button", { name: /^Remove ingredient:/ }).count(), 0, "last ingredient cannot leave an invalid empty meal");
+  await photo.getByRole("button", { name: "Undo removal", exact: true }).click();
+  await photo.getByText("Ingredient restored", { exact: true }).waitFor();
+  assert.deepEqual(await photo.evaluate(() => window.wellnessFixture.meals().at(-1).data.items), beforeManualEdits.data.items, "undo restores exact ingredient snapshots and amounts");
+  await photo.getByRole("button", { name: "Add ingredient", exact: true }).click();
+  await photo.getByRole("heading", { name: "Add an ingredient to this meal", exact: true }).waitFor();
+  await photo.getByRole("button", { name: "Barcode", exact: true }).click();
+  await photo.getByLabel("Barcode", { exact: true }).fill("12345678");
+  await photo.getByRole("button", { name: "Look up", exact: true }).click();
+  await photo.getByRole("button", { name: /Synthetic packaged food/ }).click();
+  await photo.getByLabel("Amount eaten (g)", { exact: true }).fill("25");
+  await photo.getByRole("button", { name: "Add food", exact: true }).click();
+  await photo.getByText("Ingredient added", { exact: true }).waitFor();
+  const manuallyEdited = await photo.evaluate(() => window.wellnessFixture.meals().at(-1));
+  assert.equal(manuallyEdited.id, savedMealId, "manual ingredient edits update the same diary meal");
+  assert.equal(manuallyEdited.data.items.length, 3);
+  assert.deepEqual(manuallyEdited.data.items.slice(0, 2), beforeManualEdits.data.items, "adding a food leaves the existing nutrients, units and portions intact");
+  assert.equal(manuallyEdited.data.items[2].quantity, 25);
+  assert.equal(manuallyEdited.data.items[2].food.source, "openfoodfacts");
+  assert.equal((await actions(photo)).filter((c) => ["nutrition", "correct_meal"].includes(c.action)).length, aiCallsBeforeManualEdits, "manual corrections do not use AI");
   await photo.close();
   for (const scenario of ["photo-empty", "photo-retry", "save-retry"]) {
     const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
