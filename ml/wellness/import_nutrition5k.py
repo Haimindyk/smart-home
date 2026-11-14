@@ -4,22 +4,39 @@ import argparse
 import csv
 import hashlib
 import json
+import math
+import re
 from pathlib import Path
 
 
 def records(metadata, image_root):
-    for values in csv.reader(Path(metadata).open()):
+    with Path(metadata).open(newline="") as source:
+        yield from _records(csv.reader(source), image_root)
+
+
+def _records(reader, image_root):
+    for values in reader:
         if not values or values[0] == "dish_id":
             continue
         dish = values[0]
-        count = int(values[6])
-        ingredients = []
-        if len(values) < 7 + count * 7:
+        if not re.fullmatch(r"dish_[0-9]+", dish):
             raise ValueError("invalid_nutrition5k_row")
+        relative = f"{dish}/rgb.png"
+        path = Path(image_root) / relative
+        if not path.is_file():
+            continue
+        # Original Nutrition5k has six dish totals, then repeated seven-field
+        # ingredient groups. There is no ingredient-count column.
+        if len(values) < 13 or (len(values) - 6) % 7:
+            raise ValueError("invalid_nutrition5k_row")
+        count = (len(values) - 6) // 7
+        ingredients = []
         for i in range(count):
-            _, name, mass, kcal, fat, carbs, protein = values[7 + i * 7 : 14 + i * 7]
-            mass = float(mass)
-            if mass <= 0:
+            _, name, mass, kcal, fat, carbs, protein = values[6 + i * 7 : 13 + i * 7]
+            mass, kcal, fat, carbs, protein = map(float, (mass, kcal, fat, carbs, protein))
+            if not name.strip() or any(not math.isfinite(v) or v < 0 for v in (mass, kcal, fat, carbs, protein)):
+                raise ValueError("invalid_nutrition5k_row")
+            if mass == 0:
                 continue
             ingredients.append(
                 {
@@ -28,18 +45,14 @@ def records(metadata, image_root):
                     "basis": "g",
                     "source": "manual",
                     "per100": {
-                        "kcal": float(kcal) * 100 / mass,
-                        "fat": float(fat) * 100 / mass,
-                        "carbs": float(carbs) * 100 / mass,
-                        "protein": float(protein) * 100 / mass,
+                        "kcal": kcal * 100 / mass,
+                        "fat": fat * 100 / mass,
+                        "carbs": carbs * 100 / mass,
+                        "protein": protein * 100 / mass,
                     },
                 }
             )
         if not ingredients:
-            continue
-        relative = f"{dish}/rgb.png"
-        path = Path(image_root) / relative
-        if not path.is_file():
             continue
         yield {
             "id": "nutrition5k:" + dish,
