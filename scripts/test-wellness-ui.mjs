@@ -239,6 +239,11 @@ try {
     await labelSection
       .getByText("Synthetic packaged food", { exact: true })
       .waitFor();
+    const productAmount = labelSection.getByRole("region", { name: he ? "כמות המוצר" : "Product amount", exact: true });
+    await productAmount.getByLabel(he ? "כמות שאכלת (g)" : "Amount eaten (g)", { exact: true }).fill("65");
+    assert(await productAmount.isVisible(), "gram selection is directly visible after barcode lookup");
+    await productAmount.getByRole("button", { name: he ? "יחידות" : "Units", exact: true }).click();
+    await productAmount.getByLabel(he ? "מספר יחידות" : "Number of units", { exact: true }).fill("2");
     const addProduct = labelSection.getByRole("button", {
       name: he ? "הוספה לארוחה" : "Add to meal",
     });
@@ -252,6 +257,10 @@ try {
         : "I checked that the product, unit and values match the package",
     );
     await labelConfirm.check();
+    assert(await addProduct.isDisabled(), "unknown unit size cannot silently become 100 g");
+    await productAmount.getByLabel(he ? "גרם ליחידה" : "g per unit", { exact: true }).fill("30");
+    assert(await addProduct.isEnabled(), "explicit 30 g units allow adding the product");
+    if (process.env.WELLNESS_SCREENSHOTS_DIR) await page.screenshot({ path: join(process.env.WELLNESS_SCREENSHOTS_DIR, language + "-product-units.png"), animations: "disabled" });
     await addProduct.click();
     await labelSection
       .getByLabel(he ? "ברקוד המוצר" : "Product barcode", { exact: true })
@@ -290,6 +299,7 @@ try {
     await labelSection
       .getByLabel(he ? "שומן (גרם)" : "Fat (g)", { exact: true })
       .fill("4");
+    await labelSection.getByLabel(he ? "כמות שאכלת (g)" : "Amount eaten (g)", { exact: true }).fill("40");
     await labelConfirm.check();
     await addProduct.click();
     assert.equal(
@@ -316,6 +326,10 @@ try {
       (await actions(page)).filter((c) => c.table === "meals").length,
       1,
     );
+    const productMeal = await page.evaluate(() => window.wellnessFixture.meals().at(-1).data);
+    assert.equal(productMeal.items[0].quantity, 60, "two scanned 30 g units persist as 60 g");
+    assert.equal(productMeal.items[1].quantity, 40, "printed-label grams persist exactly");
+    assert.equal(productMeal.items[0].food.per100.kcal, 250, "quantity edits do not rewrite source per100");
     const optin = page.getByRole("button", {
       name: he
         ? "מאשר/ת השתתפות באימון המודלים שלנו"
@@ -538,10 +552,20 @@ try {
   const savedMealId = await photo.evaluate(
     () => window.wellnessFixture.meals().at(-1).id,
   );
-  await photo
-    .getByRole("button", { name: "אורז לבן מבושל", exact: true })
-    .click();
+  const tabsBeforePhotoOpen = photo.context().pages().length;
+  await photo.getByRole("button", { name: "Open meal and correct recognition", exact: true }).click();
+  assert.equal(photo.context().pages().length, tabsBeforePhotoOpen, "thumbnail opens meal corrections, not a raw image tab");
+  await photo.getByRole("region", { name: "Correct recognition with text", exact: true }).waitFor();
+  const correctionBounds = await photo.getByLabel("What should change?", { exact: true }).boundingBox();
+  assert(correctionBounds && correctionBounds.y >= 0 && correctionBounds.y + correctionBounds.height < 844, "free-text correction appears in the first mobile viewport");
+  if (process.env.WELLNESS_SCREENSHOTS_DIR) await photo.screenshot({ path: join(process.env.WELLNESS_SCREENSHOTS_DIR, "photo-correction-visible.png"), animations: "disabled" });
   await photo.getByLabel("What should change?").fill("זה דג ולא חזה עוף");
+  await photo.evaluate(() => history.replaceState(null, "", "/?photo-test=1&correction-error=1"));
+  await photo.getByRole("button", { name: "Update meal", exact: true }).click();
+  await photo.getByRole("alert").waitFor();
+  assert.equal(await photo.getByLabel("What should change?").inputValue(), "זה דג ולא חזה עוף", "a failed correction retains the personal text");
+  assert.equal((await actions(photo)).filter((c) => c.table === "meals").length, 1, "a failed correction does not alter the diary");
+  await photo.evaluate(() => history.replaceState(null, "", "/?photo-test=1"));
   await photo.getByRole("button", { name: "Update meal", exact: true }).click();
   await photo.getByText("Meal updated", { exact: true }).waitFor();
   await photo
@@ -921,11 +945,33 @@ try {
   assert(await lookup.isEnabled(), "barcode lookup works with AI disabled");
   await lookup.click();
   await noAI.getByText("Synthetic packaged food", { exact: true }).waitFor();
+  await noAI.getByLabel("Amount eaten (g)", { exact: true }).fill("75");
+  await noAI.getByLabel("I checked that the product, unit and values match the package", { exact: true }).check();
+  await noAI.getByRole("button", { name: "Add to meal", exact: true }).click();
+  await noAI.getByRole("button", { name: "Save to diary", exact: true }).click();
+  assert.equal(await noAI.evaluate(() => window.wellnessFixture.meals().at(-1).data.items[0].quantity), 75);
   assert(
     !(await actions(noAI)).some((c) => c.action === "nutrition"),
     "disabled AI is never used for labels",
   );
   await noAI.close();
+
+  // The barcode route inside food search must also ask for quantity before adding.
+  const foodBarcode = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await foodBarcode.goto(base + "/?ai-disabled=1");
+  await foodBarcode.getByRole("button", { name: "Add meal", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: "Food database", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: "Barcode", exact: true }).click();
+  await foodBarcode.getByLabel("Barcode", { exact: true }).fill("12345678");
+  await foodBarcode.getByRole("button", { name: "Look up", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: /Synthetic packaged food/ }).click();
+  const searchedAmount = foodBarcode.getByRole("region", { name: "Product amount", exact: true });
+  await searchedAmount.getByLabel("Amount eaten (g)", { exact: true }).fill("25");
+  await foodBarcode.getByRole("button", { name: "Add food", exact: true }).click();
+  await foodBarcode.getByRole("button", { name: "Save to diary", exact: true }).click();
+  assert.equal(await foodBarcode.evaluate(() => window.wellnessFixture.meals().at(-1).data.items[0].quantity), 25);
+  assert(!(await actions(foodBarcode)).some((c) => c.action === "nutrition"), "food-search barcode quantity never calls AI");
+  await foodBarcode.close();
 
   console.log(
     "PASS: Hebrew/English mobile proposal approval, food estimate confirmation, non-AI barcode/printed-label flow with AI disabled, separate training consent, per-example approval/revocation, automatic photo save and saved-meal correction, adult gate, chat follow-ups/history/deletion, opt-in context and escaped model text. Synthetic services; live model not tested.",

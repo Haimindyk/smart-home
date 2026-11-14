@@ -13,7 +13,8 @@ import { mealNutrients, scaleNutrients } from "@/lib/health/calculations";
 import { lookupFood } from "@/lib/health/api";
 import { useHealthText } from "@/lib/health/i18n";
 import { BarcodeCamera } from "./barcode-camera";
-import { foodPickerItem } from "@/lib/health/food-portions";
+import { defaultProductAmount, productAmount, productAmountItem } from "@/lib/health/product-amount";
+import { ProductAmountInput } from "./product-amount";
 import { Field, ErrorText, SelectField } from "./shared";
 const roundValue = (v: number) => Math.round(v * 10) / 10;
 export function FoodPicker({ onAdd, initialMode }: { onAdd: (item: MealItem) => void; initialMode?: "search"|"saved"|"manual" }) {
@@ -24,6 +25,8 @@ export function FoodPicker({ onAdd, initialMode }: { onAdd: (item: MealItem) => 
     [barcode, setBarcode] = useState(""),
     [camera, setCamera] = useState(false);
   const [results, setResults] = useState<Food[]>([]),
+    [selected, setSelected] = useState<Food | null>(null),
+    [selection, setSelection] = useState(defaultProductAmount),
     [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
     [missing, setMissing] = useState("");
@@ -38,6 +41,7 @@ export function FoodPicker({ onAdd, initialMode }: { onAdd: (item: MealItem) => 
   const [quantity, setQuantity] = useState(100),
     [favorite, setFavorite] = useState(true);
   async function search(code?: string) {
+    setSelected(null);
     setSavedOnly(false);
     setBusy(true);
     setError(null);
@@ -96,6 +100,8 @@ export function FoodPicker({ onAdd, initialMode }: { onAdd: (item: MealItem) => 
       f.name.toLowerCase().includes(query.toLowerCase()) ||
       f.nameEn?.toLowerCase().includes(query.toLowerCase()),
   );
+  let validSelection = false;
+  try { if (selected) { productAmount(selected, selection); validSelection = true; } } catch { /* Incomplete unit size. */ }
   return (
     <div className="food-picker grid gap-4">
       <h3 className="font-medium">{h("הוספת מזון", "Add food")}</h3>
@@ -177,14 +183,27 @@ export function FoodPicker({ onAdd, initialMode }: { onAdd: (item: MealItem) => 
           )}
         </p>
       )}
-      <div className={`max-h-56 overflow-y-auto ${manual ? "hidden" : ""}`}>
+      {selected && !manual && <div className="product-result grid gap-3">
+        <strong>{selected.name}</strong>
+        <ProductAmountInput food={selected} basis={selected.basis} value={selection} onChange={setSelection} />
+        <div className="flex gap-2">
+          <Button disabled={!validSelection} onClick={() => {
+            if (!selected || !validSelection) return;
+            onAdd(productAmountItem(selected, selection));
+            setSelected(null);
+          }}>{h("הוספת מזון", "Add food")}</Button>
+          <Button variant="ghost" onClick={() => setSelected(null)}>{h("ביטול", "Cancel")}</Button>
+        </div>
+      </div>}
+      <div className={`max-h-56 overflow-y-auto ${manual || selected ? "hidden" : ""}`}>
         {unique.map((f) => (
           <button
             type="button"
             key={f.id}
-            onClick={() =>
-              onAdd(foodPickerItem(f))
-            }
+            onClick={() => {
+              setSelected(f);
+              setSelection(f.unitWeight ? { mode: "units", quantity: "1", unitAmount: "" } : { mode: "amount", quantity: String(f.servingSize ?? 100), unitAmount: "" });
+            }}
             className="food-result flex w-full items-center justify-between gap-3 text-start text-sm hover:bg-accent"
           >
             <span>
