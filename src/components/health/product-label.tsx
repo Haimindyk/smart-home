@@ -8,6 +8,8 @@ import { useHealthStore } from "@/lib/health/store";
 import { useHealthText } from "@/lib/health/i18n";
 import { BarcodeCamera } from "./barcode-camera";
 import { ErrorText, Field, SelectField, Disclosure } from "./shared";
+import { ProductAmountInput } from "./product-amount";
+import { defaultProductAmount, productAmount, productAmountItem } from "@/lib/health/product-amount";
 
 export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem) => void; autoScan?: boolean }) {
   const h = useHealthText(),
@@ -24,7 +26,7 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
     [printedAmount, setPrintedAmount] = useState("100");
   const [values, setValues] = useState<Record<string, string>>({}),
     [confirmed, setConfirmed] = useState(false),
-    [quantity, setQuantity] = useState("100");
+    [amount, setAmount] = useState(defaultProductAmount);
   const [energyUnit, setEnergyUnit] = useState<"kcal" | "kJ">("kcal"),
     [sodiumUnit, setSodiumUnit] = useState<"mg" | "g" | "salt_g">("mg");
   const request = useRef(0);
@@ -37,6 +39,7 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
     setMessage("");
     setConfirmed(false);
     setManual(false);
+    setAmount(defaultProductAmount());
     try {
       const response = await lookupFood("", code, true, owner ?? undefined);
       if (
@@ -49,7 +52,12 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
           f.source === "openfoodfacts" ||
           (f.source === "label" && f.sourceId?.startsWith("label:printed-confirmed:v1:")),
       );
-      if (found) setFood(found);
+      if (found) {
+        const stored = useHealthStore.getState().data.personal_foods.map((f) => f.data)
+          .concat(useHealthStore.getState().data.meals.flatMap((m) => m.data.items.map((i) => i.food)))
+          .find((f) => f.barcode === code && f.basis === found.basis && f.unitWeight);
+        setFood(stored ? { ...found, unitWeight: stored.unitWeight } : found);
+      }
       else {
         setName(response.name ?? "");
         setManual(true);
@@ -80,9 +88,6 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
       if (useHealthStore.getState().owner !== owner)
         throw new Error("session_mismatch");
       if (!confirmed) throw new Error("label_confirmation_required");
-      const amount = Number(quantity);
-      if (!Number.isFinite(amount) || amount <= 0 || amount > 10000)
-        throw new Error("invalid_input");
       const selected = manual
         ? foodFromPrintedLabel({
             name,
@@ -97,9 +102,9 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
         : food;
       if (!selected || !["openfoodfacts", "label"].includes(selected.source))
         throw new Error("label_values_required");
-      onAdd({ id: crypto.randomUUID(), food: selected, quantity: amount });
+      onAdd(productAmountItem(selected, amount));
       setFood(null);
-      setManual(false); setEnergyUnit("kcal"); setSodiumUnit("mg"); setPrintedAmount("100"); setBasis("g"); setQuantity("100");
+      setManual(false); setEnergyUnit("kcal"); setSodiumUnit("mg"); setPrintedAmount("100"); setBasis("g"); setAmount(defaultProductAmount());
       setConfirmed(false);
       setValues({});
       setName("");
@@ -113,6 +118,13 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
       setError(e instanceof Error ? e.message : "failed");
     }
   }
+  let preview = food;
+  if (manual) {
+    try { preview = foodFromPrintedLabel({ name, basis, printedAmount, values, confirmed: true, energyUnit, sodiumUnit }); }
+    catch { preview = null; }
+  }
+  let validAmount = false;
+  try { if (preview) { productAmount(preview, amount); validAmount = true; } } catch { /* Input is incomplete. */ }
   const valueField = (key:string,label:string) => <Field key={key} label={label} type="number" min="0" step="any" value={values[key]??""} onChange={e=>{setValues(v=>({...v,[key]:e.target.value}));setConfirmed(false)}}/>;
   return <section className="product-entry grid gap-4" aria-label={h("ערכי מוצר מהאריזה", "Product label values")}>
     <ErrorText error={error}/>
@@ -125,13 +137,13 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
     {food&&!manual&&<div className="product-result"><strong>{food.name}</strong><p>{h("לכל 100", "Per 100")} {food.basis}: {food.per100.kcal} kcal · P {food.per100.protein} / C {food.per100.carbs} / F {food.per100.fat}</p><small>{food.source==="openfoodfacts"?"Open Food Facts":h("תווית שאושרה", "Confirmed label")}</small></div>}
     {manual&&<div className="grid gap-4"><button type="button" className="justify-self-start text-sm underline" onClick={()=>{setManual(false);setCamera(true);setError(null);setMessage("")}}>{h("חזרה לסריקת ברקוד", "Back to barcode scanner")}</button>
       <Field label={h("שם המוצר שעל האריזה", "Product name on package")} value={name} onChange={e=>{setName(e.target.value);setConfirmed(false)}}/>
-      <div className="grid grid-cols-2 gap-3"><Field label={h("הערכים המודפסים הם לכמות", "Printed values are per amount")} type="number" min="0.1" value={printedAmount} onChange={e=>{setPrintedAmount(e.target.value);setConfirmed(false)}}/><SelectField label={h("יחידת התווית", "Label unit")} value={basis} onChange={e=>{setBasis(e.target.value as "g"|"ml");setConfirmed(false)}}><option value="g">{h("גרם", "grams")}</option><option value="ml">{h("מ״ל", "ml")}</option></SelectField></div>
+      <div className="grid grid-cols-2 gap-3"><Field label={h("הערכים המודפסים הם לכמות", "Printed values are per amount")} type="number" min="0.1" value={printedAmount} onChange={e=>{setPrintedAmount(e.target.value);setConfirmed(false)}}/><SelectField label={h("יחידת התווית", "Label unit")} value={basis} onChange={e=>{setBasis(e.target.value as "g"|"ml");setAmount(defaultProductAmount());setConfirmed(false)}}><option value="g">{h("גרם", "grams")}</option><option value="ml">{h("מ״ל", "ml")}</option></SelectField></div>
       <p className="text-xs text-muted-foreground">{h("ארבעת הערכים הראשיים נדרשים. אפס מזינים במפורש.", "All four main values are required. Enter zero explicitly.")}</p>
       <div className="grid grid-cols-2 gap-3">{valueField("kcal",energyUnit==="kJ"?h("אנרגיה (קילו־ג׳אול)","Energy (kJ)"):h("קלוריות (קק״ל)","Calories (kcal)"))}{valueField("protein",h("חלבון (גרם)","Protein (g)"))}{valueField("carbs",h("פחמימות (גרם)","Carbohydrate (g)"))}{valueField("fat",h("שומן (גרם)","Fat (g)"))}</div>
       <Disclosure title={h("ערכים נוספים ויחידות", "More nutrients and units")}><div className="grid gap-3"><div className="grid grid-cols-2 gap-3"><SelectField label={h("יחידת האנרגיה המודפסת", "Printed energy unit")} value={energyUnit} onChange={e=>{setEnergyUnit(e.target.value as typeof energyUnit);setConfirmed(false)}}><option value="kcal">kcal</option><option value="kJ">kJ</option></SelectField><SelectField label={h("יחידת הנתרן או המלח המודפסת", "Printed sodium or salt unit")} value={sodiumUnit} onChange={e=>{setSodiumUnit(e.target.value as typeof sodiumUnit);setConfirmed(false)}}><option value="mg">{h("נתרן במ״ג","Sodium in mg")}</option><option value="g">{h("נתרן בגרם","Sodium in g")}</option><option value="salt_g">{h("מלח בגרם","Salt in g")}</option></SelectField></div>
       <div className="grid grid-cols-2 gap-3">{valueField("fiber",h("סיבים (גרם, אופציונלי)","Fiber (g, optional)"))}{valueField("sugar",h("סוכר (גרם, אופציונלי)","Sugar (g, optional)"))}{valueField("saturatedFat",h("שומן רווי (גרם, אופציונלי)","Saturated fat (g, optional)"))}{valueField("sodium",sodiumUnit==="salt_g"?h("מלח (גרם, אופציונלי)","Salt (g, optional)"):sodiumUnit==="g"?h("נתרן (גרם, אופציונלי)","Sodium (g, optional)"):h("נתרן (מ״ג, אופציונלי)","Sodium (mg, optional)"))}</div></div></Disclosure>
     </div>}
-    {(food||manual)&&<><Field label={`${h("כמות שאכלת", "Amount eaten")} (${manual?basis:food?.basis??"g"})`} type="number" min="0.1" max="10000" step="any" value={quantity} onChange={e=>setQuantity(e.target.value)}/><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>{h("בדקתי שהמוצר, היחידה והערכים תואמים לאריזה", "I checked that the product, unit and values match the package")}</label><Button disabled={!confirmed||busy} onClick={add}>{h("הוספה לארוחה", "Add to meal")}</Button></>}
+    {(food||manual)&&<><ProductAmountInput food={preview} basis={manual?basis:food?.basis??"g"} value={amount} onChange={setAmount}/><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>{h("בדקתי שהמוצר, היחידה והערכים תואמים לאריזה", "I checked that the product, unit and values match the package")}</label><Button className="health-primary-action" disabled={!confirmed||busy||!validAmount} onClick={add}>{h("הוספה לארוחה", "Add to meal")}</Button></>}
     <Disclosure className="health-help" title={h("מקור הנתונים ודיוק", "Data source and accuracy")}><p>{h("Open Food Facts הוא מאגר קהילתי (ODbL). יש לבדוק שהמוצר והערכים תואמים לאריזה. ערכים שלא ידועים נשארים ריקים. ערכי מנה מחושבים ל־100 גרם או מ״ל, בלי להמיר ביניהם.", "Open Food Facts is a community database (ODbL). Check the product and values against your package. Unknown values stay empty. Printed servings are scaled to 100 g or ml, without converting between mass and volume.")}</p></Disclosure>
   </section>;
 }

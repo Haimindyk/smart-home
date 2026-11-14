@@ -276,6 +276,7 @@ export async function healthFunction(
       requestId: input.requestId,
     };
   if (input.action === "correct_meal") {
+    if (new URLSearchParams(location.search).has("correction-error")) throw new Error("provider_failed");
     const row = useHealthStore
       .getState()
       .data.meals.find(

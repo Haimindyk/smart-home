@@ -114,3 +114,43 @@ combining program choice, exercise instruction and workout tracking. Those pages
 do not disclose a generative-AI architecture, so we do not attribute a specific
 model or learning method to it. For our app, a clear exercise demonstration and
 quick logging remain necessary even when an AI proposal is unavailable.
+
+
+## Reachable meal correction and product quantities
+
+The diary photo thumbnail and visible **Correct recognition** action open meal
+details, not a raw image tab or the manual editor. The free-text correction field
+is at the start of the sheet, before the photo, totals and ingredient list.
+Typed corrections remain available while availability/consent/sync state explains
+any disabled action. Errors retain the draft and use the shared translated error
+messages. A photo whose values have become protected manual/label records shows
+a manual-edit explanation rather than silently presenting an editable AI record.
+The existing owner/version checks, correction IDs, quotas and source restrictions
+still apply; this UI change does not allow AI to edit protected label values.
+Private image links are owner-scoped, and an unavailable image does not block
+opening corrections. Signed URLs from another owner/path are not displayed.
+
+Both packaged-product scanning and barcode lookup inside food search now show
+an amount selector **before adding**. Choose grams (or ml for a liquid-basis
+record) or units, with an immediate total amount/calorie preview. Units require
+an explicit package unit size or an already user-confirmed product unit weight;
+a manufacturer servingSize alone is not assumed to mean one unit. Fractional
+units and previously confirmed weight ranges are supported. Clearing a known
+unit-size field does not silently refill or reuse it. New product lookups reset
+the amount selection, and changing a printed-label mass/volume basis resets it
+too. No density conversion is inferred.
+
+Amount changes scale nutrition from source per100 values; they never regenerate
+nutrients through AI. A selected unit size is retained in that food snapshot,
+and the packaged-product flow can reuse the owner's prior confirmed unit weight
+for the exact barcode/basis. Editing quantities does not rewrite previous meals.
+The existing packaged-label confirmation still applies, and missing printed
+macros are not filled by a model.
+
+Verification uses the actual React components with synthetic owner/API data in
+Hebrew/English mobile Chromium: diary thumbnail opens text correction in the
+first viewport, updates the same meal, and does not open a raw-image tab; two
+30 g product units persist as 60 g, printed 40 g persists as 40 g, the alternative
+food-search barcode path persists its chosen grams, unknown unit sizes cannot
+be added, and product logging works with AI disabled. This does not claim a live
+authenticated production-device or camera recognition accuracy benchmark.

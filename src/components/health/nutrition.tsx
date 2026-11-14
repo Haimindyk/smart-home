@@ -1,7 +1,6 @@
 "use client";
-import Image from "next/image";
 import { displayedMealTitle } from "@/lib/health/meal-presentation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Camera, ArrowUpLeft, Flame, Beef, Wheat, Droplet, Plus, Search, Bookmark, PenLine, ScanBarcode, Utensils } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,6 @@ import {
   sumNutrients,
 } from "@/lib/health/calculations";
 import { uploadMealImage } from "@/lib/health/api";
-import { createClient } from "@/lib/supabase/client";
 import { useHealthText } from "@/lib/health/i18n";
 import { Panel, Field, SelectField, Empty, ErrorText, round, Disclosure, ChoiceTabs } from "./shared";
 import { FoodPicker } from "./food-picker";
@@ -31,33 +29,8 @@ import { NutrientRing } from "./nutrient-ring";
 import { ProductLabel } from "./product-label";
 import { MealCamera } from "./meal-camera";
 import { MealDetails } from "./meal-details";
+import { MealImage } from "./meal-image";
 const kinds = ["breakfast", "lunch", "dinner", "snack"] as const;
-function MealImage({ path, thumbnail=false }: { path: string; thumbnail?:boolean }) {
-  const [url, setUrl] = useState("");
-  const h = useHealthText();
-  useEffect(() => {
-    let cancelled = false;
-    void createClient()
-      .storage.from("health-images")
-      .createSignedUrl(path, 300)
-      .then(({ data }) => {
-        if (!cancelled) setUrl(data?.signedUrl ?? "");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [path]);
-  return url ? (
-    <a aria-label={h("פתיחת התמונה", "View photo")}
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      className="text-sm underline"
-    >
-      {thumbnail ? <Image unoptimized width={64} height={64} src={url} alt={h("תמונת הארוחה", "Meal photo")} className="health-meal-thumb"/> : h("הצגת תמונת הארוחה", "View meal photo")}
-    </a>
-  ) : null;
-}
 export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }: { date: string; initialAdd?:boolean; addRequest?:number; onAddClosed?:()=>void }) {
   const h = useHealthText();
   const data = useHealthStore((s) => s.data),
@@ -239,9 +212,9 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
                     className="health-meal-card"
                   >
                     <div className="health-meal-card-main">
-                      {m.data.imagePath ? <MealImage path={m.data.imagePath} thumbnail/> : <span className="health-meal-thumb health-meal-placeholder" aria-hidden="true"><Utensils size={23}/></span>}
+                      {m.data.imagePath ? <MealImage path={m.data.imagePath} thumbnail onOpen={()=>setDetailsId(m.id)}/> : <span className="health-meal-thumb health-meal-placeholder" aria-hidden="true"><Utensils size={23}/></span>}
                       <div className="min-w-0 flex-1"><h3><button onClick={()=>setDetailsId(m.id)}>{displayedMealTitle(m.data,label(kind))}</button></h3><p className="health-meal-foods">{m.data.items.slice(0,2).map(i=>`${i.food.name} · ${i.quantity} ${i.food.basis === "ml" ? h("מ״ל","ml") : h("גרם","g")}`).join(" · ")}</p>{m.data.items.length>2&&<small>{h(`ועוד ${m.data.items.length-2} פריטים`,`+${m.data.items.length-2} more items`)}</small>}</div>
-                      <div className="health-meal-card-end"><strong>{round(n.kcal)} <small>kcal</small></strong><Button size="sm" variant="ghost" onClick={()=>{setEditing(m);setEditor(true)}}>{h("עריכה", "Edit")}</Button></div>
+                      <div className="health-meal-card-end"><strong>{round(n.kcal)} <small>kcal</small></strong><Button size="sm" variant="ghost" onClick={()=>{if(m.data.imagePath||m.data.aiEstimate||m.data.items.some(i=>i.food.source==="ai")){setDetailsId(m.id)}else{setEditing(m);setEditor(true)}}}>{m.data.imagePath||m.data.aiEstimate||m.data.items.some(i=>i.food.source==="ai")?h("תיקון זיהוי", "Correct recognition"):h("עריכה", "Edit")}</Button></div>
                     </div>
                     <div className="health-meal-macros">{([["protein",h("חלבון","Protein"),Beef],["carbs",h("פחמימות","Carbs"),Wheat],["fat",h("שומן","Fat"),Droplet]] as const).map(([key,title,Icon])=><span key={key} className={`meal-macro-${key}`} aria-label={`${title}: ${round(n[key])} g`}><Icon size={13}/>{round(n[key])} {h("ג׳","g")}</span>)}</div>
                     <details className="mt-2 text-sm">
@@ -485,7 +458,7 @@ function MealEditor({
     }));
   }
   const totals = mealNutrients(meal.items);
-  const foodPicker=<FoodPicker initialMode={foodMode==="text"||foodMode==="product"?"search":foodMode} onAdd={item=>setMeal(m=>({...m,items:[...m.items,item]}))}/>;
+  const foodPicker=<FoodPicker key={owner} initialMode={foodMode==="text"||foodMode==="product"?"search":foodMode} onAdd={item=>setMeal(m=>({...m,items:[...m.items,item]}))}/>;
   return (
     <Dialog open onOpenChange={(open)=>{if(!open&&!busy)onClose()}}>
     <DialogContent blurOverlay={mode!=="label"} className="health-app meal-composer start-0 top-auto bottom-0 translate-x-0 translate-y-0 rtl:translate-x-0" showCloseButton={false}>

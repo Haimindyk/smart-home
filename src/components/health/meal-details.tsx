@@ -6,10 +6,11 @@ import { useHealthStore } from "@/lib/health/store";
 import { correctSavedMeal } from "@/lib/health/wellness-api";
 import { useHealthText } from "@/lib/health/i18n";
 import { HealthSheet } from "./health-sheet";
+import { MealImage } from "./meal-image";
 import { MealPortion } from "./meal-portion";
 import { AiConsent, useWellnessAvailability } from "./ai-consent";
 import { mealNutrients, scaleNutrients } from "@/lib/health/calculations";
-import { Disclosure, round } from "./shared";
+import { Disclosure, ErrorText, round } from "./shared";
 import { Button } from "@/components/ui/button";
 export function MealDetails({
   id,
@@ -26,19 +27,22 @@ export function MealDetails({
   const [text, setText] = useState(""),
     [portionId, setPortionId] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
-    [message, setMessage] = useState("");
+    [message, setMessage] = useState(""),
+    [error, setError] = useState<string | null>(null);
   const lock = useRef(false),
     attempt = useRef<{ text: string; version: number; id: string } | null>(
       null,
     );
   if (!row) return null;
   const meal = row,
-    totals = mealNutrients(row.data.items);
+    totals = mealNutrients(row.data.items),
+    hasAiFood = row.data.items.some((i) => ["ai", "usda"].includes(i.food.source));
   async function correct() {
     if (lock.current || !text.trim() || !availability.ready) return;
     lock.current = true;
     setBusy(true);
     setMessage("");
+    setError(null);
     if (
       attempt.current?.text !== text ||
       attempt.current.version !== meal.version
@@ -52,13 +56,9 @@ export function MealDetails({
       await correctSavedMeal(meal, text, attempt.current.id);
       setText("");
       setMessage(h("הארוחה עודכנה", "Meal updated"));
-    } catch {
-      setMessage(
-        h(
-          "לא ניתן לעדכן כרגע. סנכרנו את היומן ונסו שוב.",
-          "Could not update. Sync the diary and retry.",
-        ),
-      );
+    } catch (e) {
+      const code = e instanceof Error ? e.message : "failed";
+      setError(code === "version_conflict" ? "sync_required" : code);
     } finally {
       lock.current = false;
       setBusy(false);
@@ -70,6 +70,40 @@ export function MealDetails({
       onClose={onClose}
     >
       <div className="grid gap-5">
+        {hasAiFood && (
+          <section className="health-recognition-correction grid gap-3" aria-label={h("תיקון זיהוי במלל", "Correct recognition with text")}>
+            <h3 className="font-semibold">{h("תיקון הזיהוי במילים שלך", "Correct the recognition in your own words")}</h3>
+            <AiConsent />
+            <label>
+              {h("מה צריך לתקן?", "What should change?")}
+              <textarea
+                className="health-meal-correction mt-2 w-full"
+                disabled={busy}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                maxLength={2000}
+                placeholder={h(
+                  "למשל: זה דג ולא חזה עוף",
+                  "For example: this is fish, not chicken breast",
+                )}
+              />
+            </label>
+            <Button
+              className="health-primary-action"
+              disabled={busy || !!portionId || !availability.ready || !text.trim()}
+              onClick={() => void correct()}
+            >
+              {busy
+                ? h("מעדכן…", "Updating…")
+                : h("עדכון הארוחה", "Update meal")}
+            </Button>
+            <ErrorText error={error} />
+            {message && <p role="status">{message}</p>}
+          </section>
+        )}
+        {row.data.imagePath && <MealImage path={row.data.imagePath} preview />}
+        {!hasAiFood && (row.data.imagePath || row.data.aiEstimate) && <p className="text-sm text-muted-foreground">{h("הערכים בארוחה נשמרו ממוצר או הוזנו ידנית. אפשר לעדכן אותם בעריכה ידנית.", "This meal uses product or manually entered values. Use manual editing to update them.")}</p>}
+
         <div className="health-meal-detail-total">
           <strong>
             {round(totals.kcal)} <small>kcal</small>
@@ -122,41 +156,6 @@ export function MealDetails({
                 </p>
               ))}
           </Disclosure>
-        )}
-        {row.data.items.some((i) => ["ai", "usda"].includes(i.food.source)) && (
-          <>
-            <p>
-              {h(
-                "הערכת AI · אפשר לתקן או להוסיף מרכיב",
-                "AI estimate · Correct or add an ingredient",
-              )}
-            </p>
-            <AiConsent />
-            <label>
-              {h("מה צריך לתקן?", "What should change?")}
-              <textarea
-                className="health-meal-correction mt-2 w-full"
-                disabled={busy}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                maxLength={2000}
-                placeholder={h(
-                  "למשל: יש גם מיונז 15 גרם",
-                  "For example: also add 15 g of mayonnaise",
-                )}
-              />
-            </label>
-            <Button
-              className="health-primary-action"
-              disabled={busy || !!portionId || !availability.ready || !text.trim()}
-              onClick={() => void correct()}
-            >
-              {busy
-                ? h("מעדכן…", "Updating…")
-                : h("עדכון הארוחה", "Update meal")}
-            </Button>
-            <p role="status">{message}</p>
-          </>
         )}
         <Button variant="outline" disabled={busy || !!portionId} onClick={onEdit}>
           {h("עריכה ידנית", "Edit manually")}
