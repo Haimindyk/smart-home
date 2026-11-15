@@ -1,0 +1,49 @@
+{
+  "products": [
+    {
+      "code": "7290000112220",
+      "product_name": "טחינה",
+      "product_name_he": "טחינה",
+      "nutrition_data_per": "100g",
+      "nutriments": {
+        "energy-kcal_100g": 689,
+        "proteins_100g": 24,
+        "carbohydrates_100g": 12,
+        "fat_100g": 60,
+        "sugars_100g": 1.2,
+        "saturated-fat_100g": 10,
+        "sodium_100g": 0.15
+      }
+    },
+    {
+      "code": "7290017275345",
+      "product_name": "טחינה גולמית",
+      "product_name_he": "טחינה גולמית",
+      "nutrition_data_per": "100g",
+      "nutriments": {
+        "energy-kcal_100g": 667,
+        "proteins_100g": 24,
+        "carbohydrates_100g": 2,
+        "fat_100g": 60,
+        "fiber_100g": 11.5,
+        "sugars_100g": 1,
+        "saturated-fat_100g": 10
+      }
+    },
+    {
+      "code": "7290011723101",
+      "product_name": "טחינה הר ברכה",
+      "product_name_he": "טחינה הר ברכה",
+      "nutrition_data_per": "100g",
+      "nutriments": {
+        "energy-kcal_100g": 691,
+        "proteins_100g": 20.5,
+        "carbohydrates_100g": 13.3,
+        "fat_100g": 61.74,
+        "sugars_100g": 1,
+        "saturated-fat_100g": 10.7,
+        "sodium_100g": 0.22
+      }
+    }
+  ]
+}

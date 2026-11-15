@@ -31,6 +31,8 @@ export function FoodPicker({ onAdd, initialMode, showHeading = true }: { onAdd: 
     [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
     [missing, setMissing] = useState("");
+  const [searchedQuery,setSearchedQuery]=useState<string|null>(null);
+  const activeSearch=useRef(0);
   const [manual, setManual] = useState(initialMode === "manual"),
     [food, setFood] = useState<Food>(() => ({
       id: crypto.randomUUID(),
@@ -44,21 +46,24 @@ export function FoodPicker({ onAdd, initialMode, showHeading = true }: { onAdd: 
   const manualLock = useRef(false);
   async function search(code?: string) {
     if (code !== undefined && !/^\d{8,14}$/.test(code)) return;
-    if (code === undefined && (savedOnly || query.trim().length < 2)) return;
+    if (code === undefined && query.trim().length < 2) return;
+    const token=++activeSearch.current, submitted=query.trim();
     setSelected(null);
     setSavedOnly(false);
     setBusy(true);
     setError(null);
     setMissing("");
     try {
-      const r = await lookupFood(query, code);
+      const r = await lookupFood(submitted, code);
+      if(token!==activeSearch.current)return;
       setResults(r.foods);
+      if(code===undefined)setSearchedQuery(submitted);
       if (r.needsLabel)
         setMissing(r.name ?? h("המוצר לא נמצא", "Product not found"));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "failed");
+      if(token===activeSearch.current)setError(e instanceof Error ? e.message : "failed");
     } finally {
-      setBusy(false);
+      if(token===activeSearch.current)setBusy(false);
     }
   }
   async function addManual() {
@@ -125,7 +130,7 @@ export function FoodPicker({ onAdd, initialMode, showHeading = true }: { onAdd: 
             label={h("שם מזון או מוצר", "Food or product name")}
             placeholder={h("חיפוש…", "Search…")}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {++activeSearch.current;setQuery(e.target.value);setResults([]);setSearchedQuery(null);setBusy(false);setMissing("");setError(null);setSelected(null)}}
           />
         </div>
         <Button
@@ -202,7 +207,7 @@ export function FoodPicker({ onAdd, initialMode, showHeading = true }: { onAdd: 
         </div>
       </div>}
       {!manual && !selected && busy && <p role="status" className="text-sm text-muted-foreground">{h("מחפש מזונות…", "Searching foods…")}</p>}
-      {!manual && !selected && !busy && unique.length===0 && <Empty>{savedOnly && lookupMode === "search" ? h("עוד אין מזונות שמורים שמתאימים לחיפוש", "No saved foods match yet") : lookupMode === "barcode" ? h("סרקו או הזינו את המספר שעל האריזה", "Scan or enter the number on the package") : query.trim() ? h("לא נמצאו מזונות. אפשר להוסיף ידנית.", "No foods found. You can add one manually.") : h("מזונות שהוספתם ליומן יופיעו כאן", "Foods you log will appear here")}</Empty>}
+      {!manual && !selected && !busy && unique.length===0 && (lookupMode === "search" && query.trim().length>=2 && (savedOnly || searchedQuery!==query.trim()) ? <Button className="food-catalog-search" variant="outline" onClick={()=>void search()}>{h("חיפוש במאגר המזון", "Search food database")}</Button> : <Empty>{savedOnly && lookupMode === "search" ? h("עוד אין מזונות שמורים שמתאימים לחיפוש", "No saved foods match yet") : lookupMode === "barcode" ? h("סרקו או הזינו את המספר שעל האריזה", "Scan or enter the number on the package") : query.trim() ? h("לא נמצאו מזונות. אפשר להוסיף ידנית.", "No foods found. You can add one manually.") : h("מזונות שהוספתם ליומן יופיעו כאן", "Foods you log will appear here")}</Empty>)}
       <div className={`food-results ${manual || selected ? "hidden" : ""}`}>
         {unique.map((f) => (
           <button

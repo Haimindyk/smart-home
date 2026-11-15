@@ -86,7 +86,7 @@ access, nutrition-only profiles and narrow mobile layouts using synthetic data.
 
 Food search opens directly with one search row and a barcode action. Recent/saved
 choices appear only for text search, not barcode or manual entry. Barcode mode
-shows barcode results and has an explicit return path. Saved-food queries filter
-locally without switching to the remote catalog. Lists scroll with the sheet.
+shows barcode results and has an explicit return path. Typing in saved foods filters locally; an explicit search can also open the
+shared catalog. Lists scroll with the sheet.
 Manual entry shows the four core nutrients and amount first; optional nutrients
 stay in a disclosure. Units and nutrient labels use the user's language. Search status and empty states explain the next action briefly.

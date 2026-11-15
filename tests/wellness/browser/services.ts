@@ -1,3 +1,5 @@
+import tahiniSearch from "../fixtures/off-tahini-search.json";
+import { searchFoodNames } from "../../../supabase/functions/_shared/food-search";
 import { prepareImage } from "../../../src/lib/health/api";
 import { applyFoodCorrection } from "../../../supabase/functions/_shared/wellness-food-correction";
 import { nutritionTrainingItems } from "../../../supabase/functions/_shared/training-measurements";
@@ -119,6 +121,7 @@ export const lookupFood = async (
   labelOnly?: boolean,
 ) => {
   calls.push({ action: labelOnly ? "label-lookup" : "food-lookup" });
+  if (!barcode && ["טחינה","tahini"].includes(_query.trim())) return searchFoodNames(_query,[],async input=>{const url=new URL(String(input));return Response.json(url.hostname==="search.openfoodfacts.org"?{hits:tahiniSearch.products.map(p=>({code:p.code}))}:{status:1,product:tahiniSearch.products.find(p=>url.pathname.includes(p.code))})});
   return barcode === "12345678"
     ? {
         foods: [
