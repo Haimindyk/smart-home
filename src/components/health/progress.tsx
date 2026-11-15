@@ -322,7 +322,7 @@ export function HealthProgress({ date }: { date: string }) {
             title={timed ? h("החזקה ארוכה ביותר שבוצעה", "Longest completed hold") : h("משקל מרבי בסט שבוצע", "Maximum weight in completed sets")}
             points={exercisePoints}
             unit={timed ? "s" : "kg"}
-            precision={timed ? 0 : 1}
+            precision={timed ? 0 : 2}
           />
           <Disclosure title={h("חזרות וביצועים", "Reps & performances")}>
             <div className="max-h-64 overflow-auto text-sm">
