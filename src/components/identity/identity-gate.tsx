@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useHealthStore } from "@/lib/health/store";
 import { Delete, House } from "lucide-react";
@@ -25,6 +26,14 @@ const KEYS = [
   "back",
 ] as const;
 
+function readAuthOwner(): { userId?: string; memberId?: string } | null {
+  try {
+    return JSON.parse(localStorage.getItem("kh-auth-owner") ?? "null");
+  } catch {
+    return null;
+  }
+}
+
 export function IdentityGate({ children }: { children: React.ReactNode }) {
   const actingMemberId = useIdentity((s) => s.actingMemberId);
   const setActingMemberId = useIdentity((s) => s.setActingMemberId);
@@ -41,38 +50,55 @@ export function IdentityGate({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     const client = createClient();
     const check = async () => {
+      // getSession() only reads local storage — no network round trip.
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+      const cached = readAuthOwner();
+      const knownDevice = Boolean(
+        session &&
+          actingMemberId &&
+          cached?.userId === session.user.id &&
+          cached?.memberId === actingMemberId,
+      );
+
       if (!navigator.onLine) {
-        const {
-          data: { session },
-        } = await client.auth.getSession();
-        const cached = JSON.parse(
-          localStorage.getItem("kh-auth-owner") ?? "null",
-        );
         if (!cancelled) {
           setVerified(
-            Boolean(
-              session &&
-                session.expires_at &&
-                session.expires_at * 1000 > Date.now() &&
-                cached?.userId === session.user.id &&
-                cached?.memberId === actingMemberId,
-            ),
+            knownDevice &&
+              Boolean(
+                session?.expires_at && session.expires_at * 1000 > Date.now(),
+              ),
           );
           setChecking(false);
         }
         return;
       }
+
+      // A returning member on this device opens straight into the app; the
+      // server check below runs in the background and locks again only if it
+      // definitively rejects the session. Without this, every launch waited
+      // on two sequential network calls before showing anything.
+      if (knownDevice && !cancelled) {
+        setVerified(true);
+        setChecking(false);
+      }
+
       const {
         data: { user },
+        error: userError,
       } = await client.auth.getUser();
-      const { data: member } = user
+      // A flaky network must not lock out a member we already trust locally.
+      if (knownDevice && userError && isAuthRetryableFetchError(userError)) return;
+      const { data: member, error: memberError } = user
         ? await client
             .from("members")
             .select("id")
             .eq("user_id", user.id)
             .maybeSingle()
-        : { data: null };
+        : { data: null, error: null };
       if (cancelled) return;
+      if (knownDevice && memberError) return; // transient — keep the trusted state
       if (member && (!actingMemberId || actingMemberId === member.id)) {
         localStorage.setItem(
           "kh-auth-owner",
