@@ -7,7 +7,6 @@ import { HealthSheet } from "./health-sheet";
 import { Button } from "@/components/ui/button";
 import { useHealthStore } from "@/lib/health/store";
 import {
-  profileSchema,
   type HealthRow,
   type MealItem,
   type Nutrients,
@@ -40,7 +39,6 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
     owner = useHealthStore((s) => s.owner),
     save = useHealthStore((s) => s.save),
     remove = useHealthStore((s) => s.remove);
-  const profile = data.health_profiles[0]?.data ?? profileSchema.parse({});
   const [addMenu,setAddMenu]=useState(initialAdd);
   const [seenAddRequest,setSeenAddRequest]=useState(addRequest);
   if(addRequest!==seenAddRequest){setSeenAddRequest(addRequest);if(addRequest>0)setAddMenu(true)}
@@ -54,17 +52,13 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
   const [editing, setEditing] = useState<HealthRow<"meals"> | null>(null),
     [editor, setEditor] = useState(false),
     [error, setError] = useState<string | null>(null);
-  const [weight, setWeight] = useState(""),
-    [water, setWater] = useState(250);
+  const [weight, setWeight] = useState("");
   const meals = data.meals.filter((m) => m.data.date === date);
   const goal = goalForDate(
     data.nutrition_goals.map((g) => g.data),
     date,
   );
   const totals = sumNutrients(meals.map((m) => mealNutrients(m.data.items)));
-  const drank = data.water_logs
-    .filter((w) => w.data.date === date)
-    .reduce((s, w) => s + w.data.amount, 0);
   const label = (k: string) =>
     ({
       breakfast: h("בוקר", "Breakfast"),
@@ -72,13 +66,6 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
       dinner: h("ערב", "Dinner"),
       snack: h("ביניים", "Snack"),
     })[k];
-  async function recordWater(amount: number) {
-    try {
-      await save("water_logs", { date, amount });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "failed");
-    }
-  }
   async function recordWeight() {
     try {
       await save(
@@ -181,7 +168,7 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
                     className="health-meal-card"
                   >
                     <div className="health-meal-card-main">
-                      {m.data.imagePath ? <MealImage path={m.data.imagePath} thumbnail onOpen={()=>setDetailsId(m.id)}/> : <span className="health-meal-thumb health-meal-placeholder" aria-hidden="true"><Utensils size={23}/></span>}
+                      {(m.data.imagePath||m.data.items.find(i=>i.food.imagePath)?.food.imagePath) ? <MealImage path={(m.data.imagePath||m.data.items.find(i=>i.food.imagePath)?.food.imagePath)!} thumbnail onOpen={()=>setDetailsId(m.id)}/> : <span className="health-meal-thumb health-meal-placeholder" aria-hidden="true"><Utensils size={23}/></span>}
                       <div className="min-w-0 flex-1"><h3><button onClick={()=>setDetailsId(m.id)}>{displayedMealTitle(m.data,label(kind))}</button></h3><p className="health-meal-foods">{m.data.items.slice(0,2).map(i=>`${i.food.name} · ${i.quantity} ${i.food.basis === "ml" ? h("מ״ל","ml") : h("גרם","g")}`).join(" · ")}</p>{m.data.items.length>2&&<small>{h(`ועוד ${m.data.items.length-2} פריטים`,`+${m.data.items.length-2} more items`)}</small>}</div>
                       <div className="health-meal-card-end"><strong>{round(n.kcal)} <small>{h("קל׳", "kcal")}</small></strong><Button size="sm" variant="ghost" onClick={()=>{if(m.data.imagePath||m.data.aiEstimate||m.data.items.some(i=>i.food.source==="ai")){setDetailsId(m.id)}else{setEditing(m);setEditor(true)}}}>{m.data.imagePath||m.data.aiEstimate||m.data.items.some(i=>i.food.source==="ai")?h("תיקון זיהוי", "Correct recognition"):h("עריכה", "Edit")}</Button></div>
                     </div>
@@ -264,62 +251,7 @@ export function Nutrition({ date, initialAdd=false, addRequest=0, onAddClosed }:
         )}
       </Disclosure>
       <FoodLibrary />
-      <Panel title={h("מים ומשקל", "Water & weight")}>
-        <p className="mb-3 text-lg font-semibold">
-          {drank.toLocaleString()} / {profile.waterTarget.toLocaleString()}{" "}
-          {h("מ״ל", "ml")}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {[250, 500].map((v) => (
-            <Button
-              key={v}
-              variant="outline"
-              onClick={() => void recordWater(v)}
-            >
-              +{v} ml
-            </Button>
-          ))}
-        </div>
-        <form
-          className="mt-3 flex items-end gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void recordWater(water);
-          }}
-        >
-          <div className="flex-1">
-            <Field
-              label={h("כמות מים במ״ל", "Water amount (ml)")}
-              type="number"
-              min={1}
-              max={5000}
-              value={water}
-              onChange={(e) => setWater(+e.target.value)}
-            />
-          </div>
-          <Button type="submit">{h("הוספה", "Add")}</Button>
-        </form>
-        <details className="mt-3 text-sm">
-          <summary>
-            {h("רישומי מים ותיקונים", "Water entries & corrections")}
-          </summary>
-          {data.water_logs
-            .filter((w) => w.data.date === date)
-            .map((w) => (
-              <div key={w.id} className="mt-2 flex justify-between">
-                <span>{w.data.amount} ml</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() =>
-                    void remove("water_logs", w).catch(() => setError("failed"))
-                  }
-                >
-                  {h("מחיקה", "Delete")}
-                </Button>
-              </div>
-            ))}
-        </details>
+      <Panel title={h("מעקב משקל", "Weight tracking")}>
         <form
           className="mt-5 flex items-end gap-2"
           onSubmit={(e) => {

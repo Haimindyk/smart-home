@@ -13,6 +13,7 @@ import {
 import { mealNutrients, scaleNutrients } from "@/lib/health/calculations";
 import { lookupFood } from "@/lib/health/api";
 import { useHealthText } from "@/lib/health/i18n";
+import { MealImage } from "./meal-image";
 import { BarcodeCamera } from "./barcode-camera";
 import { defaultProductAmount, productAmount, productAmountItem } from "@/lib/health/product-amount";
 import { ProductAmountInput } from "./product-amount";
@@ -104,7 +105,7 @@ export function FoodPicker({ onAdd, initialMode, showHeading = true }: { onAdd: 
     ...(savedOnly ? [] : recent),
     ...(savedOnly ? [] : results),
   ];
-  const unique = Array.from(new Map(all.map((f) => [f.id, f])).values()).filter(
+  const unique = Array.from(new Map(all.map((f) => [f.id, f])).values()).map(f=>({...f,imagePath:f.imagePath??data.personal_foods.find(p=>p.data.id===f.id)?.data.imagePath})).filter(
     (f) =>
       !query ||
       results.some((r) => r.id === f.id) ||
@@ -219,7 +220,8 @@ export function FoodPicker({ onAdd, initialMode, showHeading = true }: { onAdd: 
             }}
             className="food-result flex w-full items-center justify-between gap-3 text-start text-sm hover:bg-accent"
           >
-            <span>
+            {f.imagePath&&<MealImage path={f.imagePath} thumbnail displayOnly alt={h("תמונת המוצר","Product photo")}/>}
+            <span className="flex-1">
               {f.name}
               <span className="block text-xs text-muted-foreground">
                 {Math.round(f.per100.kcal)} {h("קל׳", "kcal")} / 100 {f.basis === "ml" ? h("מ״ל", "ml") : h("גרם", "g")} · {h("חלבון", "P")} {roundValue(f.per100.protein)} / {h("פחמימות", "C")} {roundValue(f.per100.carbs)} / {h("שומן", "F")} {roundValue(f.per100.fat)}

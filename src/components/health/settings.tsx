@@ -140,7 +140,7 @@ export function HealthSettings() {
               "Disabling a module keeps its history. Data is not shared with the household. Anyone who knows your PIN can sign in as you.",
             )}
           </p>
-<Field label={h("יעד מים במ״ל", "Water target (ml)")} type="number" min={250} max={10000} value={profile.waterTarget} onChange={e=>patch("waterTarget",+e.target.value)}/><Button disabled={busy} onClick={()=>void persist()}>{h("שמירת העדפות", "Save preferences")}</Button></div></Disclosure>
+<Button disabled={busy} onClick={()=>void persist()}>{h("שמירת העדפות", "Save preferences")}</Button></div></Disclosure>
       {data.nutrition_goals.length>0 && <Disclosure title={h("היסטוריית יעדים", "Goal history")} value={String(data.nutrition_goals.length)}>{[...data.nutrition_goals].sort((a,b)=>b.data.date.localeCompare(a.data.date)).map(g=><p className="mt-3 text-sm" key={g.id}>{g.data.date} · {g.data.kcal} kcal · P {g.data.protein} / C {g.data.carbs} / F {g.data.fat}</p>)}</Disclosure>}
       <Disclosure title={h("עזרה בשיפור המודלים · לבחירתך", "Help improve our models · optional")}><TrainingData/></Disclosure>
       <Panel title={h("הנתונים שלך", "Your data")}>

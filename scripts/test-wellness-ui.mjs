@@ -256,6 +256,9 @@ try {
     await labelSection
       .getByText("Synthetic packaged food", { exact: true })
       .waitFor();
+    await labelSection.getByLabel(he?"תמונת מוצר (אופציונלי)":"Product photo (optional)",{exact:true}).setInputFiles({name:"product.png",mimeType:"image/png",buffer:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ1sAAAAASUVORK5CYII=","base64")});
+    await page.waitForFunction(()=>window.wellnessFixture.calls.some(c=>c.action==="upload_photo"));
+
     const productAmount = labelSection.getByRole("region", { name: he ? "כמות המוצר" : "Product amount", exact: true });
     await productAmount.getByLabel(he ? "כמות שאכלת (g)" : "Amount eaten (g)", { exact: true }).fill("65");
     assert(await productAmount.isVisible(), "gram selection is directly visible after barcode lookup");
@@ -277,8 +280,17 @@ try {
     assert(await addProduct.isDisabled(), "unknown unit size cannot silently become 100 g");
     await productAmount.getByLabel(he ? "גרם ליחידה" : "g per unit", { exact: true }).fill("30");
     assert(await addProduct.isEnabled(), "explicit 30 g units allow adding the product");
+    assert.equal(await page.getByLabel(he?"כמות מים במ״ל":"Water amount (ml)",{exact:true}).count(),0,"water tracking is removed");
+
     if (process.env.WELLNESS_SCREENSHOTS_DIR) await page.screenshot({ path: join(process.env.WELLNESS_SCREENSHOTS_DIR, language + "-product-units.png"), animations: "disabled" });
     await addProduct.click();
+    await page.waitForFunction(()=>window.wellnessFixture.foods().some(f=>f.data.imagePath));
+    assert((await page.evaluate(()=>window.wellnessFixture.foods().find(f=>f.data.imagePath).data.imagePath)).endsWith("/test.jpg"),"the private product image is remembered with the food");
+    await labelSection.getByRole("button",{name:he?"איתור מוצר":"Find product",exact:true}).click();
+    await labelSection.locator(".product-photo-choice .health-meal-thumb").waitFor();
+    assert.equal(await labelSection.locator(".product-photo-choice .health-meal-thumb").count(),1,"rescanning the same product restores its saved photo");
+
+
     await labelSection
       .getByLabel(he ? "ברקוד המוצר" : "Product barcode", { exact: true })
       .fill("87654321");
