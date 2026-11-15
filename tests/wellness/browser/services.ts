@@ -2,7 +2,7 @@ import { prepareImage } from "../../../src/lib/health/api";
 import { applyFoodCorrection } from "../../../supabase/functions/_shared/wellness-food-correction";
 import { nutritionTrainingItems } from "../../../supabase/functions/_shared/training-measurements";
 import { useLocaleStore } from "../../../src/lib/i18n/store";
-import { localDate } from "../../../src/lib/health/calculations";
+import { localDate, dateRange } from "../../../src/lib/health/calculations";
 import { create } from "zustand";
 import { profileSchema, payloadSchemas } from "../../../src/lib/health/model";
 import {
@@ -398,6 +398,10 @@ export const useAppStore = create(() => ({
 }));
 if (new URLSearchParams(location.search).has("preview")) {
   const today = localDate(profile.data.timezone);
+  if (new URLSearchParams(location.search).has("progress-series")) {
+    data.weight_logs = dateRange(today,2).map((date,index)=>({ id:crypto.randomUUID(),version:1,owner_user_id:useHealthStore.getState().owner,data:payloadSchemas.weight_logs.parse({date,weight:80-index*.5}) }));
+  }
+  if (new URLSearchParams(location.search).has("nutrition-only")) profile.data.workoutsEnabled=false;
   if (new URLSearchParams(location.search).has("daily-populated")) {
     const he = document.documentElement.lang === "he";
     data.meals = [{ id: crypto.randomUUID(), version: 1, owner_user_id: useHealthStore.getState().owner,

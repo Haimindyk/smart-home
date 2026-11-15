@@ -494,7 +494,7 @@ try {
   }
   for (const lang of ["he", "en"]) {
     const mobile = await browser.newPage({ viewport: { width:390, height:844 } });
-    await mobile.goto(base + "/?preview=1&lang=" + lang);
+    await mobile.goto(base + "/?preview=1&daily-populated=1&lang=" + lang);
     await mobile.getByRole("tab", { name:lang === "he" ? "צ׳אט AI" : "AI chat", exact:true }).click();
     const starter = mobile.getByRole("button", { name:lang === "he" ? "איך לחלק חלבון ביום?" : "How can I spread protein through the day?", exact:true });
     await starter.click();
@@ -513,6 +513,24 @@ try {
     const plan = await mobile.locator(".workout-plan-tile").first().boundingBox();
     const planGrid = await mobile.locator(".workout-plan-grid").boundingBox();
     assert(plan && planGrid && Math.abs(plan.width-planGrid.width)<2, "mobile workout plan fills its available row");
+    await mobile.getByRole("tab",{name:lang === "he" ? "התקדמות" : "Progress",exact:true}).click();
+    assert.equal(await mobile.locator(".health-progress-single").count(),1,"a single logged day shows its value instead of a misleading graph");
+    assert.equal(await mobile.locator(".health-progress-chart svg").count(),0,"one point never renders an empty trend chart");
+    const intake = mobile.locator(".health-progress > details").filter({has:mobile.getByText(lang === "he" ? "צריכה מול יעד יומי" : "Intake vs daily goal",{exact:true})});
+    assert(!(await intake.evaluate(e=>e.open)),"detailed intake tables start collapsed");
+    await intake.locator("summary").click();
+    assert(await intake.getByRole("table").isVisible(),"the complete intake history stays available");
+    await mobile.getByRole("button",{name:lang === "he" ? "שבוע" : "Week",exact:true}).click();
+    assert.equal(await mobile.getByRole("button",{name:lang === "he" ? "שבוע" : "Week",exact:true}).getAttribute("aria-pressed"),"true");
+    assert(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),"progress fits a 320px phone");
+    await mobile.goto(base+"/?preview=1&daily-populated=1&progress-series=1&nutrition-only=1&lang="+lang);
+    await mobile.getByRole("tab",{name:lang === "he" ? "התקדמות" : "Progress",exact:true}).click();
+    assert.equal(await mobile.locator(".health-progress-chart svg").count(),1,"two weigh-ins keep a real trend graph");
+    const weightCard = mobile.locator(".health-progress-chart").filter({has:mobile.getByRole("heading",{name:lang === "he" ? "מעקב משקל" : "Weight history",exact:true})});
+    assert.match(await weightCard.locator(".health-progress-latest strong").textContent(),/79\.5/,"fractional weigh-ins are not rounded into a different weight");
+    assert.equal(await mobile.locator(".health-progress-stats").count(),0,"nutrition-only users do not see workout statistics");
+    if(process.env.WELLNESS_SCREENSHOTS_DIR) await mobile.screenshot({path:join(process.env.WELLNESS_SCREENSHOTS_DIR,lang+"-progress-series.png"),animations:"disabled"});
+
     await mobile.close();
   }
   if (process.env.WELLNESS_SCREENSHOTS_DIR) {

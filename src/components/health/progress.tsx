@@ -8,16 +8,18 @@ import {
   workoutVolume,
 } from "@/lib/health/calculations";
 import { useHealthText } from "@/lib/health/i18n";
-import { Panel, SelectField, Empty, round } from "./shared";
+import { Panel, SelectField, Empty, ChoiceTabs, Disclosure, round } from "./shared";
 import { Button } from "@/components/ui/button";
 function Chart({
   title,
   points,
   unit,
+  precision=0,
 }: {
   title: string;
   points: { date: string; value: number | null }[];
   unit: string;
+  precision?: number;
 }) {
   const h = useHealthText();
   const values = points.flatMap((p) => (p.value === null ? [] : [p.value]));
@@ -30,6 +32,9 @@ function Chart({
   const min = Math.min(...values),
     max = Math.max(...values),
     range = Math.max(1, max - min);
+  const latest = points.findLast(p=>p.value !== null)!;
+  const numberFormat = new Intl.NumberFormat(h("he-IL","en-GB"),{maximumFractionDigits:precision});
+  const format = (value:number|null)=>value===null ? "—" : numberFormat.format(value);
   const path = points
     .map((p, i) => {
       if (p.value === null) return "";
@@ -40,8 +45,12 @@ function Chart({
     })
     .join(" ");
   return (
-    <Panel title={title}>
-      <svg
+    <Panel title={title} className="health-progress-chart">
+      <div className={values.length === 1 ? "health-progress-single" : "health-progress-latest"}>
+        <strong>{format(latest.value)} <small>{unit}</small></strong>
+        <span>{new Intl.DateTimeFormat(h("he-IL","en-GB"),{day:"numeric",month:"short",timeZone:"UTC"}).format(new Date(`${latest.date}T12:00:00Z`))}</span>
+      </div>
+      {values.length === 1 ? <p className="health-progress-hint">{h("המגמה תופיע אחרי רישום נוסף", "A trend appears after another entry")}</p> : <svg
         role="img"
         aria-label={`${title} (${unit})`}
         viewBox="0 0 600 200"
@@ -74,10 +83,10 @@ function Chart({
         <text x="510" y="185" fontSize="12" fill="currentColor">
           {points.at(-1)?.date.slice(5)}
         </text>
-      </svg>
-      <p className="text-sm text-muted-foreground">
-        {round(min)}–{round(max)} {unit}
-      </p>
+      </svg>}
+      {values.length > 1 && <p className="text-sm text-muted-foreground">
+        {format(min)}–{format(max)} {unit}
+      </p>}
       <details className="mt-3 text-sm">
         <summary>{h("טבלת נתונים", "Data table")}</summary>
         <table className="mt-2 w-full">
@@ -95,7 +104,7 @@ function Chart({
             {points.map((p, i) => (
               <tr key={p.date + String(i)}>
                 <td>{p.date}</td>
-                <td className="text-end tabular-nums">{round(p.value)}</td>
+                <td className="text-end tabular-nums">{format(p.value)}</td>
               </tr>
             ))}
           </tbody>
@@ -181,16 +190,14 @@ export function HealthProgress({ date }: { date: string }) {
     )
     .sort((a, b) => a.date.localeCompare(b.date));
   return (
-    <div className="grid gap-5">
-      <SelectField
+    <div className="health-progress grid gap-5">
+      <ChoiceTabs
         label={h("תקופה עד התאריך שנבחר", "Period ending on selected date")}
-        value={days}
-        onChange={(e) => setDays(+e.target.value)}
-      >
-        <option value={7}>{h("שבוע", "Week")}</option>
-        <option value={30}>{h("30 ימים", "30 days")}</option>
-      </SelectField>
-      <div className="grid grid-cols-2 gap-3">
+        value={String(days)}
+        onChange={next=>setDays(Number(next))}
+        options={[{value:"7",label:h("שבוע", "Week")},{value:"30",label:h("30 ימים", "30 days")}]}
+      />
+      {data.health_profiles[0]?.data.workoutsEnabled && <div className="health-progress-stats grid grid-cols-2 gap-3">
         <Panel title={h("אימונים שהושלמו", "Completed workouts")}>
           <strong className="text-3xl">{completed}</strong>
           <p className="mt-2 text-xs text-muted-foreground">
@@ -206,15 +213,15 @@ export function HealthProgress({ date }: { date: string }) {
             {h("לפי הימים בתכנון הנוכחי", "Based on current scheduled days")}
           </p>
         </Panel>
-      </div>
+      </div>}
       {data.health_profiles[0]?.data.nutritionEnabled && (
         <>
           <Chart
             title={h("קלוריות שדווחו", "Logged calories")}
             points={calories}
-            unit="kcal"
+            unit={h("קל׳", "kcal")}
           />
-          <Panel title={h("צריכה מול יעד יומי", "Intake vs daily goal")}>
+          <Disclosure title={h("צריכה מול יעד יומי", "Intake vs daily goal")}>
             <div className="max-h-64 overflow-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -242,13 +249,14 @@ export function HealthProgress({ date }: { date: string }) {
                 </tbody>
               </table>
             </div>
-          </Panel>
+          </Disclosure>
           <Chart
             title={h("מעקב משקל", "Weight history")}
             points={weights}
-            unit="kg"
+            unit={h("ק״ג", "kg")}
+            precision={1}
           />
-          <Panel title={h("שקילות וממוצע שבועי", "Weigh-ins & weekly average")}>
+          <Disclosure title={h("שקילות וממוצע שבועי", "Weigh-ins & weekly average")}>
             <p>
               {h("ממוצע 7 ימים אחרונים", "Last 7 days average")}:{" "}
               {weekly.length
@@ -278,7 +286,7 @@ export function HealthProgress({ date }: { date: string }) {
                   </Button>
                 </div>
               ))}
-          </Panel>
+          </Disclosure>
         </>
       )}
       {data.health_profiles[0]?.data.workoutsEnabled && (
@@ -314,8 +322,9 @@ export function HealthProgress({ date }: { date: string }) {
             title={timed ? h("החזקה ארוכה ביותר שבוצעה", "Longest completed hold") : h("משקל מרבי בסט שבוצע", "Maximum weight in completed sets")}
             points={exercisePoints}
             unit={timed ? "s" : "kg"}
+            precision={timed ? 0 : 1}
           />
-          <Panel title={h("חזרות וביצועים", "Reps & performances")}>
+          <Disclosure title={h("חזרות וביצועים", "Reps & performances")}>
             <div className="max-h-64 overflow-auto text-sm">
               {sessions.flatMap((s) =>
                 s.data.exercises
@@ -335,7 +344,7 @@ export function HealthProgress({ date }: { date: string }) {
                   )),
               )}
             </div>
-          </Panel>
+          </Disclosure>
         </>
       )}
     </div>

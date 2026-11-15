@@ -67,6 +67,17 @@ or AI call is needed to browse either list.
 contains eight Hebrew screen concepts (daily overview, adding food, description,
 barcode, camera, correction, chat and workouts), using Heebo and reusable assets.
 The board uses illustrative data, not production diary entries. The code remains
-in GitHub; Figma is the visual planning/reference artifact. Prototype navigation
-and the final post-refinement visual review are pending the Figma Starter MCP
-allowance. Do not treat the file as a tested live app or claim complete parity.
+in GitHub; Figma is the visual planning/reference artifact. The user chose to continue directly in code without paid Figma. The optional
+board is a visual reference; its unfinished prototype does not gate application
+work. Validate actual components in the browser against the supplied references.
+Do not treat the board as a tested live app or claim complete parity.
+
+## Progress overview
+
+Week/month selection uses the shared pill controls. Each recorded series shows
+its latest value and date; a single entry has a short explanation instead of a
+mostly empty trend graph. Series with at least two records retain their chart.
+Detailed intake, weigh-ins and performance histories stay behind disclosures.
+Workout summary cards appear only when workout tracking is enabled. Browser
+checks cover sparse and multi-entry series, period selection, detailed-table
+access, nutrition-only profiles and narrow mobile layouts using synthetic data.
