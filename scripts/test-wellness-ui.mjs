@@ -493,6 +493,36 @@ try {
     await page.close();
   }
   for (const lang of ["he", "en"]) {
+    const he=lang === "he", food=await browser.newPage({viewport:{width:390,height:844}});
+    await food.goto(base+"/?ai-disabled=1&lang="+lang);
+    const before=await food.evaluate(()=>window.wellnessFixture.meals().length);
+    await food.getByRole("button",{name:he?"הוספת ארוחה":"Add meal",exact:true}).click();
+    await food.getByRole("button",{name:he?"מאגר מזון":"Food database",exact:true}).click();
+    await food.getByRole("heading",{name:he?"חיפוש מזון":"Search foods",exact:true}).waitFor();
+    assert.equal(await food.getByRole("button",{name:he?"שמירה ביומן":"Save to diary",exact:true}).count(),0,"empty search does not offer an unusable diary save");
+    await food.getByRole("button",{name:he?"ברקוד":"Barcode",exact:true}).waitFor();
+    if(process.env.WELLNESS_SCREENSHOTS_DIR) await food.screenshot({path:join(process.env.WELLNESS_SCREENSHOTS_DIR,lang+"-food-search.png"),animations:"disabled"});
+    await food.getByRole("button",{name:he?"שמורים":"Saved",exact:true}).click();
+    await food.getByLabel(he?"שם מזון או מוצר":"Food or product name",{exact:true}).fill("missing saved food");
+    await food.getByRole("button",{name:he?"חיפוש":"Search",exact:true}).click();
+    assert(!(await actions(food)).some(c=>c.action==="food-lookup"),"saved-food searches stay local");
+    await food.getByRole("button",{name:he?"מזון חדש / הזנה ידנית":"New food / manual entry",exact:true}).click();
+    assert(!(await food.getByLabel(he?"סיבים (ג׳)":"Fiber (g)",{exact:true}).isVisible()),"optional manual nutrients start collapsed");
+    await food.getByLabel(he?"שם מזון":"Food name",{exact:true}).fill("Manual fixture");
+    for(const [label,value] of [[he?"קלוריות":"Calories","165"],[he?"חלבון (ג׳)":"Protein (g)","31"],[he?"פחמימות (ג׳)":"Carbs (g)","0"],[he?"שומן (ג׳)":"Fat (g)","3.6"],[he?"כמות שנאכלה":"Amount eaten","50"]]) await food.getByLabel(label,{exact:true}).fill(value);
+    await food.locator(".food-picker details").filter({has:food.getByText(he?"ערכים נוספים":"More nutrients",{exact:true})}).locator("summary").click();
+    await food.getByLabel(he?"סיבים (ג׳)":"Fiber (g)",{exact:true}).fill("2.5");
+    if(process.env.WELLNESS_SCREENSHOTS_DIR) await food.screenshot({path:join(process.env.WELLNESS_SCREENSHOTS_DIR,lang+"-manual-food.png"),animations:"disabled"});
+    await food.getByRole("button",{name:he?"הוספת מזון":"Add food",exact:true}).click();
+    await food.locator(".meal-review-item h3").filter({hasText:"Manual fixture"}).waitFor();
+    assert.equal(await food.evaluate(()=>window.wellnessFixture.meals().length),before,"adding manual food only changes the draft");
+    await food.getByRole("button",{name:he?"שמירה ביומן":"Save to diary",exact:true}).click();
+    const saved=await food.evaluate(()=>window.wellnessFixture.meals().at(-1));
+    assert.equal(saved.data.items[0].quantity,50);assert.equal(saved.data.items[0].food.per100.fiber,2.5);
+    assert(!(await actions(food)).some(c=>c.action==="nutrition"),"manual nutrition never needs AI");
+    await food.close();
+  }
+  for (const lang of ["he", "en"]) {
     const mobile = await browser.newPage({ viewport: { width:390, height:844 } });
     await mobile.goto(base + "/?preview=1&daily-populated=1&lang=" + lang);
     await mobile.getByRole("tab", { name:lang === "he" ? "צ׳אט AI" : "AI chat", exact:true }).click();
