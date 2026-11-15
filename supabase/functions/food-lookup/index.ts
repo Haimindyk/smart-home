@@ -6,6 +6,7 @@ import {
   requireUser,
 } from "../_shared/health-http.ts";
 import { openFoodFactsProduct } from "../_shared/food-product.ts";
+import { searchFoodNames } from "../_shared/food-search.ts";
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -13,13 +14,15 @@ Deno.serve(async (req) => {
     const { admin, user } = await requireUser(req);
     const input = await body(req);
     const barcode = typeof input.barcode === "string" ? input.barcode : "";
-    if (barcode && !/^\d{8,14}$/.test(barcode))
+    if (barcode && !/^\d{8,14}$/.test(barcode)) {
       throw new Error("invalid_input");
+    }
     if (!barcode) {
-      const q =
-        typeof input.query === "string" ? input.query.trim().slice(0, 100) : "";
+      const q = typeof input.query === "string"
+        ? input.query.trim().slice(0, 100)
+        : "";
       if (q.length < 2) return json({ foods: [] });
-      // Escape LIKE wildcards; search-as-you-type never hits the external API.
+      // Escape LIKE wildcards. The client submits external name searches explicitly.
       const safe = q.replace(/[\\%_]/g, "\\$&");
       const results = await Promise.all(
         ["name", "nameEn"].map((key) =>
@@ -27,19 +30,29 @@ Deno.serve(async (req) => {
             .from("food_catalog")
             .select("data")
             .ilike(`data->>${key}`, `%${safe}%`)
-            .limit(30),
+            .limit(30)
         ),
       );
       if (results.some((r) => r.error)) throw new Error("failed");
-      return json({
-        foods: Array.from(
-          new Map(
-            results
-              .flatMap((r) => r.data ?? [])
-              .map((r) => [r.data.id, r.data]),
-          ).values(),
-        ).slice(0, 30),
-      });
+      const cached = Array.from(
+        new Map(
+          results
+            .flatMap((r) => r.data ?? [])
+            .map((r) => [r.data.id, r.data]),
+        ).values(),
+      ).slice(0, 30);
+      const found = await searchFoodNames(q, cached);
+      if (found.fetched && found.foods.length) {
+        // Shared public product data only; no query/user information is cached.
+        await admin.from("food_catalog").upsert(found.foods.map((data) => ({
+          source_key: `off:v2:${data.barcode}`,
+          source: "openfoodfacts",
+          data,
+          attribution: "Open Food Facts — ODbL",
+          updated_at: new Date().toISOString(),
+        })));
+      }
+      return json({ foods: found.foods });
     }
     const labelOnly = input.labelOnly === true;
     let personalQuery = admin
@@ -49,10 +62,11 @@ Deno.serve(async (req) => {
       .eq("data->>barcode", barcode)
       .is("deleted_at", null)
       .limit(1);
-    if (labelOnly)
+    if (labelOnly) {
       personalQuery = personalQuery
         .eq("data->>source", "label")
         .like("data->>sourceId", "label:printed-confirmed:v1:%");
+    }
     const { data: personal, error: personalError } = await personalQuery;
     if (personalError) throw new Error("failed");
     if (personal?.length) return json({ foods: personal.map((r) => r.data) });
@@ -62,16 +76,16 @@ Deno.serve(async (req) => {
       .select("data,updated_at")
       .eq("source_key", key)
       .maybeSingle();
-    const validCached =
-      cached?.data?.source === "openfoodfacts" &&
-      ["g", "ml"].includes(cached?.data?.basis)
-        ? cached
-        : null;
+    const validCached = cached?.data?.source === "openfoodfacts" &&
+        ["g", "ml"].includes(cached?.data?.basis)
+      ? cached
+      : null;
     if (
       validCached &&
       Date.parse(validCached.updated_at) > Date.now() - 30 * 86400000
-    )
+    ) {
       return json({ foods: [validCached.data] });
+    }
     let res: Response;
     try {
       res = await fetch(
@@ -103,8 +117,8 @@ Deno.serve(async (req) => {
         .maybeSingle();
       return json({
         foods: [],
-        name:
-          p?.product_name_he ?? p?.product_name ?? known?.product_name ?? null,
+        name: p?.product_name_he ?? p?.product_name ?? known?.product_name ??
+          null,
         needsLabel: true,
       });
     }

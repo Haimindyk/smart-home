@@ -187,3 +187,26 @@ a single schnitzel entry. A prior probe proposed an unsupported creamy condiment
 the trace-vs-sauce instruction was tightened. This is diagnostic evidence, not a
 recognition/weight/nutrition accuracy benchmark. No private photo, raw response
 or actual meal quantity is committed or used as training data.
+
+## Explicit food-name searches
+
+Name search first checks the shared catalog. If there is no local match, it makes
+one Open Food Facts Search-a-licious request for at most eight product codes,
+then reads their full product records in parallel within one 8-second deadline.
+The search index does not establish the gram/ml basis, so only full records are
+normalized with the same strict parser used for barcode lookup and caches valid public product data under the existing `off:v2:` keys.
+Queries and user identities are not cached. Missing core macros or an unknown /
+per-serving basis are rejected; optional unknown nutrients stay null. No AI is
+used, and the existing barcode/printed-label flow is unchanged.
+
+Typing filters locally. Submitting a search (including from Saved) searches the
+catalog; an empty local list offers an explicit Search food database action.
+The UI does not claim no results before a submitted search, and stale responses
+cannot replace results for a newer text query. Source failures/rate limits remain
+errors, not fake empty results. Open Food Facts availability/rate limits apply;
+validated cached matches avoid repeat upstream calls.
+
+Regression fixture `tests/wellness/fixtures/off-tahini-search.json` is a reduced
+public response retrieved on 2026-11-15 from
+`https://world.openfoodfacts.org/cgi/search.pl?search_terms=טחינה&search_simple=1&action=process&json=1&page_size=5&fields=code,product_name,product_name_he,nutriments,nutrition_data_per`.
+Its per-100 values describe those individual products, not all tahini recipes.
