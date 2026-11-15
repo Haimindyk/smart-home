@@ -465,16 +465,17 @@ function MealEditor({
     }));
   }
   const totals = mealNutrients(meal.items);
-  const foodPicker=<FoodPicker key={owner} initialMode={foodMode==="text"||foodMode==="product"?"search":foodMode} onAdd={item=>setMeal(m=>({...m,items:[...m.items,item]}))}/>;
+  const foodPicker=<FoodPicker key={owner} showHeading={false} initialMode={foodMode==="text"||foodMode==="product"?"search":foodMode} onAdd={item=>setMeal(m=>({...m,items:[...m.items,item]}))}/>;
+  const editorTitle=existing ? h("עריכת ארוחה", "Meal editor") : foodMode==="product" ? h("מוצר ארוז", "Packaged product") : foodMode==="text" ? h("תיאור ארוחה", "Describe your meal") : foodMode==="saved" ? h("מזונות שמורים", "Saved foods") : foodMode==="manual" ? h("הוספה ידנית", "Manual entry") : h("חיפוש מזון", "Search foods");
   return (
-    <HealthSheet title={existing ? h("עריכת ארוחה", "Meal editor") : foodMode==="product" ? h("מוצר ארוז", "Packaged product") : foodMode==="text" ? h("תיאור ארוחה", "Describe your meal") : h("מה אוכלים היום?", "What’s on your plate?")} onClose={onClose} closeDisabled={busy} blurOverlay={mode!=="label"} className="meal-composer">
+    <HealthSheet title={editorTitle} onClose={onClose} closeDisabled={busy} blurOverlay={mode!=="label"} className="meal-composer">
     <Panel
-      title={existing ? h("עריכת ארוחה", "Meal editor") : foodMode==="product" ? h("מוצר ארוז", "Packaged product") : foodMode==="text" ? h("תיאור ארוחה", "Describe your meal") : h("מה אוכלים היום?", "What’s on your plate?")}
+      title={editorTitle}
     >
       <div className="grid gap-4">
         <ErrorText error={error} />
-        {foodMode!=="product"&&foodMode!=="text"&&<p className="text-sm text-muted-foreground">{h("בדקו את הכמויות לפני השמירה.", "Review portions before saving.")}</p>}
-        {((foodMode!=="product"&&foodMode!=="text")||meal.items.length>0)&&<details className="meal-metadata"><summary>{h("פרטי הארוחה והתאריך", "Meal details & date")}</summary>
+        {meal.items.length>0&&foodMode!=="product"&&foodMode!=="text"&&<p className="text-sm text-muted-foreground">{h("בדקו את הכמויות לפני השמירה.", "Review portions before saving.")}</p>}
+        {(existing||meal.items.length>0)&&<details className="meal-metadata"><summary>{h("פרטי הארוחה והתאריך", "Meal details & date")}</summary>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field
             label={h("תאריך הארוחה", "Meal date")}
@@ -530,7 +531,7 @@ function MealEditor({
           </div>
         </section>}
         {capture && mode!=="label" && <Button variant="outline" onClick={onBrowse}>{h("חיפוש או הוספת מזון ידנית", "Search or add food manually")}</Button>}
-        {mode!=="label" && (!capture || photoReviewRequired) && (foodMode!=="text"||meal.items.length>0) && (foodMode==="text" ? <Disclosure title={h("הוספת מזון נוסף", "Add another food")}>{foodPicker}</Disclosure> : <div className="meal-search-section"><p className="mb-3 text-sm font-semibold">{h("חיפוש מזון או מוצר", "Find a food or product")}</p>{foodPicker}</div>)}
+        {mode!=="label" && (!capture || photoReviewRequired) && (foodMode!=="text"||meal.items.length>0) && (foodMode==="text" ? <Disclosure title={h("הוספת מזון נוסף", "Add another food")}>{foodPicker}</Disclosure> : <div className="meal-search-section">{foodPicker}</div>)}
         {meal.items.length>0 && <h3 className="mt-2 text-xl font-bold">{h("בארוחה שלך", "On your plate")}</h3>}
         {meal.items.map((i) => (
           <div key={i.id} className="meal-review-item rounded-xl border p-3">
@@ -632,9 +633,9 @@ function MealEditor({
             </details>
           </div>
         ))}
-        {((foodMode!=="product"&&foodMode!=="text")||meal.items.length>0)&&<div className="meal-savebar"><strong>
-          {round(totals.kcal)} kcal · P {round(totals.protein)} / C{" "}
-          {round(totals.carbs)} / F {round(totals.fat)}
+        {meal.items.length>0&&<div className="meal-savebar"><strong>
+          {round(totals.kcal)} {h("קל׳", "kcal")} · {h("חלבון", "P")} {round(totals.protein)} / {h("פחמימות", "C")}{" "}
+          {round(totals.carbs)} / {h("שומן", "F")} {round(totals.fat)}
         </strong>
         {photoReviewRequired && !photoReviewed && <p className="text-sm text-amber-700">{h("הסכום כולל רק את הפריטים שברשימה. מרכיבים שלא זוהו בביטחון אינם נכללים; יש להוסיף ולתקן לפני אישור.", "The total includes listed items only. Uncertain ingredients are excluded; add missing foods and make corrections before confirming.")}</p>}
         {photoReviewRequired && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={photoReviewed} onChange={e => setPhotoReviewed(e.target.checked)}/>{h("בדקתי את המרכיבים והכמויות, תיקנתי זיהויים והוספתי מרכיבים חסרים", "I checked ingredients and portions, corrected identities and added missing foods")}</label>}
