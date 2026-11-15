@@ -36,3 +36,12 @@ select exists(select 1 from supabase_migrations.schema_migrations where version=
 insert into supabase_migrations.schema_migrations(version,name,statements)
 values('20261104200318','wellness_photo_budget',array['Applied from reviewed Git merge; see repository migration 20261104200318_wellness_photo_budget.sql']);
 \endif
+
+select exists(select 1 from supabase_migrations.schema_migrations where version='20261115230302') as product_photos_applied \gset
+\if :product_photos_applied
+\echo 'Product-photo guards already applied.'
+\else
+\ir ../supabase/migrations/20261115230302_private_product_photos.sql
+insert into supabase_migrations.schema_migrations(version,name,statements)
+values('20261115230302','private_product_photos',array['Applied from reviewed Git merge; see repository migration']);
+\endif

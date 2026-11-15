@@ -97,9 +97,23 @@ export async function referencedImages(
     if (owner) query = query.eq("owner_user_id", owner);
     const { data, error } = await query;
     if (error) throw new Error("failed");
-    for (const row of data ?? [])
+    for (const row of data ?? []) {
       if (typeof row.data?.imagePath === "string") used.add(row.data.imagePath);
+      for(const item of (Array.isArray(row.data?.items)?row.data.items:[]))if(typeof item.food?.imagePath==="string")used.add(item.food.imagePath);
+    }
     if (!data || data.length < 500) break;
+  }
+  for(const table of ["personal_foods","recipes"]){
+    for(let offset=0;;offset+=500){
+      let query=admin.from(table).select("id,data").is("deleted_at",null).order("id").range(offset,offset+499);
+      if(owner)query=query.eq("owner_user_id",owner);
+      const {data,error}=await query;if(error)throw new Error("failed");
+      for(const row of data??[]){
+        if(typeof row.data?.imagePath==="string")used.add(row.data.imagePath);
+        for(const item of (Array.isArray(row.data?.items)?row.data.items:[]))if(typeof item.food?.imagePath==="string")used.add(item.food.imagePath);
+      }
+      if(!data||data.length<500)break;
+    }
   }
   for (let offset=0;;offset+=500) {
     let query=admin.from("wellness_exercise_illustrations").select("exercise_id,image_path").order("owner_user_id").order("exercise_id").range(offset,offset+499);

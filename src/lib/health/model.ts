@@ -32,6 +32,7 @@ export const foodSchema = z.object({
   unitWeight: unitWeightSchema.optional(),
   source: z.enum(["usda", "openfoodfacts", "label", "manual", "ai", "recipe"]),
   sourceId: z.string().optional(),
+  imagePath: z.string().min(1).max(500).optional(),
 });
 export type Food = z.infer<typeof foodSchema>;
 export const mealItemSchema = z.object({

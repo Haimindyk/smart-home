@@ -1,7 +1,8 @@
 "use client";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { lookupFood } from "@/lib/health/api";
+import { lookupFood, uploadMealImage } from "@/lib/health/api";
+import { MealImage } from "./meal-image";
 import { foodFromPrintedLabel } from "@/lib/health/product-label";
 import { type Food, type MealItem } from "@/lib/health/model";
 import { useHealthStore } from "@/lib/health/store";
@@ -30,12 +31,22 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
   const [energyUnit, setEnergyUnit] = useState<"kcal" | "kJ">("kcal"),
     [sodiumUnit, setSodiumUnit] = useState<"mg" | "g" | "salt_g">("mg");
   const request = useRef(0);
+  const addLock=useRef(false);
+  const [photoPath,setPhotoPath]=useState<string|undefined>();
+  async function photograph(file:File){
+    if(!owner||busy)return;
+    const serial=request.current;setBusy(true);setError(null);
+    try{const path=await uploadMealImage(file,owner);if(serial===request.current&&useHealthStore.getState().owner===owner)setPhotoPath(path);}
+    catch(e){if(useHealthStore.getState().owner===owner)setError(e instanceof Error?e.message:"upload_failed")}
+    finally{if(serial===request.current)setBusy(false)}
+  }
   async function search(code = barcode) {
     setCamera(false);
     const serial = ++request.current;
     setBusy(true);
     setError(null);
     setFood(null);
+    setPhotoPath(undefined);
     setMessage("");
     setConfirmed(false);
     setManual(false);
@@ -55,8 +66,9 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
       if (found) {
         const stored = useHealthStore.getState().data.personal_foods.map((f) => f.data)
           .concat(useHealthStore.getState().data.meals.flatMap((m) => m.data.items.map((i) => i.food)))
-          .find((f) => f.barcode === code && f.basis === found.basis && f.unitWeight);
-        setFood(stored ? { ...found, unitWeight: stored.unitWeight } : found);
+          .find((f) => f.barcode === code && f.basis === found.basis && (f.unitWeight||f.imagePath));
+        setFood(stored ? { ...found, unitWeight: stored.unitWeight,imagePath:stored.imagePath } : found);
+        setPhotoPath(stored?.imagePath);
       }
       else {
         setName(response.name ?? "");
@@ -82,7 +94,9 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
         setBusy(false);
     }
   }
-  function add() {
+  async function add() {
+    if(addLock.current||busy)return;
+    addLock.current=true;setBusy(true);
     setError(null);
     try {
       if (useHealthStore.getState().owner !== owner)
@@ -102,7 +116,14 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
         : food;
       if (!selected || !["openfoodfacts", "label"].includes(selected.source))
         throw new Error("label_values_required");
-      onAdd(productAmountItem(selected, amount));
+      const item=productAmountItem({...selected,...(photoPath?{imagePath:photoPath}:{})}, amount);
+      if(item.food.imagePath){
+        if(!owner||!item.food.imagePath.startsWith(owner+"/"))throw new Error("session_mismatch");
+        const existing=useHealthStore.getState().data.personal_foods.find(r=>r.data.id===item.food.id||(item.food.barcode&&r.data.barcode===item.food.barcode));
+        await useHealthStore.getState().save("personal_foods",item.food,existing);
+        if(useHealthStore.getState().owner!==owner)throw new Error("session_mismatch");
+      }
+      onAdd(item);setPhotoPath(undefined);
       setFood(null);
       setManual(false); setEnergyUnit("kcal"); setSodiumUnit("mg"); setPrintedAmount("100"); setBasis("g"); setAmount(defaultProductAmount());
       setConfirmed(false);
@@ -116,7 +137,7 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "failed");
-    }
+    } finally {addLock.current=false;setBusy(false)}
   }
   let preview = food;
   if (manual) {
@@ -129,10 +150,10 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
   return <section className="product-entry grid gap-4" aria-label={h("ערכי מוצר מהאריזה", "Product label values")}>
     <ErrorText error={error}/>
     {!manual && <>{camera&&<BarcodeCamera onCode={code=>{setBarcode(code);setCamera(false);void search(code)}}/>}<form className="flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();void search()}}>
-      <div className="min-w-0 flex-1"><Field label={h("ברקוד המוצר", "Product barcode")} inputMode="numeric" placeholder={h("הזינו מספר ברקוד", "Enter barcode number")} onFocus={()=>setCamera(false)} value={barcode} onChange={e=>{++request.current;setBusy(false);setBarcode(e.target.value.replace(/\D/g,""));setFood(null);setConfirmed(false)}}/></div>
+      <div className="min-w-0 flex-1"><Field label={h("ברקוד המוצר", "Product barcode")} inputMode="numeric" placeholder={h("הזינו מספר ברקוד", "Enter barcode number")} onFocus={()=>setCamera(false)} value={barcode} onChange={e=>{++request.current;setBusy(false);setBarcode(e.target.value.replace(/\D/g,""));setPhotoPath(undefined);setFood(null);setConfirmed(false)}}/></div>
       <Button type="submit" disabled={busy||!/^\d{8,14}$/.test(barcode)}>{busy?h("מחפש…","Looking up…"):h("איתור מוצר", "Find product")}</Button>
     </form>{!camera&&<Button type="button" variant="outline" onClick={()=>setCamera(true)}>{h("סריקת ברקוד במצלמה", "Scan barcode with camera")}</Button>}
-    <button type="button" className="justify-self-start text-sm text-muted-foreground underline" onClick={()=>{++request.current;setCamera(false);setBusy(false);setManual(true);setFood(null);setConfirmed(false);setError(null)}}>{h("אין ברקוד? הזנה מהאריזה", "No barcode? Enter package values")}</button></>}
+    <button type="button" className="justify-self-start text-sm text-muted-foreground underline" onClick={()=>{++request.current;setCamera(false);setBusy(false);setManual(true);setFood(null);setPhotoPath(undefined);setConfirmed(false);setError(null)}}>{h("אין ברקוד? הזנה מהאריזה", "No barcode? Enter package values")}</button></>}
     {message&&<p role="status" className="text-sm">{message}</p>}
     {food&&!manual&&<div className="product-result"><strong>{food.name}</strong><p>{h("לכל 100", "Per 100")} {food.basis}: {food.per100.kcal} kcal · P {food.per100.protein} / C {food.per100.carbs} / F {food.per100.fat}</p><small>{food.source==="openfoodfacts"?"Open Food Facts":h("תווית שאושרה", "Confirmed label")}</small></div>}
     {manual&&<div className="grid gap-4"><button type="button" className="justify-self-start text-sm underline" onClick={()=>{setManual(false);setCamera(true);setError(null);setMessage("")}}>{h("חזרה לסריקת ברקוד", "Back to barcode scanner")}</button>
@@ -143,6 +164,7 @@ export function ProductLabel({ onAdd, autoScan=false }: { onAdd: (item: MealItem
       <Disclosure title={h("ערכים נוספים ויחידות", "More nutrients and units")}><div className="grid gap-3"><div className="grid grid-cols-2 gap-3"><SelectField label={h("יחידת האנרגיה המודפסת", "Printed energy unit")} value={energyUnit} onChange={e=>{setEnergyUnit(e.target.value as typeof energyUnit);setConfirmed(false)}}><option value="kcal">kcal</option><option value="kJ">kJ</option></SelectField><SelectField label={h("יחידת הנתרן או המלח המודפסת", "Printed sodium or salt unit")} value={sodiumUnit} onChange={e=>{setSodiumUnit(e.target.value as typeof sodiumUnit);setConfirmed(false)}}><option value="mg">{h("נתרן במ״ג","Sodium in mg")}</option><option value="g">{h("נתרן בגרם","Sodium in g")}</option><option value="salt_g">{h("מלח בגרם","Salt in g")}</option></SelectField></div>
       <div className="grid grid-cols-2 gap-3">{valueField("fiber",h("סיבים (גרם, אופציונלי)","Fiber (g, optional)"))}{valueField("sugar",h("סוכר (גרם, אופציונלי)","Sugar (g, optional)"))}{valueField("saturatedFat",h("שומן רווי (גרם, אופציונלי)","Saturated fat (g, optional)"))}{valueField("sodium",sodiumUnit==="salt_g"?h("מלח (גרם, אופציונלי)","Salt (g, optional)"):sodiumUnit==="g"?h("נתרן (גרם, אופציונלי)","Sodium (g, optional)"):h("נתרן (מ״ג, אופציונלי)","Sodium (mg, optional)"))}</div></div></Disclosure>
     </div>}
+    {(food||manual)&&<div className="product-photo-choice">{photoPath&&<MealImage path={photoPath} thumbnail displayOnly alt={h("תמונת המוצר","Product photo")}/>}<Field label={h("תמונת מוצר (אופציונלי)","Product photo (optional)")} type="file" accept="image/*" capture="environment" disabled={busy} onChange={e=>{const file=e.target.files?.[0];if(file)void photograph(file)}}/><small>{h("התמונה תישמר במזונות שלך, ללא פענוח AI","Saved with your foods, without AI analysis")}</small></div>}
     {(food||manual)&&<><ProductAmountInput food={preview} basis={manual?basis:food?.basis??"g"} value={amount} onChange={setAmount}/><label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>{h("בדקתי שהמוצר, היחידה והערכים תואמים לאריזה", "I checked that the product, unit and values match the package")}</label><Button className="health-primary-action" disabled={!confirmed||busy||!validAmount} onClick={add}>{h("הוספה לארוחה", "Add to meal")}</Button></>}
     <Disclosure className="health-help" title={h("מקור הנתונים ודיוק", "Data source and accuracy")}><p>{h("Open Food Facts הוא מאגר קהילתי (ODbL). יש לבדוק שהמוצר והערכים תואמים לאריזה. ערכים שלא ידועים נשארים ריקים. ערכי מנה מחושבים ל־100 גרם או מ״ל, בלי להמיר ביניהם.", "Open Food Facts is a community database (ODbL). Check the product and values against your package. Unknown values stay empty. Printed servings are scaled to 100 g or ml, without converting between mass and volume.")}</p></Disclosure>
   </section>;
