@@ -37,6 +37,7 @@ final class WellnessUITests: XCTestCase {
         if !meal.isHittable { app.swipeUp() }
         XCTAssertTrue(meal.waitForExistence(timeout: 5)); meal.tap()
         XCTAssertTrue(app.staticTexts["טונה"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Back"].exists, "System navigation should also use the app's Hebrew localization")
         capture(app, name: "native-meal-details")
         app.buttons["tab-workouts"].tap()
         XCTAssertTrue(app.buttons["workout-55555555-5555-8555-8555-555555555555"].waitForExistence(timeout: 5))

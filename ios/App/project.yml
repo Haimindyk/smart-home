@@ -1,6 +1,7 @@
 name: SmartHomeWellness
 options:
   minimumXcodeGenVersion: 2.42.0
+  developmentLanguage: he
   deploymentTarget:
     iOS: '17.0'
 packages:
@@ -27,6 +28,8 @@ targets:
       path: Config/Info.plist
       properties:
         CFBundleDisplayName: Wellness
+        CFBundleDevelopmentRegion: he
+        CFBundleLocalizations: [he]
         CFBundleShortVersionString: '0.1.0'
         CFBundleVersion: '1'
         UILaunchScreen: {}

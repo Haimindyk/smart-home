@@ -15,7 +15,7 @@ struct TodayScreen: View {
                                 Text(store.selectedDate, format: .dateTime.month(.wide).year())
                                 Image(systemName: "chevron.down").font(.caption)
                             }.foregroundStyle(.secondary)
-                        }.accessibilityLabel("בחירת תאריך").accessibilityIdentifier("date-picker")
+                        }.frame(minHeight: 44).accessibilityLabel("בחירת תאריך").accessibilityIdentifier("date-picker")
                     }
                     DayRail()
                     CalorieCard()
@@ -64,11 +64,11 @@ private struct DayRail: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack {
-                Button { shift(-7) } label: { Image(systemName: "chevron.right") }.accessibilityLabel("שבוע קודם")
+                Button { shift(-7) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }.accessibilityLabel("שבוע קודם")
                 Spacer()
-                if !calendar.isDateInToday(store.selectedDate) { Button("היום") { store.selectedDate = Date() }.font(.caption.bold()) }
+                if !calendar.isDateInToday(store.selectedDate) { Button("היום") { store.selectedDate = Date() }.font(.caption.bold()).frame(minHeight: 44) }
                 Spacer()
-                Button { shift(7) } label: { Image(systemName: "chevron.left") }.accessibilityLabel("שבוע הבא")
+                Button { shift(7) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }.accessibilityLabel("שבוע הבא")
             }.foregroundStyle(.secondary)
             HStack(spacing: 5) {
                 ForEach(days, id: \.self) { day in
@@ -138,7 +138,7 @@ struct ProgressRing: View {
             Circle().stroke(color.opacity(0.13), lineWidth: 5)
             Circle().trim(from: 0, to: progress).stroke(color, style: StrokeStyle(lineWidth: 5, lineCap: .round)).rotationEffect(.degrees(-90))
             Image(systemName: symbol).foregroundStyle(color).font(.title3)
-        }.accessibilityHidden(true)
+        }.environment(\.layoutDirection, .leftToRight).accessibilityHidden(true)
     }
 }
 
