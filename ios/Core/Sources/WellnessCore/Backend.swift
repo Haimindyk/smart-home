@@ -31,6 +31,7 @@ public actor Backend {
     private var current: Session?
     private var generation = 0
     private var refreshTask: Task<Session, Error>?
+    private var refreshAttempt: UUID?
     public init(root: URL, publicKey: String, vault: any SessionVault, network: URLSession? = nil) throws {
         guard root.scheme == "https", root.host != nil, root.user == nil, root.password == nil,
               !publicKey.isEmpty, !publicKey.hasPrefix("sb_secret_"), publicKey != "CONFIGURE_PUBLIC_KEY" else { throw BackendError.configuration }
@@ -69,6 +70,8 @@ public actor Backend {
     public func login(pin: String) async throws -> Session {
         guard pin.count == 4, pin.allSatisfy({ $0.isASCII && $0.isNumber }) else { throw BackendError.invalidPIN }
         generation += 1; let attempt = generation
+        refreshTask?.cancel(); refreshTask = nil; refreshAttempt = nil; current = nil
+        try vault.clear()
         let (data, status) = try await raw("/functions/v1/pin-login", method: "POST", body: .object(["pin": .string(pin)]))
         let result = try json(data)
         if status == 429 || result["error"] == .string("rate_limited") { throw BackendError.rateLimited }
@@ -96,8 +99,9 @@ public actor Backend {
         guard let active = current, active.owner == old.owner else { throw BackendError.sessionChanged }
         if active.refreshToken != old.refreshToken { return active }
         if let refreshTask { return try await refreshTask.value }
-        let task = Task { try await self.performRefresh(old) }; refreshTask = task
-        defer { refreshTask = nil }
+        let attempt = UUID()
+        let task = Task { try await self.performRefresh(old) }; refreshTask = task; refreshAttempt = attempt
+        defer { if refreshAttempt == attempt { refreshTask = nil; refreshAttempt = nil } }
         return try await task.value
     }
     private func performRefresh(_ old: Session) async throws -> Session {
@@ -175,7 +179,7 @@ public actor Backend {
         return image
     }
     public func signOut() async {
-        let old = current; generation += 1; refreshTask?.cancel(); refreshTask = nil; current = nil
+        let old = current; generation += 1; refreshTask?.cancel(); refreshTask = nil; refreshAttempt = nil; current = nil
         try? vault.clear()
         if let old { _ = try? await raw("/auth/v1/logout", method: "POST", token: old.accessToken, query: [.init(name: "scope", value: "local")]) }
     }

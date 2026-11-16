@@ -42,10 +42,18 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/WellnessDerivedData" \
             -resultBundlePath "$RUNNER_TEMP/WellnessUI.xcresult" \
             -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test
+      - name: Export native screenshots
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/WellnessUI.xcresult" ]; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/WellnessUI.xcresult" --output-path "$RUNNER_TEMP/WellnessScreenshots"
+          fi
       - name: Save native UI test results and screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: native-ios-ui-results
-          path: ${{ runner.temp }}/WellnessUI.xcresult
+          path: |
+            ${{ runner.temp }}/WellnessUI.xcresult
+            ${{ runner.temp }}/WellnessScreenshots
           retention-days: 3

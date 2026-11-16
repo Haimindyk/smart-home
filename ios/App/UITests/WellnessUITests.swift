@@ -9,11 +9,18 @@ final class WellnessUITests: XCTestCase {
     private func capture(_ app: XCUIApplication, name: String) {
         let image = XCTAttachment(screenshot: app.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image)
     }
+    private func logicalText(_ value: Any?) -> String {
+        // SwiftUI inserts Unicode direction isolates around interpolated Hebrew.
+        let text = value as? String ?? ""
+        return String(String.UnicodeScalarView(text.unicodeScalars.filter {
+            !(0x2066...0x2069).contains($0.value) && $0.value != 0x200e && $0.value != 0x200f
+        }))
+    }
     func testEmptyDayHasZeroConsumptionAndCalendarOpens() {
         let app = launch("empty")
         let calories = app.descendants(matching: .any)["calories-card"].firstMatch
         XCTAssertTrue(calories.waitForExistence(timeout: 15))
-        XCTAssertEqual(calories.value as? String, "0 מתוך 1800")
+        XCTAssertEqual(logicalText(calories.value), "0 מתוך 1800")
         XCTAssertFalse(app.buttons["הוסף מים"].exists)
         capture(app, name: "native-empty-day")
         app.buttons["date-picker"].tap()
@@ -24,7 +31,7 @@ final class WellnessUITests: XCTestCase {
         let app = launch("meal")
         let calories = app.descendants(matching: .any)["calories-card"].firstMatch
         XCTAssertTrue(calories.waitForExistence(timeout: 15))
-        XCTAssertEqual(calories.value as? String, "150 מתוך 1800")
+        XCTAssertEqual(logicalText(calories.value), "150 מתוך 1800")
         capture(app, name: "native-today")
         let meal = app.buttons["meal-33333333-3333-4333-8333-333333333333"]
         if !meal.isHittable { app.swipeUp() }
@@ -32,7 +39,7 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["טונה"].waitForExistence(timeout: 5))
         capture(app, name: "native-meal-details")
         app.buttons["tab-workouts"].tap()
-        XCTAssertTrue(app.staticTexts["הליכה לבדיקה"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["workout-55555555-5555-8555-8555-555555555555"].waitForExistence(timeout: 5))
         capture(app, name: "native-workouts")
         app.buttons["tab-health"].tap()
         XCTAssertTrue(app.staticTexts["הפעילות שלך"].waitForExistence(timeout: 5))

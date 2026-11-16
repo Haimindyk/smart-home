@@ -37,7 +37,7 @@ struct WorkoutsScreen: View {
                                 if workout.data["appleHealth"] != .null { Image(systemName: "heart.fill").foregroundStyle(.pink).accessibilityLabel("Apple Health") }
                                 Text(statusName(workout.data["status"].stringValue)).font(.caption).foregroundStyle(.secondary)
                             }.wellnessCard()
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.plain).accessibilityIdentifier("workout-\(workout.id)")
                     }
                 }.padding(22)
             }.background(Color.wellnessCanvas.opacity(0.35)).toolbar(.hidden, for: .navigationBar).refreshable { await store.refresh() }

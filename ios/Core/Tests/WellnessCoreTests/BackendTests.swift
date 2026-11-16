@@ -152,4 +152,26 @@ final class BackendTests: XCTestCase {
             catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
         }
     }
+    func testFailedAccountSwitchCannotRestorePreviousSession() async throws {
+        let vault = MemoryVault()
+        try vault.save(Session(accessToken: "previous", refreshToken: "previous", owner: owner, member: member))
+        let api = try backend(vault: vault) { request in
+            XCTAssertEqual(request.url!.path, "/functions/v1/pin-login")
+            return (200, "{\"error\":\"invalid_pin\"}")
+        }
+        do { _ = try await api.login(pin: "0000"); XCTFail("Invalid PIN accepted") }
+        catch { XCTAssertEqual(error as? BackendError, .invalidPIN) }
+        XCTAssertNil(try vault.load())
+        let restored = try await api.restore(); XCTAssertNil(restored)
+    }
+    func testRateLimitIsReportedWithoutTreatingItAsWrongPIN() async throws {
+        let api = try backend { _ in (200, "{\"error\":\"rate_limited\"}") }
+        do { _ = try await api.login(pin: "0000"); XCTFail("Rate limit ignored") }
+        catch { XCTAssertEqual(error as? BackendError, .rateLimited) }
+    }
+    func testPrivilegedOrPlaceholderClientKeysAreRejected() {
+        for key in ["sb_secret_test", "CONFIGURE_PUBLIC_KEY", "", "header.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.signature"] {
+            XCTAssertThrowsError(try Backend(root: URL(string: "https://example.test")!, publicKey: key, vault: MemoryVault()))
+        }
+    }
 }
