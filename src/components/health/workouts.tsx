@@ -232,9 +232,11 @@ export function Workouts({
                       }[s.data.status]
                     }{" "}
                     ·{" "}
-                    {s.data.quick
-                      ? h("תיעוד מהיר ללא סטים", "Quick log without sets")
-                      : `${round(workoutVolume(s.data.exercises))} kg · ${h("נפח", "volume")}`}
+                    {s.data.appleHealth
+                      ? `Apple Health · ${round(s.data.appleHealth.durationSeconds / 60)} ${h("דק׳", "min")}`
+                      : s.data.quick
+                        ? h("תיעוד מהיר ללא סטים", "Quick log without sets")
+                        : `${round(workoutVolume(s.data.exercises))} kg · ${h("נפח", "volume")}`}
                   </p>
                 </div>
                 <Button

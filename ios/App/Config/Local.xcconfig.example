@@ -1,0 +1,4 @@
+// Copy to Local.xcconfig (ignored by Git). Use the existing project's public key.
+SUPABASE_PUBLIC_KEY = CONFIGURE_PUBLIC_KEY
+// Set your Apple development team for a physical device build.
+DEVELOPMENT_TEAM =

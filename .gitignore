@@ -52,3 +52,11 @@ next-env.d.ts
 *.pt
 *.pth
 *.onnx
+
+# Native iOS: generated projects, local public-key/signing configuration and builds
+/ios/**/Local.xcconfig
+/ios/**/*.xcodeproj/
+/ios/**/.build/
+/ios/**/.swiftpm/
+/ios/**/DerivedData/
+*.xcuserstate

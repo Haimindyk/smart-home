@@ -1,7 +1,9 @@
 # Apple Watch and iPhone activity import
 
-Research checked against Apple documentation on 2026-11-15. The current app is a
-web/PWA app; there is no HealthKit bridge or completed import feature yet.
+Research checked against Apple documentation on 2026-11-15. The production app is a
+web/PWA app. The first native SwiftUI/HealthKit companion is implemented under
+`ios/`; see [the native build and validation guide](../ios/README.md). Device
+HealthKit validation and distribution are not yet complete.
 
 - Manual, free path: Health on iPhone → profile → Export All Health Data. Apple
   exports health/fitness data as XML. A browser importer can read the selected
