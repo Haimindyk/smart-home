@@ -103,4 +103,14 @@ All reads/writes carry the verified user's bearer token and owner filter; RLS
 remains authoritative. No medical archive is uploaded.
 
 GitHub is the source of truth. All changes go through a PR; backend/web releases
-remain consequences of a main merge. iOS distribution is not automated here.
+remain consequences of a main merge. ## TestFlight
+
+Merging a PR that touches `ios/**` into `main` runs `.github/workflows/ios-beta.yml`
+on the self-hosted macOS runner: portable tests, `xcodegen generate`, signed archive
+(automatic signing via App Store Connect API key) and upload to TestFlight through
+`ios/fastlane` (`bundle exec fastlane beta`). Build number = GitHub run number;
+bump `MARKETING_VERSION` in `ios/App/project.yml` for a new version. Required
+`beta` environment secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_API_KEY`,
+`APPLE_DEVELOPER_TEAM_ID`, `MACOS_KEYCHAIN_PASSWORD`, `SUPABASE_PUBLIC_KEY`.
+One-time Apple setup: App ID `com.haimindyk.smarthome.wellness` with HealthKit
+enabled, an App Store Connect app record, and an app icon (not yet in the project).

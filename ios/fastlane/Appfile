@@ -1,0 +1,2 @@
+app_identifier("com.haimindyk.smarthome.wellness")
+team_id(ENV["APPLE_DEVELOPER_TEAM_ID"])

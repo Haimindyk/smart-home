@@ -1,0 +1,4 @@
+fastlane/vendor/
+fastlane/.bundle/
+fastlane/report.xml
+fastlane/asc_api_key.p8

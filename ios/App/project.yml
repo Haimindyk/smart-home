@@ -30,8 +30,9 @@ targets:
         CFBundleDisplayName: Wellness
         CFBundleDevelopmentRegion: he
         CFBundleLocalizations: [he]
-        CFBundleShortVersionString: '0.1.0'
-        CFBundleVersion: '1'
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSHealthShareUsageDescription: הצגת פעילות וייבוא אימונים שתבחר מ־Apple Health לחשבון שלך. לא נכתוב נתונים ל־Apple Health.
@@ -44,6 +45,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.haimindyk.smarthome.wellness
+        MARKETING_VERSION: '0.1.0'
+        CURRENT_PROJECT_VERSION: '1'
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
     dependencies:
