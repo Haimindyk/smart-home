@@ -1,0 +1,4 @@
+// Host and publishable/legacy anon key only. Never put a service/secret key here.
+SUPABASE_HOST = ogoxwhebqxjligxeqnqd.supabase.co
+SUPABASE_PUBLIC_KEY = CONFIGURE_PUBLIC_KEY
+#include? "Local.xcconfig"
