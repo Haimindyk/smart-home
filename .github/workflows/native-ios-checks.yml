@@ -32,3 +32,20 @@ jobs:
           -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
           -derivedDataPath "$RUNNER_TEMP/WellnessDerivedData"
           CODE_SIGNING_ALLOWED=NO build
+      - name: Test native screens with synthetic services
+        working-directory: ios/App
+        run: |
+          SIMULATOR_ID=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for runtime,devices in d["devices"].items() if "iOS" in runtime for x in devices if "iPhone" in x["name"]))')
+          xcodebuild -project SmartHomeWellness.xcodeproj \
+            -scheme SmartHomeWellness -configuration Debug \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -derivedDataPath "$RUNNER_TEMP/WellnessDerivedData" \
+            -resultBundlePath "$RUNNER_TEMP/WellnessUI.xcresult" \
+            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test
+      - name: Save native UI test results and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-ios-ui-results
+          path: ${{ runner.temp }}/WellnessUI.xcresult
+          retention-days: 3

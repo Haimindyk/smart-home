@@ -4,7 +4,7 @@ import WellnessCore
 
 @MainActor
 final class AppStore: ObservableObject {
-    enum Phase: Equatable { case starting, signedOut, signedIn, retry }
+    enum Phase: Equatable { case starting, signedOut, signedIn, signingOut, retry }
     @Published private(set) var phase: Phase = .starting
     @Published private(set) var session: Session?
     @Published private(set) var loading = false
@@ -26,6 +26,20 @@ final class AppStore: ObservableObject {
     private var revision = 0
     private var healthRevision = 0
     init() {
+#if DEBUG
+        if let scenario = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--ui-test-") }) {
+            // Simulator UI tests are fully synthetic and cannot reach a production API.
+            backend = nil
+            phase = scenario == "--ui-test-login" ? .signedOut : .signedIn
+            if phase == .signedIn {
+                session = Session(accessToken: "ui-test", refreshToken: "ui-test", owner: UITestFixtures.owner, member: "ui-test")
+                profile = .object(["timezone": .string("UTC")])
+                goals = UITestFixtures.goals(date: dateKey)
+                if scenario == "--ui-test-meal" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey) }
+            }
+            return
+        }
+#endif
         let info = Bundle.main.infoDictionary ?? [:]
         if let host = info["SUPABASE_HOST"] as? String, !host.contains("/"),
            let root = URL(string: "https://\(host)"), let key = info["SUPABASE_PUBLIC_KEY"] as? String {
@@ -125,7 +139,7 @@ final class AppStore: ObservableObject {
         revision += 1; healthRevision += 1
         session = nil; meals = []; goals = []; plans = []; workouts = []; profile = .null
         candidates = []; selection = []; steps = nil; healthLoaded = false; importMessage = nil; error = nil
-        busy = false; loading = false; phase = .starting
+        busy = false; loading = false; phase = .signingOut
         await backend?.signOut()
         phase = .signedOut
     }

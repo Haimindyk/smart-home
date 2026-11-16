@@ -28,7 +28,7 @@ private struct AppRoot: View {
     var body: some View {
         Group {
             switch store.phase {
-            case .starting: ProgressView("פותחים את היום שלך…")
+            case .starting, .signingOut: ProgressView("פותחים את היום שלך…")
             case .signedOut: LoginScreen()
             case .signedIn: HomeShell()
             case .retry:
@@ -97,6 +97,7 @@ private struct HomeShell: View {
                         .background(tab == item ? Color.black.opacity(0.07) : .clear, in: Capsule())
                     }
                     .accessibilityAddTraits(tab == item ? [.isSelected] : [])
+                    .accessibilityIdentifier("tab-\(String(describing: item))")
                 }
             }
             .padding(6).background(.ultraThinMaterial, in: Capsule())

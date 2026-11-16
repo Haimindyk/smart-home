@@ -46,4 +46,15 @@ targets:
     dependencies:
       - package: WellnessCore
     scheme:
-      testTargets: []
+      testTargets: [SmartHomeWellnessUITests]
+  SmartHomeWellnessUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.haimindyk.smarthome.wellness.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: SmartHomeWellness
+    dependencies:
+      - target: SmartHomeWellness

@@ -15,7 +15,7 @@ struct TodayScreen: View {
                                 Text(store.selectedDate, format: .dateTime.month(.wide).year())
                                 Image(systemName: "chevron.down").font(.caption)
                             }.foregroundStyle(.secondary)
-                        }.accessibilityLabel("בחירת תאריך")
+                        }.accessibilityLabel("בחירת תאריך").accessibilityIdentifier("date-picker")
                     }
                     DayRail()
                     CalorieCard()
@@ -33,7 +33,7 @@ struct TodayScreen: View {
                         ContentUnavailableView("עוד אין ארוחות ביום הזה", systemImage: "fork.knife", description: Text("הארוחות שלך מהחשבון יופיעו כאן."))
                     } else {
                         ForEach(store.dayMeals) { meal in
-                            NavigationLink { MealDetail(meal: meal) } label: { MealCard(meal: meal) }.buttonStyle(.plain)
+                            NavigationLink { MealDetail(meal: meal) } label: { MealCard(meal: meal) }.buttonStyle(.plain).accessibilityIdentifier("meal-\(meal.id)")
                         }
                     }
                 }.padding(22)
@@ -104,7 +104,10 @@ private struct CalorieCard: View {
                 else { Text("יעד יומי עדיין לא הוגדר").font(.caption).foregroundStyle(.secondary) }
             }.frame(maxWidth: .infinity, alignment: .leading)
             ProgressRing(value: consumed, target: target, color: .orange, symbol: "flame.fill").frame(width: 88, height: 88)
-        }.wellnessCard().accessibilityElement(children: .combine)
+        }.wellnessCard().accessibilityElement(children: .ignore)
+            .accessibilityLabel("קלוריות נאכלו")
+            .accessibilityValue("\(Int(consumed.rounded()))\(target.map { " מתוך \(Int($0))" } ?? "")")
+            .accessibilityIdentifier("calories-card")
     }
 }
 
