@@ -34,8 +34,11 @@ final class WellnessUITests: XCTestCase {
         XCTAssertEqual(logicalText(calories.value), "150 מתוך 1800")
         capture(app, name: "native-today")
         let meal = app.buttons["meal-33333333-3333-4333-8333-333333333333"]
-        if !meal.isHittable { app.swipeUp() }
+        // A partially visible card can be reported hittable while its center is
+        // under the floating tab bar. Bring the whole card into the viewport.
+        app.swipeUp()
         XCTAssertTrue(meal.waitForExistence(timeout: 5)); meal.tap()
+        XCTAssertTrue(app.navigationBars["ארוחת בדיקה"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["טונה"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["Back"].exists, "System navigation should also use the app's Hebrew localization")
         capture(app, name: "native-meal-details")
