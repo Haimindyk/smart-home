@@ -34,6 +34,15 @@ enum UITestFixtures {
         """
         return (try? JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))) ?? .null
     }
+    static var trainerProposal: JSONValue {
+        let json = """
+        {"requestId":"req-1","kind":"program","message":"תוכנית ABC לשלושה ימים בשבוע, 45 דקות לאימון, עם דגש על חזה וגב.","reasons":["שלושה ימי אימון מאפשרים התאוששות בין האימונים","בחרתי תרגילים מהציוד שסימנת"],
+         "changes":[{"id":"c1","expectedVersion":null,"data":{"name":"אימון A – חזה וכתפיים","days":[0],"archived":false,"notes":"","exercises":[
+            {"id":"a1","name":"שכיבות סמיכה","sets":3,"reps":12,"weight":0,"rest":60,"muscle":"חזה","equipment":"משקל גוף"},
+            {"id":"a2","name":"לחיצת חזה עם דאמבלים","sets":3,"reps":10,"weight":14,"rest":90,"muscle":"חזה","equipment":"דאמבלים"}]}}]}
+        """
+        return (try? JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))) ?? .null
+    }
     static func plans() -> [HealthRow] {
         func ex(_ id: String, _ name: String, _ sets: Int, _ reps: Int, _ weight: Double, _ muscle: String) -> String {
             "{\"id\":\"\(id)\",\"name\":\"\(name)\",\"muscle\":\"\(muscle)\",\"equipment\":\"\",\"kind\":\"strength\",\"sets\":\(sets),\"reps\":\(reps),\"weight\":\(weight),\"rest\":60,\"duration\":0,\"distance\":0,\"notes\":\"\"}"

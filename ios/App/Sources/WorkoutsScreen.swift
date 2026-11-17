@@ -4,6 +4,7 @@ import WellnessCore
 struct WorkoutsScreen: View {
     @EnvironmentObject private var store: AppStore
     @State private var creating = false
+    @State private var trainer = false
     @State private var planToArchive: HealthRow?
     private var history: [HealthRow] { store.workouts.sorted { ($0.data["startedAt"].stringValue ?? "") > ($1.data["startedAt"].stringValue ?? "") } }
     var body: some View {
@@ -14,6 +15,8 @@ struct WorkoutsScreen: View {
                     HStack {
                         Text("התוכניות שלי").sectionTitle()
                         Spacer()
+                        Button { trainer = true } label: { Image(systemName: "sparkles").font(.subheadline.weight(.bold)).foregroundStyle(.flame).frame(width: 40, height: 40).background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline)) }
+                            .buttonStyle(PressableStyle()).accessibilityLabel("מאמן AI").accessibilityIdentifier("trainer-button")
                         Button { creating = true } label: { Label("תוכנית חדשה", systemImage: "plus").font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(height: 40).background(Color.wellnessInk, in: Capsule()).foregroundStyle(Color.wellnessOnInk) }
                             .buttonStyle(PressableStyle()).accessibilityIdentifier("new-plan")
                     }
@@ -49,6 +52,7 @@ struct WorkoutsScreen: View {
                     }
                 }.padding(22)
             }.wellnessScreen().toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $trainer) { TrainerSheet().environmentObject(store) }
             .sheet(isPresented: $creating) { PlanEditorSheet().environmentObject(store) }
             .confirmationDialog("להעביר את התוכנית לארכיון?", isPresented: Binding(get: { planToArchive != nil }, set: { if !$0 { planToArchive = nil } }), titleVisibility: .visible) {
                 Button("העבר לארכיון", role: .destructive) { if let plan = planToArchive { Task { _ = await store.archivePlan(plan) } }; planToArchive = nil }

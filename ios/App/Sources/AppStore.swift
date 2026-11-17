@@ -243,6 +243,31 @@ final class AppStore: ObservableObject {
             if session?.owner == owner, let index = meals.firstIndex(where: { $0.id == row.id }) { meals[index] = saved }
         }
     }
+    // MARK: - AI trainer (wellness-ai: program / adjust / apply)
+    struct TrainingPreferences: Equatable {
+        var goal = "muscle", experience = "beginner", split = "auto", notes = ""
+        var days: Set<Int> = [0, 2, 4]
+        var minutes = 45
+        var focus: [String] = []
+        var equipment: Set<String> = ["bodyweight", "dumbbell", "machine", "cable"]
+        var json: JSONValue {
+            .object(["goal": .string(goal), "experience": .string(experience), "days": .array(days.sorted().map { .number(Double($0)) }), "minutes": .number(Double(minutes)),
+                     "split": .string(split), "focus": .array(focus.map { .string($0) }), "equipment": .array(equipment.sorted().map { .string($0) }), "avoid": .array([]), "notes": .string(String(notes.prefix(1000)))])
+        }
+    }
+    /// Stores the preferences in the profile first, exactly like the web app, so the server reads the same values.
+    func saveTrainingPreferences(_ prefs: TrainingPreferences) async -> Bool {
+#if DEBUG
+        if backend == nil, session?.accessToken == "ui-test" { return true }
+#endif
+        guard let row = profileRow, case .object(var fields) = row.data else { self.error = "צריך להשלים פרופיל באפליקציה הרגילה לפני שימוש במאמן."; return false }
+        fields["trainingPreferences"] = prefs.json
+        return await write("לא הצלחנו לשמור את ההעדפות.") { backend, owner in
+            let saved = try await backend.save(table: "health_profiles", owner: owner, payload: .object(fields), existing: row)
+            if session?.owner == owner { profileRow = saved; profile = saved.data }
+        }
+    }
+
     // MARK: - Workout plans
     struct PlanExercise: Identifiable, Equatable { var id = UUID(); var name = ""; var catalogId: String?; var muscle = ""; var equipment = ""; var sets = 3; var reps = 10; var weight = 0.0; var rest = 90 }
     func savePlan(name: String, days: Set<Int>, exercises: [PlanExercise]) async -> Bool {
@@ -350,7 +375,10 @@ final class AppStore: ObservableObject {
     /// Calls an allow-listed edge function as the signed-in owner. Returns the server's error code on failure.
     func call(_ function: String, _ body: JSONValue) async -> Result<JSONValue, BackendError> {
 #if DEBUG
-        if backend == nil, session?.accessToken == "ui-test", function == "wellness-chat" { return .success(UITestFixtures.chatState) }
+        if backend == nil, session?.accessToken == "ui-test" {
+            if function == "wellness-chat" { return .success(UITestFixtures.chatState) }
+            if function == "wellness-ai" { return .success(body["action"].stringValue == "apply" ? .object(["ok": .bool(true)]) : UITestFixtures.trainerProposal) }
+        }
 #endif
         guard let owner = session?.owner, let backend else { return .failure(.sessionRequired) }
         do {

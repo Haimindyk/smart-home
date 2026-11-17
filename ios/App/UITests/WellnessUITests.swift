@@ -137,6 +137,21 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["2/20 הודעות היום"].exists)
         capture(app, name: "native-coach-chat")
     }
+    func testAITrainerFlowRequiresApprovalBeforeSaving() {
+        let app = launch("coach")
+        XCTAssertTrue(app.descendants(matching: .any)["calories-card"].firstMatch.waitForExistence(timeout: 15))
+        app.buttons["tab-workouts"].tap()
+        app.buttons["trainer-button"].tap()
+        XCTAssertTrue(app.navigationBars["מאמן AI"].waitForExistence(timeout: 5))
+        capture(app, name: "native-trainer-form")
+        var tries = 0
+        while !app.buttons["trainer-generate"].exists && tries < 6 { app.swipeUp(); tries += 1 }
+        XCTAssertTrue(app.buttons["trainer-generate"].exists, "The form must be able to reach its submit button")
+        app.buttons["trainer-generate"].tap()
+        XCTAssertTrue(app.buttons["trainer-apply"].waitForExistence(timeout: 5), "The proposal must be shown for approval before anything is saved")
+        XCTAssertTrue(app.staticTexts["שכיבות סמיכה"].exists)
+        capture(app, name: "native-trainer-proposal")
+    }
     func testLoginRequiresFourDigits() {
         let app = launch("login")
         let pin = app.secureTextFields.firstMatch
