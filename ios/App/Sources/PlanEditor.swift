@@ -19,8 +19,8 @@ struct PlanEditorSheet: View {
                     HStack(spacing: 6) {
                         ForEach(0..<7, id: \.self) { day in
                             Button { if days.contains(day) { days.remove(day) } else { days.insert(day) } } label: {
-                                Text(dayNames[day]).font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, minHeight: 44)
-                                    .foregroundStyle(days.contains(day) ? Color.wellnessOnInk : Color.wellnessInk)
+                                Text(dayNames[day]).font(.hb(.subheadline, .semibold)).frame(maxWidth: .infinity, minHeight: 44)
+                                    .foregroundStyle(days.contains(day) ? Color.wellnessOnPrimary : Color.wellnessInk)
                                     .background(days.contains(day) ? Color.wellnessInk : Color.wellnessChip, in: Capsule())
                             }.buttonStyle(.plain).accessibilityAddTraits(days.contains(day) ? [.isSelected] : [])
                         }
@@ -29,7 +29,7 @@ struct PlanEditorSheet: View {
                 Section {
                     ForEach($exercises) { $exercise in
                         VStack(alignment: .leading, spacing: 16) {
-                            TextField("שם התרגיל", text: $exercise.name).font(.headline)
+                            TextField("שם התרגיל", text: $exercise.name).font(.hb(.headline, .semibold))
                             Stepper("סטים: \(exercise.sets)", value: $exercise.sets, in: 1...30)
                             Stepper("חזרות: \(exercise.reps)", value: $exercise.reps, in: 1...500)
                             Stepper("משקל: \(exercise.weight, specifier: "%g") ק״ג", value: $exercise.weight, in: 0...1000, step: 2.5)
@@ -69,7 +69,7 @@ struct CatalogPicker: View {
                         Section(ExerciseCatalog.muscleLabels[muscle] ?? muscle) {
                             ForEach(items) { item in
                                 Button { onPick(item); dismiss() } label: {
-                                    HStack(spacing: 12) { if let d = ExerciseDemos.resolve(name: item.he, catalogId: item.id) { ExerciseThumb(demo: d, size: 44) }; VStack(alignment: .leading, spacing: 3) { Text(item.he).font(.headline).foregroundStyle(Color.wellnessInk); Text(item.equipmentHe).font(.caption).foregroundStyle(Color.wellnessSecondary) }; Spacer(); Image(systemName: "plus.circle").foregroundStyle(Color.wellnessSecondary) }
+                                    HStack(spacing: 12) { if let d = ExerciseDemos.resolve(name: item.he, catalogId: item.id) { ExerciseThumb(demo: d, size: 44) }; VStack(alignment: .leading, spacing: 3) { Text(item.he).font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessInk); Text(item.equipmentHe).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }; Spacer(); Image(systemName: "plus.circle").foregroundStyle(Color.wellnessSecondary) }
                                 }.accessibilityElement(children: .combine).accessibilityIdentifier("catalog-\(item.id)")
                             }
                         }

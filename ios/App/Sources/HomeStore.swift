@@ -63,6 +63,50 @@ final class HomeStore: ObservableObject {
         } catch { if app.session?.owner == owner { self.error = "לא הצלחנו לטעון את ההיסטוריה." } }
     }
 
+    // MARK: Shopping helpers
+    struct ScannedProduct { let name: String; let price: Double? }
+    /// Family-taught names and per-chain prices first (barcode_products), then the shared food-lookup function (Open Food Facts).
+    func lookupBarcode(_ code: String) async -> ScannedProduct? {
+        guard code.count >= 8, code.count <= 14, code.allSatisfy(\.isNumber), let app, let owner = app.session?.owner else { return nil }
+        if let backend = app.backend,
+           let row = try? await backend.householdRows(table: "barcode_products", owner: owner, filters: [.init(name: "barcode", value: "eq.\(code)")], limit: 1, singlePage: true).first, let name = row.str("product_name") {
+            let prices = ["price_rami_levy", "price_shufersal", "price_osher_ad", "price_carrefour", "price_super_pharm"].compactMap { row.num($0) }
+            return ScannedProduct(name: name, price: prices.min())
+        }
+        if let foods = await app.searchFoods(query: code, barcode: code), let name = foods.first?["name"].stringValue { return ScannedProduct(name: name, price: nil) }
+        return nil
+    }
+    func addShoppingItem(title: String, price: Double?, section: HSection) async {
+        let before = Set(tasks.map(\.id))
+        await addTask(title: title, section: section)
+        if let price, let added = tasks.first(where: { !before.contains($0.id) && $0.title == title }) {
+            await update(added, fields: ["price": .number(price), "currency": .string("ILS")]) { $0.price = price }
+        }
+    }
+    func shareText(for section: HSection) -> String {
+        let open = tasks(in: section.id).filter { $0.parentID == nil && !$0.isCompleted }
+        let lines = open.map { t -> String in
+            var line = "• \(t.title)"
+            if let q = t.quantity { line += " ×\(q.formatted())" + (t.unit.map { " \($0)" } ?? "") }
+            return line
+        }
+        return "\(section.emoji ?? "🛒") \(section.name)\n" + lines.joined(separator: "\n")
+    }
+
+    // MARK: Ordering
+    /// Moves a top-level task one step up or down inside its section; the new rank sits between its new neighbours (same scheme as the web app).
+    func move(_ task: HTask, in section: HSection, by step: Int) async {
+        let siblings = tasks.filter { $0.sectionID == section.id && $0.parentID == nil && !$0.isCompleted }.sorted { $0.position < $1.position }
+        guard let index = siblings.firstIndex(where: { $0.id == task.id }) else { return }
+        let target = index + step
+        guard siblings.indices.contains(target) else { return }
+        let before: String?, after: String?
+        if step < 0 { before = target > 0 ? siblings[target - 1].position : nil; after = siblings[target].position }
+        else { before = siblings[target].position; after = target + 1 < siblings.count ? siblings[target + 1].position : nil }
+        guard let position = try? FractionalIndex.between(before, after) else { return }
+        await update(task, fields: ["position": .string(position)]) { $0.position = position }
+    }
+
     // MARK: Sections
     func addSection(name: String, emoji: String, kind: String) async {
         let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)

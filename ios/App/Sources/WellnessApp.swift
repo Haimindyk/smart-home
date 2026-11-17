@@ -16,10 +16,10 @@ struct WellnessApp: App {
                 .onChange(of: store.phase) { _, phase in if phase != .signedIn { home.reset() } }
                 .environment(\.layoutDirection, .rightToLeft)
                 .environment(\.locale, Locale(identifier: "he_IL"))
-                .tint(Color.wellnessInk)
+                .tint(Color.wellnessPrimary)
                 .overlay {
                     // Keep meals and Health data out of the app-switcher snapshot.
-                    if scenePhase != .active { Color.wellnessCanvas.ignoresSafeArea().overlay(Image(systemName: "heart.fill").font(.largeTitle)) }
+                    if scenePhase != .active { Color.wellnessCanvas.ignoresSafeArea().overlay(Image(systemName: "heart.fill").font(.hb(.largeTitle))) }
                 }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active, store.phase == .signedIn { Task { await store.refresh(); await home.refresh() } }
@@ -62,9 +62,9 @@ private struct LoginScreen: View {
     var body: some View {
         VStack(spacing: 26) {
             Spacer()
-            Image(systemName: "heart.fill").font(.largeTitle.weight(.semibold)).imageScale(.large).foregroundStyle(.flame).padding(30).background(Color.wellnessCard, in: Circle()).shadow(color: .black.opacity(0.06), radius: 18, y: 8)
+            Image(systemName: "heart.fill").font(.hb(.largeTitle, .semibold)).imageScale(.large).foregroundStyle(.flame).padding(30).background(Color.wellnessCard, in: Circle()).shadow(color: .black.opacity(0.06), radius: 18, y: 8)
             VStack(spacing: 8) {
-                Text("טוב שחזרת").font(.system(.largeTitle, design: .rounded).bold())
+                Text("טוב שחזרת").font(.hb(.largeTitle, .bold))
                 Text("אותו קוד, אותם נתונים").foregroundStyle(Color.wellnessSecondary)
             }
             HStack(spacing: 14) {
@@ -75,12 +75,12 @@ private struct LoginScreen: View {
             }.accessibilityHidden(true).sensoryFeedback(.selection, trigger: pin.count)
             SecureField("הקוד האישי שלך", text: $pin)
                 .keyboardType(.numberPad).textContentType(.password)
-                .multilineTextAlignment(.center).font(.title2.monospacedDigit())
+                .multilineTextAlignment(.center).font(.hb(.title2)).monospacedDigit()
                 .padding(22).background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous)).shadow(color: .black.opacity(0.04), radius: 12, y: 4)
                 .privacySensitive()
                 .onChange(of: pin) { _, value in pin = String(value.filter { $0.isASCII && $0.isNumber }.prefix(4)) }
             Button { Task { let code = pin; pin = ""; await store.login(code) } } label: {
-                if store.busy { ProgressView().tint(Color.wellnessOnInk) } else { Text("כניסה") }
+                if store.busy { ProgressView().tint(Color.wellnessOnPrimary) } else { Text("כניסה") }
             }.buttonStyle(PrimaryButton()).disabled(pin.count != 4 || store.busy)
             Spacer(); Spacer()
         }.padding(28).frame(maxWidth: 480).frame(maxWidth: .infinity).wellnessScreen()

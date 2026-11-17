@@ -32,6 +32,9 @@ targets:
         buildPhase: resources
       - path: Resources/exercise-demos.json
         buildPhase: resources
+      - path: Resources/Fonts
+        type: folder
+        buildPhase: resources
     info:
       path: Config/Info.plist
       properties:
@@ -43,6 +46,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIAppFonts: [Fonts/Heebo-Regular.ttf, Fonts/Heebo-Medium.ttf, Fonts/Heebo-SemiBold.ttf, Fonts/Heebo-Bold.ttf, Fonts/Heebo-ExtraBold.ttf]
         NSCameraUsageDescription: המצלמה משמשת רק לסריקת ברקוד של מוצר כדי להוסיף אותו לארוחה. התמונה לא נשמרת.
         NSHealthUpdateUsageDescription: האפליקציה לא כותבת נתונים ל־Apple Health; ההרשאה נדרשת על ידי Apple עבור גישת HealthKit לקריאה בלבד.
         NSHealthShareUsageDescription: הצגת פעילות וייבוא אימונים שתבחר מ־Apple Health לחשבון שלך. לא נכתוב נתונים ל־Apple Health.

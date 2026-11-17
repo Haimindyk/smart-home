@@ -34,7 +34,7 @@ struct ProgressScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    Text("ההתקדמות שלך").font(.largeTitle.bold())
+                    Text("ההתקדמות שלך").font(.hb(.largeTitle, .bold))
                     HStack(spacing: 12) {
                         stat("ממוצע יומי", average > 0 ? "\(Int(average.rounded()))" : "—", "קק״ל", .kcalAmberText)
                         stat("ימים עם תיעוד", "\(loggedDays)", "מתוך 7", .proteinBlueText)
@@ -47,7 +47,7 @@ struct ProgressScreen: View {
                                     .foregroundStyle(day.kcal > (target ?? .infinity) ? Color.fatCoral : Color.kcalAmber).cornerRadius(6)
                             }
                             if let target { RuleMark(y: .value("יעד", target)).lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 4])).foregroundStyle(Color.wellnessSecondary)
-                                .annotation(position: .bottom, alignment: .leading) { Text("יעד \(Int(target))").font(.caption2).foregroundStyle(Color.wellnessSecondary) } }
+                                .annotation(position: .bottom, alignment: .leading) { Text("יעד \(Int(target))").font(.hb(.caption2)).foregroundStyle(Color.wellnessSecondary) } }
                         }
                         .chartXAxis { AxisMarks(values: .stride(by: .day)) { _ in AxisValueLabel(format: .dateTime.weekday(.narrow)) } }
                         .frame(height: 180)
@@ -57,7 +57,7 @@ struct ProgressScreen: View {
                             ContentUnavailableView("עוד אין מספיק נתונים", systemImage: "scalemass", description: Text("הוסף שקילות בהגדרות כדי לראות מגמה."))
                                 .frame(height: 180)
                         } else {
-                            if let delta { Text(String(format: "%+.1f ק״ג מאז %@", delta, weights.first!.date.formatted(.dateTime.day().month(.abbreviated)))).font(.subheadline).foregroundStyle(Color.wellnessSecondary) }
+                            if let delta { Text(String(format: "%+.1f ק״ג מאז %@", delta, weights.first!.date.formatted(.dateTime.day().month(.abbreviated)))).font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary) }
                             let low = (weights.map(\.kg).min() ?? 0) - 1, high = (weights.map(\.kg).max() ?? 0) + 1
                             Chart(weights, id: \.date) { point in
                                 AreaMark(x: .value("תאריך", point.date), yStart: .value("בסיס", low), yEnd: .value("ק״ג", point.kg)).foregroundStyle(LinearGradient(colors: [Color.fatCoral.opacity(0.3), .clear], startPoint: .top, endPoint: .bottom)).interpolationMethod(.catmullRom)
@@ -73,9 +73,9 @@ struct ProgressScreen: View {
     }
     private func stat(_ title: String, _ value: String, _ unit: String, _ color: Color) -> some View {
         VStack(spacing: 4) {
-            Text(value).font(.title2.weight(.heavy).monospacedDigit()).foregroundStyle(color)
-            Text(unit).font(.caption2).foregroundStyle(Color.wellnessSecondary)
-            Text(title).font(.caption).foregroundStyle(Color.wellnessSecondary).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+            Text(value).font(.hb(.title2, .heavy)).monospacedDigit().foregroundStyle(color)
+            Text(unit).font(.hb(.caption2)).foregroundStyle(Color.wellnessSecondary)
+            Text(title).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
         }.frame(maxWidth: .infinity).padding(.vertical, 14).padding(.horizontal, 4)
             .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.wellnessHairline))

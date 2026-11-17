@@ -127,7 +127,7 @@ public actor Backend {
         return result
     }
     // MARK: - Household tables (shared, not owner-scoped: sections, tasks, chores, events, members)
-    public static let householdReadable: Set<String> = ["sections", "tasks", "chores", "chore_completions", "family_events", "members", "activity_log"]
+    public static let householdReadable: Set<String> = ["sections", "tasks", "chores", "chore_completions", "family_events", "members", "activity_log", "barcode_products"]
     public static let householdWritable: Set<String> = ["sections", "tasks", "chores", "family_events"]
     private static let householdRPCs: Set<String> = ["complete_chore"]
 

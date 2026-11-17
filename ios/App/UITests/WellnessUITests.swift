@@ -213,12 +213,24 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["נועה"].waitForExistence(timeout: 5))
         capture(app, name: "native-home-members")
         app.buttons["סגור"].tap()
-        app.buttons["home-menu"].tap()
-        app.buttons["חיפוש"].tap()
+        app.buttons["home-search"].tap()
         let search = app.searchFields.firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("חלב")
-        XCTAssertTrue(app.buttons.containing(.staticText, identifier: "חלב").firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "חלב")).firstMatch.waitForExistence(timeout: 5))
         capture(app, name: "native-home-search")
+    }
+    func testHouseholdTaskEditorAddsSubtask() {
+        let app = launch("home")
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "לשלם ארנונה")).element(boundBy: 0)
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        row.tap()
+        let field = app.textFields["subtask-field"]
+        var tries = 0
+        while !field.exists && tries < 6 { app.swipeUp(); tries += 1 }
+        XCTAssertTrue(field.exists, "The editor offers subtasks")
+        field.tap(); field.typeText("לצלם את החשבון\n")
+        XCTAssertTrue(app.staticTexts["לצלם את החשבון"].waitForExistence(timeout: 5))
+        capture(app, name: "native-home-subtask")
     }
     func testLoginRequiresFourDigits() {
         let app = launch("login")

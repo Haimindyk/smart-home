@@ -49,8 +49,8 @@ struct HistorySheet: View {
                     HStack(alignment: .top, spacing: 12) {
                         MemberAvatar(member: item.actorID.flatMap { home.member($0) }, size: 36)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(item.summary.isEmpty ? "\(item.entityType) · \(item.action)" : item.summary).font(.body).foregroundStyle(Color.wellnessInk)
-                            if let when = item.createdAt { Text(when, format: .relative(presentation: .named)).font(.caption).foregroundStyle(Color.wellnessSecondary) }
+                            Text(item.summary.isEmpty ? "\(item.entityType) · \(item.action)" : item.summary).font(.hb(.body)).foregroundStyle(Color.wellnessInk)
+                            if let when = item.createdAt { Text(when, format: .relative(presentation: .named)).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }
                         }
                     }.accessibilityElement(children: .combine)
                 }
@@ -74,9 +74,9 @@ struct MembersSheet: View {
                     ForEach(home.members) { m in
                         HStack(spacing: 14) {
                             MemberAvatar(member: m, size: 44)
-                            Text(m.name).font(.headline)
+                            Text(m.name).font(.hb(.headline, .semibold))
                             Spacer()
-                            if m.id == home.me?.id { Text("זה אתה").font(.caption.weight(.semibold)).padding(.horizontal, 10).padding(.vertical, 4).background(Color.wellnessChip, in: Capsule()) }
+                            if m.id == home.me?.id { Text("זה אתה").font(.hb(.caption, .semibold)).padding(.horizontal, 10).padding(.vertical, 4).background(Color.wellnessChip, in: Capsule()) }
                         }.frame(minHeight: 52).accessibilityElement(children: .combine)
                     }
                 }
@@ -117,7 +117,7 @@ struct SearchSheet: View {
                     Button { if let id = hit.sectionID { home.selectedSectionID = id }; dismiss() } label: {
                         HStack(spacing: 12) {
                             Image(systemName: hit.icon).foregroundStyle(Color.wellnessSecondary).frame(width: 28)
-                            VStack(alignment: .leading, spacing: 2) { Text(hit.title).foregroundStyle(Color.wellnessInk); Text(hit.subtitle).font(.caption).foregroundStyle(Color.wellnessSecondary) }
+                            VStack(alignment: .leading, spacing: 2) { Text(hit.title).foregroundStyle(Color.wellnessInk); Text(hit.subtitle).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }
                         }.frame(minHeight: 44)
                     }.accessibilityElement(children: .combine)
                 }

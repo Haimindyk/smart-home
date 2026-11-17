@@ -11,13 +11,13 @@ struct WorkoutsScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    Text("האימונים שלך").font(.system(.largeTitle, design: .rounded).bold())
+                    Text("האימונים שלך").font(.hb(.largeTitle, .bold))
                     HStack {
                         Text("התוכניות שלי").sectionTitle()
                         Spacer()
-                        Button { trainer = true } label: { Image(systemName: "sparkles").font(.subheadline.weight(.bold)).foregroundStyle(.flame).frame(width: 40, height: 40).background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline)) }
+                        Button { trainer = true } label: { Image(systemName: "sparkles").font(.hb(.subheadline, .bold)).foregroundStyle(.flame).frame(width: 40, height: 40).background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline)) }
                             .buttonStyle(PressableStyle()).accessibilityLabel("מאמן AI").accessibilityIdentifier("trainer-button")
-                        Button { creating = true } label: { Label("תוכנית חדשה", systemImage: "plus").font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(height: 40).background(Color.wellnessInk, in: Capsule()).foregroundStyle(Color.wellnessOnInk) }
+                        Button { creating = true } label: { Label("תוכנית חדשה", systemImage: "plus").font(.hb(.subheadline, .semibold)).padding(.horizontal, 14).frame(height: 40).background(Color.wellnessPrimary, in: Capsule()).foregroundStyle(Color.wellnessOnPrimary) }
                             .buttonStyle(PressableStyle()).accessibilityIdentifier("new-plan")
                     }
                     if store.activePlans.isEmpty {
@@ -26,12 +26,12 @@ struct WorkoutsScreen: View {
                     ForEach(store.activePlans) { plan in
                         NavigationLink { PlanDetail(plan: plan) } label: {
                             HStack(spacing: 16) {
-                                Image(systemName: "dumbbell.fill").font(.title2).padding(14).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                Image(systemName: "dumbbell.fill").font(.hb(.title2)).padding(14).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text(plan.data["name"].stringValue ?? "תוכנית אימון").font(.headline)
-                                    Text("\(plan.data["exercises"].arrayValue.count) תרגילים").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
+                                    Text(plan.data["name"].stringValue ?? "תוכנית אימון").font(.hb(.headline, .semibold))
+                                    Text("\(plan.data["exercises"].arrayValue.count) תרגילים").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
-                                Image(systemName: "chevron.left").foregroundStyle(Color.wellnessSecondary).font(.caption)
+                                Image(systemName: "chevron.left").foregroundStyle(Color.wellnessSecondary).font(.hb(.caption))
                             }.wellnessCard()
                         }.buttonStyle(PressableStyle()).accessibilityIdentifier("plan-\(plan.id)")
                         .contextMenu { Button(role: .destructive) { planToArchive = plan } label: { Label("העבר לארכיון", systemImage: "archivebox") } }
@@ -42,11 +42,11 @@ struct WorkoutsScreen: View {
                         NavigationLink { WorkoutDetail(workout: workout) } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text(workout.data["name"].stringValue ?? "אימון").font(.headline)
-                                    Text(workout.data["date"].stringValue ?? "").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
+                                    Text(workout.data["name"].stringValue ?? "אימון").font(.hb(.headline, .semibold))
+                                    Text(workout.data["date"].stringValue ?? "").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                                 if workout.data["appleHealth"] != .null { Image(systemName: "heart.fill").foregroundStyle(.pink).accessibilityLabel("Apple Health") }
-                                Text(statusName(workout.data["status"].stringValue)).font(.caption).foregroundStyle(Color.wellnessSecondary)
+                                Text(statusName(workout.data["status"].stringValue)).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
                             }.wellnessCard()
                         }.buttonStyle(PressableStyle()).accessibilityIdentifier("workout-\(workout.id)")
                     }
@@ -76,12 +76,12 @@ private struct PlanDetail: View {
                     HStack(spacing: 12) {
                         if let found { ExerciseThumb(demo: found) }
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(exercise["name"].stringValue ?? "תרגיל").font(.headline).foregroundStyle(Color.wellnessInk)
-                            Text("\(Int(exercise["sets"].doubleValue ?? 0)) סטים · \(Int(exercise["reps"].doubleValue ?? 0)) חזרות").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
+                            Text(exercise["name"].stringValue ?? "תרגיל").font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessInk)
+                            Text("\(Int(exercise["sets"].doubleValue ?? 0)) סטים · \(Int(exercise["reps"].doubleValue ?? 0)) חזרות").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
                             if exercise["loadUnknown"].boolValue != true, let weight = exercise["weight"].doubleValue, weight > 0 {
-                                Text("\(weight, specifier: "%g") ק״ג").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
+                                Text("\(weight, specifier: "%g") ק״ג").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
                             }
-                            if let notes = exercise["notes"].stringValue, !notes.isEmpty { Text(notes).font(.footnote).foregroundStyle(Color.wellnessSecondary) }
+                            if let notes = exercise["notes"].stringValue, !notes.isEmpty { Text(notes).font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary) }
                         }.frame(maxWidth: .infinity, alignment: .leading)
                         if found != nil { Image(systemName: "play.rectangle").foregroundStyle(Color.wellnessSecondary) }
                     }.padding(.vertical, 6)

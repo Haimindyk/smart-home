@@ -53,7 +53,7 @@ struct TrainerSheet: View {
             Section("הערות (לא חובה)") { TextField("פציעות, העדפות…", text: $prefs.notes, axis: .vertical).lineLimit(1...4) }
             if let error { Section { Text(error).foregroundStyle(Color.fatCoralText) } }
             Section {
-                Button { Task { await generate() } } label: { if busy { HStack(spacing: 10) { ProgressView().tint(Color.wellnessOnInk); Text("מכין הצעה…") } } else { Label(mode == "program" ? "יצירת תוכנית" : "הצעת שיפור", systemImage: "sparkles") } }
+                Button { Task { await generate() } } label: { if busy { HStack(spacing: 10) { ProgressView().tint(Color.wellnessOnPrimary); Text("מכין הצעה…") } } else { Label(mode == "program" ? "יצירת תוכנית" : "הצעת שיפור", systemImage: "sparkles") } }
                     .buttonStyle(PrimaryButton()).listRowBackground(Color.clear).listRowInsets(EdgeInsets()).disabled(!canSubmit).accessibilityIdentifier("trainer-generate")
             } footer: { Text("ההצעה מוצגת לבדיקה. שום דבר לא נשמר עד שתאשר.") }
         }.wellnessList()
@@ -61,7 +61,7 @@ struct TrainerSheet: View {
     private var canSubmit: Bool { !busy && !prefs.days.isEmpty && !prefs.equipment.isEmpty && (mode == "program" || !planId.isEmpty) }
     private func review(_ proposal: JSONValue) -> some View {
         List {
-            Section { Text(proposal["message"].stringValue ?? "").font(.headline) }
+            Section { Text(proposal["message"].stringValue ?? "").font(.hb(.headline, .semibold)) }
             reasonsSection(proposal["reasons"].arrayValue.compactMap(\.stringValue))
             ForEach(Array(proposal["changes"].arrayValue.enumerated()), id: \.offset) { _, change in changeSection(change) }
             if let error { Section { Text(error).foregroundStyle(Color.fatCoralText) } }
@@ -80,13 +80,13 @@ struct TrainerSheet: View {
         let sets = Int(e["sets"].doubleValue ?? 0), reps = Int(e["reps"].doubleValue ?? 0), weight = e["weight"].doubleValue ?? 0
         let detail = "\(sets) סטים · \(reps) חזרות" + (weight > 0 ? " · \(weight.formatted()) ק״ג" : "")
         return VStack(alignment: .leading, spacing: 3) {
-            Text(e["name"].stringValue ?? "תרגיל").font(.headline)
-            Text(detail).font(.subheadline).foregroundStyle(Color.wellnessSecondary)
+            Text(e["name"].stringValue ?? "תרגיל").font(.hb(.headline, .semibold))
+            Text(detail).font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
         }.accessibilityElement(children: .combine)
     }
     private var approvalSection: some View {
         Section {
-            Button { Task { await apply() } } label: { if busy { ProgressView().tint(Color.wellnessOnInk) } else { Text("אשר ושמור") } }
+            Button { Task { await apply() } } label: { if busy { ProgressView().tint(Color.wellnessOnPrimary) } else { Text("אשר ושמור") } }
                 .buttonStyle(PrimaryButton()).listRowBackground(Color.clear).listRowInsets(EdgeInsets()).disabled(busy).accessibilityIdentifier("trainer-apply")
             Button("חזרה לשינוי הבקשה") { proposal = nil }.frame(maxWidth: .infinity).disabled(busy).listRowBackground(Color.clear)
         } footer: { Text("הגרסה הקודמת של התוכנית נשמרת בהיסטוריה. זה מידע כללי ולא תחליף למאמן מוסמך.") }
@@ -114,7 +114,7 @@ struct TrainerSheet: View {
     private func chips(_ range: Range<Int>, selected: @escaping (Int) -> Bool, label: @escaping (Int) -> String, toggle: @escaping (Int) -> Void) -> some View {
         HStack(spacing: 6) {
             ForEach(Array(range), id: \.self) { i in
-                Button { toggle(i) } label: { Text(label(i)).font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(selected(i) ? Color.wellnessOnInk : Color.wellnessInk).background(selected(i) ? Color.wellnessInk : Color.wellnessChip, in: Capsule()) }.buttonStyle(.plain).accessibilityAddTraits(selected(i) ? [.isSelected] : [])
+                Button { toggle(i) } label: { Text(label(i)).font(.hb(.subheadline, .semibold)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(selected(i) ? Color.wellnessOnPrimary : Color.wellnessInk).background(selected(i) ? Color.wellnessInk : Color.wellnessChip, in: Capsule()) }.buttonStyle(.plain).accessibilityAddTraits(selected(i) ? [.isSelected] : [])
             }
         }
     }
@@ -131,7 +131,7 @@ struct FlowChips: View {
     }
     private func row(_ list: [String]) -> some View {
         HStack(spacing: 6) { ForEach(list, id: \.self) { item in
-            Button { toggle(item) } label: { Text(label(item)).font(.footnote.weight(.semibold)).padding(.horizontal, 10).frame(minHeight: 40).foregroundStyle(selected(item) ? Color.wellnessOnInk : Color.wellnessInk).background(selected(item) ? Color.wellnessInk : Color.wellnessChip, in: Capsule()) }.buttonStyle(.plain).accessibilityAddTraits(selected(item) ? [.isSelected] : [])
+            Button { toggle(item) } label: { Text(label(item)).font(.hb(.footnote, .semibold)).padding(.horizontal, 10).frame(minHeight: 40).foregroundStyle(selected(item) ? Color.wellnessOnPrimary : Color.wellnessInk).background(selected(item) ? Color.wellnessInk : Color.wellnessChip, in: Capsule()) }.buttonStyle(.plain).accessibilityAddTraits(selected(item) ? [.isSelected] : [])
         } }
     }
 }

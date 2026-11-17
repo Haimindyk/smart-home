@@ -42,8 +42,8 @@ struct RootShell: View {
                 ForEach(RootTab.allCases, id: \.self) { item in
                     Button { withAnimation(reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.8)) { tab = item } } label: {
                         VStack(spacing: 5) {
-                            Image(systemName: item.icon).font(.title3).symbolEffect(.bounce, value: tab == item)
-                            if !typeSize.isAccessibilitySize { Text(item.rawValue).font(.caption.weight(.semibold)).lineLimit(1) }
+                            Image(systemName: item.icon).font(.hb(.title3)).symbolEffect(.bounce, value: tab == item)
+                            if !typeSize.isAccessibilitySize { Text(item.rawValue).font(.hb(.caption, .semibold)).lineLimit(1) }
                         }
                         .foregroundStyle(tab == item ? Color.wellnessInk : Color.wellnessInk.opacity(0.8))
                         .frame(maxWidth: .infinity).padding(.vertical, 11)
@@ -60,8 +60,8 @@ struct RootShell: View {
             Button {
                 switch tab { case .home: addingTask = true; case .calendar: addingEvent = true; case .health: addingMeal = true }
             } label: {
-                Image(systemName: "plus").font(.title2.weight(.bold)).foregroundStyle(Color.wellnessOnInk)
-                    .frame(width: 66, height: 66).background(Color.wellnessInk, in: Circle()).shadow(color: .black.opacity(0.18), radius: 12, y: 5)
+                Image(systemName: "plus").font(.hb(.title2, .bold)).foregroundStyle(Color.wellnessOnPrimary)
+                    .frame(width: 66, height: 66).background(Color.wellnessPrimary, in: Circle()).shadow(color: .black.opacity(0.18), radius: 12, y: 5)
             }.buttonStyle(PressableStyle())
                 .accessibilityLabel(tab == .home ? "הוספת משימה" : tab == .calendar ? "הוספת אירוע" : "הוספת ארוחה").accessibilityIdentifier("add-meal")
         }
@@ -103,9 +103,9 @@ struct HealthTabBar: View {
             HStack(spacing: 6) {
                 ForEach(HealthTab.allCases, id: \.self) { item in
                     Button { withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.82)) { nav.tab = item } } label: {
-                        Text(item.rawValue).font(.subheadline.weight(.semibold)).padding(.horizontal, 16).frame(minHeight: 40)
-                            .foregroundStyle(nav.tab == item ? Color.wellnessOnInk : Color.wellnessInk)
-                            .background { if nav.tab == item { Capsule().fill(Color.wellnessInk).matchedGeometryEffect(id: "seg", in: pill) } else { Capsule().fill(Color.wellnessChip) } }
+                        Text(item.rawValue).font(.hb(.subheadline, .semibold)).padding(.horizontal, 16).frame(minHeight: 40)
+                            .foregroundStyle(nav.tab == item ? Color.wellnessInk : Color.wellnessSecondary)
+                            .background { if nav.tab == item { Capsule().fill(Color.wellnessCard).overlay(Capsule().strokeBorder(Color.wellnessInk, lineWidth: 1.5)).matchedGeometryEffect(id: "seg", in: pill) } else { Capsule().strokeBorder(Color.wellnessHairline) } }
                     }.buttonStyle(.plain).accessibilityAddTraits(nav.tab == item ? [.isSelected] : [])
                         .accessibilityIdentifier("tab-\(String(describing: item))")
                 }

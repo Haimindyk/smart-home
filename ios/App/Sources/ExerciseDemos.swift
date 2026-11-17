@@ -51,7 +51,7 @@ struct ExerciseDemoSheet: View {
                     if let cues = demo.cues, !cues.isEmpty {
                         VStack(alignment: .leading, spacing: 8) { Text("דגשי ביצוע").sectionTitle(); Text(cues) }.frame(maxWidth: .infinity, alignment: .leading).wellnessCard()
                     }
-                    Text("חומר לימוד כללי, לא הנחיה רפואית אישית.").font(.footnote).foregroundStyle(Color.wellnessSecondary)
+                    Text("חומר לימוד כללי, לא הנחיה רפואית אישית.").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary)
                 }.padding(20)
             }.wellnessScreen().navigationTitle(name).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("סגור") { dismiss() } } }

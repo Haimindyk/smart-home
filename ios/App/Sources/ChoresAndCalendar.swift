@@ -3,10 +3,11 @@ import WellnessCore
 
 // MARK: - Chores
 
-struct ChoreList: View {
+struct ChorePanelBody: View {
     @EnvironmentObject private var home: HomeStore
     let section: HSection
     @State private var confirmDelete: HChore?
+    @State private var draft = ""
     private func status(_ chore: HChore) -> (text: String, color: Color) {
         guard let due = chore.nextDue else { return ("", Color.wellnessSecondary) }
         var cal = Calendar(identifier: .gregorian); cal.timeZone = home.timeZone
@@ -23,25 +24,27 @@ struct ChoreList: View {
         switch c.freq { case "daily": return n == 1 ? "כל יום" : "כל \(n) ימים"; case "weekly": return n == 1 ? "כל שבוע" : "כל \(n) שבועות"; case "monthly": return n == 1 ? "כל חודש" : "כל \(n) חודשים"; default: return "לפי הצורך" }
     }
     var body: some View {
-        List {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: "plus").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.wellnessSecondary)
+                TextField("מטלה חדשה (כל שבוע)…", text: $draft).submitLabel(.done)
+                    .onSubmit { let text = draft; draft = ""; Task { await home.addChore(title: text, section: section, freq: "weekly", interval: 1) } }
+            }.padding(.horizontal, 14).frame(minHeight: 46).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             let chores = home.chores(in: section.id)
-            if chores.isEmpty { ContentUnavailableView("אין מטלות", systemImage: "arrow.triangle.2.circlepath", description: Text("הוסף מטלה חוזרת בכפתור +.")).listRowSeparator(.hidden).listRowBackground(Color.clear) }
+            if chores.isEmpty { Text("אין מטלות עדיין").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary).frame(maxWidth: .infinity).padding(.vertical, 22) }
             ForEach(chores) { chore in
                 let s = status(chore)
                 HStack(spacing: 12) {
-                    Text(chore.emoji ?? "🧹").font(.title2).frame(width: 46, height: 46).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    Text(chore.emoji ?? "🧹").font(.system(size: 22)).frame(width: 46, height: 46).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(chore.title).font(.headline).foregroundStyle(Color.wellnessInk).multilineTextAlignment(.leading)
-                        HStack(spacing: 8) { Text(s.text).font(.caption.weight(.semibold)).foregroundStyle(s.color); Text(repeatText(chore)).font(.caption).foregroundStyle(Color.wellnessSecondary) }
+                        Text(chore.title).font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessInk).multilineTextAlignment(.leading)
+                        HStack(spacing: 8) { Text(s.text).font(.hb(.caption, .semibold)).foregroundStyle(s.color); Text(repeatText(chore)).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }
                     }.frame(maxWidth: .infinity, alignment: .leading)
-                    Button { Task { await home.complete(chore) } } label: { Label("בוצע", systemImage: "checkmark").font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(minHeight: 44).foregroundStyle(Color.wellnessOnInk).background(Color.wellnessInk, in: Capsule()) }
+                    Button { Task { await home.complete(chore) } } label: { Label("בוצע", systemImage: "checkmark").font(.hb(.subheadline, .semibold)).padding(.horizontal, 14).frame(minHeight: 44).foregroundStyle(Color.wellnessOnPrimary).background(Color.wellnessPrimary, in: Capsule()) }
                         .buttonStyle(PressableStyle()).sensoryFeedback(.success, trigger: chore.nextDue).accessibilityLabel("סמן \(chore.title) כבוצע").accessibilityIdentifier("chore-complete-\(chore.id)")
-                }.wellnessCard(padding: 14).listRowSeparator(.hidden).listRowBackground(Color.clear).listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
-                .swipeActions { Button(role: .destructive) { confirmDelete = chore } label: { Label("מחיקה", systemImage: "trash") } }
+                }.padding(10).swipeToDelete { confirmDelete = chore }
             }
-            Color.clear.frame(height: 90).listRowSeparator(.hidden).listRowBackground(Color.clear)
         }
-        .listStyle(.plain).scrollContentBackground(.hidden).refreshable { await home.refresh() }
         .confirmationDialog("למחוק את המטלה?", isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }), titleVisibility: .visible) {
             Button("מחיקה", role: .destructive) { if let c = confirmDelete { Task { await home.delete(c) } }; confirmDelete = nil }
         }
@@ -116,7 +119,7 @@ struct CalendarScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack {
-                        Text(monthStart, format: .dateTime.month(.wide).year()).font(.title.bold())
+                        Text(monthStart, format: .dateTime.month(.wide).year()).font(.hb(.title, .bold))
                         Spacer()
                         Button { step(-1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44).background(Color.wellnessCard, in: Circle()) }.accessibilityLabel("חודש קודם")
                         Button { step(1) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44).background(Color.wellnessCard, in: Circle()) }.accessibilityLabel("חודש הבא")
@@ -138,7 +141,7 @@ struct CalendarScreen: View {
         let days = cal.range(of: .day, in: .month, for: monthStart)?.count ?? 30
         let letters = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"]
         return VStack(spacing: 6) {
-            HStack(spacing: 0) { ForEach(letters, id: \.self) { Text($0).font(.caption).foregroundStyle(Color.wellnessSecondary).frame(maxWidth: .infinity) } }
+            HStack(spacing: 0) { ForEach(letters, id: \.self) { Text($0).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).frame(maxWidth: .infinity) } }
             let cells = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
             LazyVGrid(columns: cells, spacing: 4) {
                 ForEach(0..<(first + days), id: \.self) { index in
@@ -149,10 +152,10 @@ struct CalendarScreen: View {
                         let isSel = selected.map { cal.isDate($0, inSameDayAs: day) } ?? false
                         Button { withAnimation(.snappy) { selected = isSel ? nil : day } } label: {
                             VStack(spacing: 3) {
-                                Text("\(index - first + 1)").font(.callout.weight(cal.isDateInToday(day) ? .bold : .regular).monospacedDigit())
+                                Text("\(index - first + 1)").font(.hb(.callout, cal.isDateInToday(day) ? .bold : .regular)).monospacedDigit()
                                 Circle().fill(has ? Color.kcalAmber : .clear).frame(width: 5, height: 5)
-                            }.frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(isSel ? Color.wellnessOnInk : Color.wellnessInk)
-                                .background { if isSel { Circle().fill(Color.wellnessInk) } else if cal.isDateInToday(day) { Circle().strokeBorder(Color.wellnessInk, lineWidth: 1.5) } }
+                            }.frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(isSel ? Color.wellnessOnPrimary : Color.wellnessInk)
+                                .background { if isSel { Circle().fill(Color.wellnessPrimary) } else if cal.isDateInToday(day) { Circle().strokeBorder(Color.wellnessInk, lineWidth: 1.5) } }
                         }.buttonStyle(.plain).accessibilityLabel(day.formatted(.dateTime.weekday(.wide).day().month(.wide)) + (has ? ", יש אירועים" : ""))
                     }
                 }
@@ -163,11 +166,11 @@ struct CalendarScreen: View {
         let e = occ.event
         let tint: Color = e.kind == "birthday" ? .fatCoral : e.kind == "medical" ? .proteinBlue : .carbsGold
         return HStack(spacing: 12) {
-            VStack(spacing: 0) { Text(occ.date, format: .dateTime.day()).font(.title3.bold().monospacedDigit()); Text(occ.date, format: .dateTime.month(.abbreviated)).font(.caption2) }
+            VStack(spacing: 0) { Text(occ.date, format: .dateTime.day()).font(.hb(.title3, .bold)).monospacedDigit(); Text(occ.date, format: .dateTime.month(.abbreviated)).font(.hb(.caption2)) }
                 .frame(width: 52, height: 56).background(tint.opacity(0.16), in: RoundedRectangle(cornerRadius: 14, style: .continuous)).foregroundStyle(Color.wellnessInk)
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) { Text(e.emoji ?? (e.kind == "birthday" ? "🎂" : e.kind == "medical" ? "🩺" : "📌")); Text(e.title).font(.headline).foregroundStyle(Color.wellnessInk) }
-                Text((e.kind == "birthday" ? "יום הולדת" : e.kind == "medical" ? "רפואי" : "אירוע") + (e.recurrence == "yearly" ? " · כל שנה" : "")).font(.caption).foregroundStyle(Color.wellnessSecondary)
+                HStack(spacing: 6) { Text(e.emoji ?? (e.kind == "birthday" ? "🎂" : e.kind == "medical" ? "🩺" : "📌")); Text(e.title).font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessInk) }
+                Text((e.kind == "birthday" ? "יום הולדת" : e.kind == "medical" ? "רפואי" : "אירוע") + (e.recurrence == "yearly" ? " · כל שנה" : "")).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
             }.frame(maxWidth: .infinity, alignment: .leading)
         }.wellnessCard(padding: 12)
     }
@@ -188,7 +191,7 @@ struct EventEditorSheet: View {
             Form {
                 Section { TextField("כותרת", text: $title).accessibilityIdentifier("event-title"); TextField("הערות", text: $notes, axis: .vertical).lineLimit(1...5) }
                 Section("סוג") { Picker("סוג", selection: $kind) { Text("יום הולדת").tag("birthday"); Text("רפואי").tag("medical"); Text("אחר").tag("other") }.pickerStyle(.segmented).onChange(of: kind) { _, k in if event == nil { yearly = k == "birthday" } } }
-                Section { DatePicker("תאריך", selection: $date, displayedComponents: .date).environment(\.locale, Locale(identifier: "he_IL")); Toggle("חוזר כל שנה", isOn: $yearly).tint(Color.wellnessInk) }
+                Section { DatePicker("תאריך", selection: $date, displayedComponents: .date).environment(\.locale, Locale(identifier: "he_IL")); Toggle("חוזר כל שנה", isOn: $yearly).tint(Color.wellnessPrimary) }
                 if event != nil { Section { Button("מחיקה", role: .destructive) { confirmDelete = true }.frame(maxWidth: .infinity) } }
             }
             .scrollContentBackground(.hidden).background(Color.wellnessCanvas).navigationTitle(event == nil ? "אירוע חדש" : "עריכת אירוע").navigationBarTitleDisplayMode(.inline)

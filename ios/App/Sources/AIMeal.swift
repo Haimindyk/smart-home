@@ -37,7 +37,7 @@ struct AIMealSheet: View {
                 Image(uiImage: image).resizable().scaledToFill().frame(height: 260).frame(maxWidth: .infinity).clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous)).accessibilityLabel("תמונת הארוחה")
             } else {
                 PhotosPicker(selection: $photo, matching: .images) {
-                    VStack(spacing: 12) { Image(systemName: "camera.viewfinder").font(.system(size: 44)).foregroundStyle(Color.wellnessSecondary); Text("בחר תמונה של הארוחה").font(.headline); Text("אפשר לצלם בצילום מהיר ולבחור כאן, או לבחור מהגלריה.").font(.footnote).foregroundStyle(Color.wellnessSecondary).multilineTextAlignment(.center) }
+                    VStack(spacing: 12) { Image(systemName: "camera.viewfinder").font(.system(size: 44)).foregroundStyle(Color.wellnessSecondary); Text("בחר תמונה של הארוחה").font(.hb(.headline, .semibold)); Text("אפשר לצלם בצילום מהיר ולבחור כאן, או לבחור מהגלריה.").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary).multilineTextAlignment(.center) }
                         .frame(maxWidth: .infinity, minHeight: 220).padding().background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.wellnessHairline, style: StrokeStyle(lineWidth: 1.5, dash: [6])))
                 }.buttonStyle(PressableStyle())
@@ -46,7 +46,7 @@ struct AIMealSheet: View {
                 .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
             Spacer()
             Button { Task { await analyze() } } label: {
-                if analyzing { HStack(spacing: 10) { ProgressView().tint(Color.wellnessOnInk); Text("מנתח…") } } else { Label("נתח ארוחה", systemImage: "sparkles") }
+                if analyzing { HStack(spacing: 10) { ProgressView().tint(Color.wellnessOnPrimary); Text("מנתח…") } } else { Label("נתח ארוחה", systemImage: "sparkles") }
             }.buttonStyle(PrimaryButton()).disabled(imageData == nil || analyzing)
         }.padding(20)
         .onChange(of: photo) { _, item in Task { await load(item) } }
@@ -60,9 +60,9 @@ struct AIMealSheet: View {
                 ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(item["food"]["name"].stringValue ?? "רכיב").font(.headline)
-                            Text("\(Int((item["quantity"].doubleValue ?? 0).rounded())) \(item["food"]["basis"].stringValue == "ml" ? "מ״ל" : "גרם") · \(Int(kcal(item).rounded())) קק״ל").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
-                            if let assumption = item["assumption"].stringValue, !assumption.isEmpty { Text(assumption).font(.caption).foregroundStyle(Color.wellnessSecondary) }
+                            Text(item["food"]["name"].stringValue ?? "רכיב").font(.hb(.headline, .semibold))
+                            Text("\(Int((item["quantity"].doubleValue ?? 0).rounded())) \(item["food"]["basis"].stringValue == "ml" ? "מ״ל" : "גרם") · \(Int(kcal(item).rounded())) קק״ל").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
+                            if let assumption = item["assumption"].stringValue, !assumption.isEmpty { Text(assumption).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }
                         }.frame(maxWidth: .infinity, alignment: .leading)
                         Stepper("", onIncrement: { change(index, 10) }, onDecrement: { change(index, -10) }).labelsHidden()
                     }.swipeActions { if items.count > 1 { Button(role: .destructive) { withAnimation { _ = items.remove(at: index) } } label: { Label("הסרה", systemImage: "trash") } } }
@@ -106,13 +106,13 @@ struct AIConsentView: View {
     @EnvironmentObject private var store: AppStore
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Image(systemName: "sparkles").font(.largeTitle).foregroundStyle(.flame)
-            Text("אישור שימוש ב־AI").font(.title2.bold())
+            Image(systemName: "sparkles").font(.hb(.largeTitle)).foregroundStyle(.flame)
+            Text("אישור שימוש ב־AI").font(.hb(.title2, .bold))
             Text("אישור שימוש ב־AI שולח את תוכן הבקשה הדרוש ל־Cloudflare. התוצאות דורשות בדיקה ואישור שלך.")
             Text("שם, PIN ופרופיל גוף מלא אינם נשלחים אוטומטית. אין שימוש בתוכן לאימון המודלים. אפשר לבטל בהגדרות.").foregroundStyle(Color.wellnessSecondary)
             Spacer()
             Button { Task { _ = await store.grantAIConsent() } } label: {
-                if store.busy { ProgressView().tint(Color.wellnessOnInk) } else { Text("מאשר/ת שימוש ב־AI האישי") }
+                if store.busy { ProgressView().tint(Color.wellnessOnPrimary) } else { Text("מאשר/ת שימוש ב־AI האישי") }
             }.buttonStyle(PrimaryButton()).disabled(store.busy)
         }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
