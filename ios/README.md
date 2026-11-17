@@ -113,4 +113,4 @@ bump `MARKETING_VERSION` in `ios/App/project.yml` for a new version. Required
 `beta` environment secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_API_KEY`,
 `APPLE_DEVELOPER_TEAM_ID`, `MACOS_KEYCHAIN_PASSWORD`, `SUPABASE_PUBLIC_KEY`.
 One-time Apple setup: App ID `com.haimindyk.smarthome.wellness` with HealthKit
-enabled, an App Store Connect app record, and an app icon (not yet in the project).
+enabled and an App Store Connect app record. The icon in `Sources/Assets.xcassets` is a placeholder.
