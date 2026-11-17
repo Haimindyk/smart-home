@@ -56,7 +56,7 @@ private struct LoginScreen: View {
     var body: some View {
         VStack(spacing: 26) {
             Spacer()
-            Image(systemName: "heart.fill").font(.system(size: 40)).foregroundStyle(.flame).padding(30).background(Color.wellnessCard, in: Circle()).shadow(color: .black.opacity(0.06), radius: 18, y: 8)
+            Image(systemName: "heart.fill").font(.largeTitle.weight(.semibold)).imageScale(.large).foregroundStyle(.flame).padding(30).background(Color.wellnessCard, in: Circle()).shadow(color: .black.opacity(0.06), radius: 18, y: 8)
             VStack(spacing: 8) {
                 Text("טוב שחזרת").font(.system(.largeTitle, design: .rounded).bold())
                 Text("אותו קוד, אותם נתונים").foregroundStyle(.secondary)
@@ -91,6 +91,7 @@ private struct HomeShell: View {
     @State private var adding = false
     @EnvironmentObject private var store: AppStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
     var body: some View {
         Group {
             switch tab {
@@ -111,9 +112,9 @@ private struct HomeShell: View {
                     } label: {
                         VStack(spacing: 5) {
                             Image(systemName: item.icon).font(.title3).symbolEffect(.bounce, value: tab == item)
-                            Text(item.rawValue).font(.caption.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.7)
+                            if !typeSize.isAccessibilitySize { Text(item.rawValue).font(.caption.weight(.semibold)).lineLimit(1) }
                         }
-                        .foregroundStyle(tab == item ? Color.wellnessInk : Color.wellnessInk.opacity(0.62))
+                        .foregroundStyle(tab == item ? Color.wellnessInk : Color.wellnessInk.opacity(0.8))
                         .frame(maxWidth: .infinity).padding(.vertical, 11)
                         .background {
                             if tab == item { Capsule().fill(Color.primary.opacity(0.08)).matchedGeometryEffect(id: "pill", in: pill) }
@@ -121,11 +122,11 @@ private struct HomeShell: View {
                         .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityAddTraits(tab == item ? [.isSelected] : [])
+                    .accessibilityLabel(item.rawValue).accessibilityAddTraits(tab == item ? [.isSelected] : [])
                     .accessibilityIdentifier("tab-\(String(describing: item))")
                 }
             }
-            .padding(6).background(.ultraThinMaterial, in: Capsule())
+            .padding(6).background(.regularMaterial, in: Capsule())
             .overlay(Capsule().strokeBorder(Color.wellnessHairline))
             .shadow(color: .black.opacity(0.08), radius: 18, y: 6)
             Button { adding = true } label: {
@@ -134,7 +135,9 @@ private struct HomeShell: View {
             }.buttonStyle(PressableStyle()).accessibilityLabel("הוספת ארוחה").accessibilityIdentifier("add-meal")
             }
             .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 5)
-            .dynamicTypeSize(...DynamicTypeSize.xLarge)
+            .background(alignment: .bottom) {
+                LinearGradient(colors: [Color.wellnessCanvas.opacity(0), Color.wellnessCanvas.opacity(0.96), Color.wellnessCanvas], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            }
         }
         .sheet(isPresented: $adding) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }
     }

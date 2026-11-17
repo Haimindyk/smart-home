@@ -73,7 +73,7 @@ struct ActivityScreen: View {
                         }
                     }
                     if let message = store.importMessage { Label(message, systemImage: "checkmark.circle.fill").foregroundStyle(.green).sensoryFeedback(.success, trigger: message) }
-                    Button("מה נשמר בחשבון?") { privacy = true }.font(.footnote).foregroundStyle(.secondary)
+                    Button { privacy = true } label: { Text("מה נשמר בחשבון?").font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
                 }.padding(22)
             }.wellnessScreen().toolbar(.hidden, for: .navigationBar).refreshable { await store.readHealth() }
                 .sheet(isPresented: $privacy) { HealthPrivacySheet() }

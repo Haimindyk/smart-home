@@ -68,6 +68,32 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["ההתקדמות שלך"].waitForExistence(timeout: 5))
         capture(app, name: "native-progress")
     }
+    /// Apple's automated accessibility audit, run as a report: findings are attached to the test result
+    /// (contrast, hit-target size, clipped text, Dynamic Type) so regressions are visible without
+    /// failing CI on simulator-specific heuristics.
+    func testAccessibilityAuditReport() throws {
+        let app = launch("meal")
+        XCTAssertTrue(app.descendants(matching: .any)["calories-card"].firstMatch.waitForExistence(timeout: 15))
+        var findings: [String] = []
+        func audit(_ screen: String) {
+            do {
+                try app.performAccessibilityAudit { issue in
+                    findings.append("[\(screen)] \(issue.compactDescription) – '\(issue.element?.label ?? "?")'")
+                    return true
+                }
+            } catch { findings.append("[\(screen)] audit unavailable: \(error.localizedDescription)") }
+        }
+        audit("today")
+        for tab in ["workouts", "health", "progress"] {
+            app.buttons["tab-\(tab)"].tap(); sleep(1); audit(tab)
+        }
+        app.buttons["tab-today"].tap()
+        app.buttons["add-meal"].tap()
+        XCTAssertTrue(app.textFields["חיפוש מוצר לפי שם…"].waitForExistence(timeout: 5))
+        audit("add-meal")
+        let report = XCTAttachment(string: findings.isEmpty ? "No findings." : findings.joined(separator: "\n"))
+        report.name = "accessibility-audit-findings"; report.lifetime = .keepAlways; add(report)
+    }
     func testLoginRequiresFourDigits() {
         let app = launch("login")
         let pin = app.secureTextFields.firstMatch

@@ -73,9 +73,9 @@ struct ProgressScreen: View {
     }
     private func stat(_ title: String, _ value: String, _ unit: String, _ color: Color) -> some View {
         VStack(spacing: 4) {
-            Text(value).font(.title2.weight(.heavy).monospacedDigit()).foregroundStyle(color).minimumScaleFactor(0.6).lineLimit(1)
+            Text(value).font(.title2.weight(.heavy).monospacedDigit()).foregroundStyle(color)
             Text(unit).font(.caption2).foregroundStyle(.secondary)
-            Text(title).font(.caption).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.center)
+            Text(title).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
         }.frame(maxWidth: .infinity).padding(.vertical, 14).padding(.horizontal, 4)
             .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.wellnessHairline))

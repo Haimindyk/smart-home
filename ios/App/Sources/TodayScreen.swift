@@ -26,7 +26,7 @@ struct TodayScreen: View {
                                 .background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline))
                         }.buttonStyle(PressableStyle()).accessibilityLabel("הגדרות").accessibilityIdentifier("settings-button")
                     }
-                    DayRail().dynamicTypeSize(...DynamicTypeSize.xxxLarge).daySwipe(store)
+                    DayRail().daySwipe(store)
                     CalorieCard().daySwipe(store)
                     SummaryCarousel()
                     HStack {
@@ -81,30 +81,39 @@ private struct DayRail: View {
                 Spacer()
                 Button { withAnimation(.snappy) { shift(7) } } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }.accessibilityLabel("שבוע הבא")
             }.foregroundStyle(.secondary)
-            HStack(spacing: 5) {
+            ViewThatFits(in: .horizontal) {
+                dayCells(scrolling: false)
+                ScrollView(.horizontal, showsIndicators: false) { dayCells(scrolling: true) }
+            }
+        }
+    }
+    @ViewBuilder private func dayCells(scrolling: Bool) -> some View {
+        HStack(spacing: 5) {
                 ForEach(days, id: \.self) { day in
                     let selected = calendar.isDate(day, inSameDayAs: store.selectedDate)
                     let future = day > Date() && !calendar.isDateInToday(day)
                     Button { withAnimation(.snappy) { store.selectedDate = day } } label: {
                         VStack(spacing: 8) {
-                            Text(day, format: .dateTime.weekday(.narrow)).font(.caption).foregroundStyle(future ? Color.primary.opacity(0.28) : Color.secondary)
+                            Text(day, format: .dateTime.weekday(.narrow)).font(.caption).foregroundStyle(future ? Color.primary.opacity(0.5) : Color.secondary)
                             Text(day, format: .dateTime.day()).font(.title3.weight(.semibold).monospacedDigit())
-                                .foregroundStyle(future ? Color.primary.opacity(0.28) : Color.wellnessInk).lineLimit(1).minimumScaleFactor(0.6)
+                                .foregroundStyle(future ? Color.primary.opacity(0.5) : Color.wellnessInk).lineLimit(1)
                             Circle().fill(calendar.isDateInToday(day) ? Color.kcalAmber : .clear).frame(width: 4, height: 4)
-                        }.frame(maxWidth: .infinity).padding(.vertical, 10)
+                        }.frame(maxWidth: scrolling ? nil : .infinity).frame(minWidth: scrolling ? 56 : 0).padding(.vertical, 10)
                             .background { if selected { RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.wellnessInk, lineWidth: 1.5) } }
                     }.buttonStyle(.plain)
                     .accessibilityLabel(day.formatted(.dateTime.weekday(.wide).day().month(.wide)))
                     .accessibilityAddTraits(selected ? [.isSelected] : [])
                 }
             }
-        }
+
     }
+
     private func shift(_ amount: Int) { if let date = calendar.date(byAdding: .day, value: amount, to: store.selectedDate) { store.selectedDate = date } }
 }
 
 private struct CalorieCard: View {
     @EnvironmentObject private var store: AppStore
+    @ScaledMetric(relativeTo: .largeTitle) private var bigNumber: CGFloat = 54
     private var consumed: Double { nutrientTotal(meals: store.dayMeals, nutrient: "kcal") }
     private var target: Double? { store.goal["kcal"].doubleValue }
     var body: some View {
@@ -112,7 +121,7 @@ private struct CalorieCard: View {
         HStack(spacing: 20) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(remaining.map { max(0, $0) } ?? consumed, format: .number.precision(.fractionLength(0)))
-                    .font(.system(size: 54, weight: .heavy)).minimumScaleFactor(0.6)
+                    .font(.system(size: bigNumber, weight: .heavy)).minimumScaleFactor(0.6)
                     .contentTransition(.numericText(value: remaining ?? consumed))
                     .animation(.snappy, value: consumed)
                 Text(remaining == nil ? "קלוריות נאכלו" : "קלוריות נותרו").font(.title3).foregroundStyle(.secondary).lineLimit(2).minimumScaleFactor(0.7)
@@ -163,13 +172,14 @@ private struct SummaryCarousel: View {
 
 private struct WaterCard: View {
     @EnvironmentObject private var store: AppStore
+    @ScaledMetric(relativeTo: .title) private var waterNumber: CGFloat = 38
     var body: some View {
         let total = store.dayWater, target = store.waterTarget
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("מים").font(.subheadline).foregroundStyle(.secondary)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(Int(total), format: .number).font(.system(size: 38, weight: .heavy).monospacedDigit()).contentTransition(.numericText(value: total))
+                    Text(Int(total), format: .number).font(.system(size: waterNumber, weight: .heavy).monospacedDigit()).contentTransition(.numericText(value: total))
                     Text("/ \(Int(target)) מ״ל").font(.caption).foregroundStyle(.secondary)
                 }.animation(.snappy, value: total)
                 HStack(spacing: 10) {
@@ -187,12 +197,13 @@ private struct WaterCard: View {
 
 private struct StepsCard: View {
     @EnvironmentObject private var store: AppStore
+    @ScaledMetric(relativeTo: .title) private var stepsNumber: CGFloat = 40
     var body: some View {
         let steps = store.steps ?? 0
         HStack(spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("צעדים").font(.subheadline).foregroundStyle(.secondary)
-                Text(steps, format: .number.precision(.fractionLength(0))).font(.system(size: 40, weight: .heavy).monospacedDigit())
+                Text(steps, format: .number.precision(.fractionLength(0))).font(.system(size: stepsNumber, weight: .heavy).monospacedDigit())
                 Text("היום · Apple Health").font(.caption).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity, alignment: .leading)
             ProgressRing(value: steps, target: 10_000, color: .wellnessInk, symbol: "figure.walk", lineWidth: 8).frame(width: 84, height: 84)

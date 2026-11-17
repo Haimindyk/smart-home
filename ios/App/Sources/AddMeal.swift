@@ -118,6 +118,7 @@ private struct PortionSheet: View {
     let food: JSONValue
     let onSaved: () -> Void
     @State private var quantity: Double = 100
+    @ScaledMetric(relativeTo: .largeTitle) private var bigNumber: CGFloat = 44
     @State private var kind = "snack"
     private var unit: String { food["basis"].stringValue == "ml" ? "מ״ל" : "גרם" }
     private func total(_ key: String) -> Double { (food["per100"][key].doubleValue ?? 0) * quantity / 100 }
@@ -132,7 +133,7 @@ private struct PortionSheet: View {
                 VStack(spacing: 14) {
                     Text("כמות").font(.subheadline).foregroundStyle(.secondary)
                     HStack(spacing: 22) {
-                        stepper("plus", 10); VStack { Text(quantity, format: .number.precision(.fractionLength(0))).font(.system(size: 44, weight: .heavy).monospacedDigit()).contentTransition(.numericText(value: quantity)); Text(unit).foregroundStyle(.secondary) }.frame(minWidth: 96)
+                        stepper("plus", 10); VStack { Text(quantity, format: .number.precision(.fractionLength(0))).font(.system(size: bigNumber, weight: .heavy).monospacedDigit()).contentTransition(.numericText(value: quantity)); Text(unit).foregroundStyle(.secondary) }.frame(minWidth: 96)
                         stepper("minus", -10)
                     }
                     if let serving = food["servingSize"].doubleValue, serving > 0 {
