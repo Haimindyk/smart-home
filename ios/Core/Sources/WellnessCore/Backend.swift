@@ -48,7 +48,7 @@ public actor Backend {
         config.urlCache = nil; config.requestCachePolicy = .reloadIgnoringLocalCacheData
         self.network = network ?? URLSession(configuration: config)
     }
-    private func raw(_ path: String, method: String = "GET", token: String? = nil, body: JSONValue? = nil, query: [URLQueryItem] = []) async throws -> (Data, Int) {
+    private func raw(_ path: String, method: String = "GET", token: String? = nil, body: JSONValue? = nil, query: [URLQueryItem] = [], binary: (Data, String)? = nil) async throws -> (Data, Int) {
         var parts = URLComponents(url: root, resolvingAgainstBaseURL: false)!
         parts.path = path; parts.queryItems = query.isEmpty ? nil : query; parts.fragment = nil
         guard let url = parts.url else { throw BackendError.configuration }
@@ -58,6 +58,7 @@ public actor Backend {
         if let token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         else if key.split(separator: ".").count == 3 { req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
         if let body { req.httpBody = try JSONEncoder().encode(body) }
+        if let binary { req.httpBody = binary.0; req.setValue(binary.1, forHTTPHeaderField: "Content-Type"); req.setValue("false", forHTTPHeaderField: "x-upsert") }
         do {
             let (data, response) = try await network.data(for: req)
             guard let response = response as? HTTPURLResponse else { throw BackendError.invalidResponse }
@@ -115,12 +116,12 @@ public actor Backend {
         let session = Session(accessToken: token, refreshToken: refresh, owner: old.owner, member: old.member)
         try vault.save(session); current = session; return session
     }
-    private func authorized(_ path: String, method: String = "GET", expectedOwner: String, body: JSONValue? = nil, query: [URLQueryItem] = []) async throws -> (Data, Int) {
+    private func authorized(_ path: String, method: String = "GET", expectedOwner: String, body: JSONValue? = nil, query: [URLQueryItem] = [], binary: (Data, String)? = nil) async throws -> (Data, Int) {
         guard var session = current, session.owner == expectedOwner else { throw BackendError.sessionRequired }
-        var result = try await raw(path, method: method, token: session.accessToken, body: body, query: query)
+        var result = try await raw(path, method: method, token: session.accessToken, body: body, query: query, binary: binary)
         if result.1 == 401 {
             session = try await refreshed(session)
-            result = try await raw(path, method: method, token: session.accessToken, body: body, query: query)
+            result = try await raw(path, method: method, token: session.accessToken, body: body, query: query, binary: binary)
         }
         guard current?.owner == expectedOwner else { throw BackendError.sessionChanged }
         return result
@@ -213,6 +214,15 @@ public actor Backend {
         guard (200..<300).contains(status) else { throw BackendError.server(status) }
         guard try json(data).arrayValue.count == 1 else { throw BackendError.conflict }
     }
+    /// Uploads a prepared JPEG to the private health-images bucket under the owner's folder and returns its path.
+    public func uploadImage(_ jpeg: Data, owner: String) async throws -> String {
+        guard !jpeg.isEmpty, jpeg.count <= 5_242_880, jpeg.starts(with: [0xFF, 0xD8, 0xFF]) else { throw BackendError.invalidResponse }
+        let path = "\(owner)/\(UUID().uuidString.lowercased()).jpg"
+        let (_, status) = try await authorized("/storage/v1/object/health-images/\(path)", method: "POST", expectedOwner: owner, binary: (jpeg, "image/jpeg"))
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        return path
+    }
+
     public func imageData(path: String, owner: String) async throws -> Data {
         guard path.count <= 500, path.hasPrefix(owner + "/"), !path.contains(".."),
               path.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "-_/ .".contains($0)) }) else { throw BackendError.invalidResponse }

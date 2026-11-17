@@ -226,4 +226,21 @@ final class BackendTests: XCTestCase {
         XCTAssertEqual(ok["foods"], .array([]))
         do { _ = try await api.invoke("pin-login", body: .null, owner: owner); XCTFail("must reject") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
     }
+    func testUploadImageSendsJPEGToOwnerFolderAndRejectsNonJPEG() async throws {
+        let owner = owner
+        var uploaded: (path: String, type: String?, size: Int)?
+        let lock = NSLock()
+        let api = try await signedInBackend { request in
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            lock.lock(); uploaded = (request.url!.path, request.value(forHTTPHeaderField: "Content-Type"), try requestBody(request).count); lock.unlock()
+            return (200, "{\"Key\":\"ok\"}")
+        }
+        let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3])
+        let path = try await api.uploadImage(jpeg, owner: owner)
+        XCTAssertTrue(path.hasPrefix(owner + "/") && path.hasSuffix(".jpg"))
+        XCTAssertEqual(uploaded?.path, "/storage/v1/object/health-images/" + path)
+        XCTAssertEqual(uploaded?.type, "image/jpeg"); XCTAssertEqual(uploaded?.size, jpeg.count)
+        do { _ = try await api.uploadImage(Data([1, 2, 3]), owner: owner); XCTFail("must reject non-JPEG") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+        do { _ = try await api.uploadImage(Data(), owner: owner); XCTFail("must reject empty") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+    }
 }

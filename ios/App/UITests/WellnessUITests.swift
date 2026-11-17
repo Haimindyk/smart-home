@@ -62,7 +62,12 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.textFields["חיפוש מוצר לפי שם…"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["סריקת ברקוד"].exists)
         capture(app, name: "native-add-meal")
-        app.buttons["סגור"].tap()
+        app.buttons["ai-meal"].tap()
+        XCTAssertTrue(app.staticTexts["אישור שימוש ב־AI"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["מאשר/ת שימוש ב־AI האישי"].exists, "AI must require explicit consent before anything is sent")
+        capture(app, name: "native-ai-consent")
+        app.navigationBars["ארוחה מתמונה"].buttons["סגור"].tap()
+        app.navigationBars["הוספת ארוחה"].buttons["סגור"].tap()
         app.buttons["settings-button"].tap()
         if !app.buttons["יציאה מהחשבון"].waitForExistence(timeout: 3) { app.swipeUp() }
         XCTAssertTrue(app.buttons["יציאה מהחשבון"].waitForExistence(timeout: 5))

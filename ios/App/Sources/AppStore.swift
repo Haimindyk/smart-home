@@ -16,6 +16,7 @@ final class AppStore: ObservableObject {
     @Published private(set) var plans: [HealthRow] = []
     @Published private(set) var workouts: [HealthRow] = []
     @Published private(set) var profile: JSONValue = .null
+    private var profileRow: HealthRow?
     @Published private(set) var waterLogs: [HealthRow] = []
     @Published private(set) var weightLogs: [HealthRow] = []
     @Published private(set) var candidates: [AppleWorkout] = []
@@ -35,7 +36,7 @@ final class AppStore: ObservableObject {
             phase = scenario == "--ui-test-login" ? .signedOut : .signedIn
             if phase == .signedIn {
                 session = Session(accessToken: "ui-test", refreshToken: "ui-test", owner: UITestFixtures.owner, member: "ui-test")
-                profile = .object(["timezone": .string("UTC")])
+                profile = .object(["timezone": .string("UTC"), "birthDate": .string("1990-01-01")])
                 goals = UITestFixtures.goals(date: dateKey)
                 if scenario == "--ui-test-meal" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey); weightLogs = UITestFixtures.weights(zone: timeZone) }
             }
@@ -98,7 +99,7 @@ final class AppStore: ObservableObject {
             let snapshot = try await (m, g, p, w, h)
             let extras = try await (wl, wt)
             guard request == revision, session?.owner == owner else { return }
-            meals = snapshot.0; goals = snapshot.1; plans = snapshot.2; workouts = snapshot.3; profile = snapshot.4.first?.data ?? .null
+            meals = snapshot.0; goals = snapshot.1; plans = snapshot.2; workouts = snapshot.3; profile = snapshot.4.first?.data ?? .null; profileRow = snapshot.4.first
             waterLogs = extras.0; weightLogs = extras.1
             candidates = pendingAppleWorkouts(candidates, existing: importedIDs)
             selection.formIntersection(Set(candidates.map(\.id)))
@@ -143,7 +144,7 @@ final class AppStore: ObservableObject {
     }
     func logout() async {
         revision += 1; healthRevision += 1
-        session = nil; meals = []; goals = []; plans = []; workouts = []; profile = .null; waterLogs = []; weightLogs = []
+        session = nil; meals = []; goals = []; plans = []; workouts = []; profile = .null; profileRow = nil; waterLogs = []; weightLogs = []
         candidates = []; selection = []; steps = nil; healthLoaded = false; importMessage = nil; error = nil
         busy = false; loading = false; phase = .signingOut
         await backend?.signOut()
@@ -246,6 +247,53 @@ final class AppStore: ObservableObject {
         await write("לא הצלחנו למחוק את הארוחה.") { backend, owner in
             try await backend.softDelete(table: "meals", row: row, owner: owner)
             if session?.owner == owner { meals.removeAll { $0.id == row.id } }
+        }
+    }
+    // MARK: - AI meal analysis (same gating and edge function as the web app)
+    struct MealAnalysis { let items: [JSONValue]; let needsClarification: Bool; let question: String; let analysisId: String; let imagePath: String }
+    /// AI is for adults only; the web app derives this from the profile's birth date.
+    var aiEligible: Bool {
+        guard let birth = profile["birthDate"].stringValue else { return false }
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = timeZone; f.dateFormat = "yyyy-MM-dd"
+        guard let date = f.date(from: birth) else { return false }
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
+        return (calendar.dateComponents([.year], from: date, to: Date()).year ?? 0) >= 18
+    }
+    var aiConsented: Bool { profile["aiProviderConsent"].boolValue == true }
+    func grantAIConsent() async -> Bool {
+        guard let row = profileRow, case .object(var fields) = row.data else { return false }
+        fields["aiProviderConsent"] = .bool(true)
+        return await write("לא הצלחנו לשמור את האישור.") { backend, owner in
+            let saved = try await backend.save(table: "health_profiles", owner: owner, payload: .object(fields), existing: row)
+            if session?.owner == owner { profileRow = saved; profile = saved.data }
+        }
+    }
+    func analyzeMeal(jpeg: Data, description: String) async -> MealAnalysis? {
+        guard aiEligible, aiConsented, let owner = session?.owner, let backend else { return nil }
+        do {
+            let path = try await backend.uploadImage(jpeg, owner: owner)
+            let requestID = UUID().uuidString.lowercased()
+            let raw = try await backend.invoke("nutrition-analyze", body: .object(["imagePath": .string(path), "requestId": .string(requestID), "mode": .string("meal"), "description": .string(description)]), owner: owner)
+            guard session?.owner == owner else { return nil }
+            let items = raw["items"].arrayValue.compactMap { item -> JSONValue? in
+                guard let name = item["name"].stringValue, let quantity = item["quantity"].doubleValue, quantity > 0, item["per100"] != .null else { return nil }
+                var food: [String: JSONValue] = ["id": .string(UUID().uuidString.lowercased()), "name": .string(name), "basis": item["basis"].stringValue == "ml" ? .string("ml") : .string("g"), "source": item["source"].stringValue.map { .string($0) } ?? .string("ai"), "per100": item["per100"]]
+                if let sourceId = item["sourceId"].stringValue { food["sourceId"] = .string(sourceId) }
+                var fields: [String: JSONValue] = ["id": .string(UUID().uuidString.lowercased()), "food": .object(food), "quantity": .number(min(10_000, quantity))]
+                if let assumption = item["assumption"].stringValue { fields["assumption"] = .string(assumption) }
+                return .object(fields)
+            }
+            guard let analysisId = raw["analysisId"].stringValue, !items.isEmpty else { self.error = "לא הצלחנו לזהות את הארוחה. אפשר לנסות תמונה אחרת או להוסיף ידנית."; return nil }
+            return MealAnalysis(items: items, needsClarification: raw["needsClarification"].boolValue == true, question: raw["question"].stringValue ?? "", analysisId: analysisId, imagePath: path)
+        } catch { if session?.owner == owner { self.error = "הניתוח לא הושלם. בדוק חיבור ונסה שוב." }; return nil }
+    }
+    func saveAnalyzedMeal(_ analysis: MealAnalysis, items: [JSONValue], kind: String) async -> Bool {
+        guard !items.isEmpty else { return false }
+        let name = items.first?["food"]["name"].stringValue ?? ""
+        let payload: JSONValue = .object(["date": .string(dateKey), "kind": .string(kind), "name": .string(name), "items": .array(items), "imagePath": .string(analysis.imagePath), "aiEstimate": .object(["analysisId": .string(analysis.analysisId)])])
+        return await write("לא הצלחנו לשמור את הארוחה.") { backend, owner in
+            let row = try await backend.save(table: "meals", owner: owner, payload: payload)
+            if session?.owner == owner { meals.append(row) }
         }
     }
     func imageData(_ path: String) async -> Data? {

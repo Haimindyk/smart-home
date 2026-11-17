@@ -14,10 +14,13 @@ struct AddMealSheet: View {
     @State private var searched = false
     @State private var scanning = false
     @State private var picked: FoodChoice?
+    @State private var aiMeal = false
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
                 HStack(spacing: 10) {
+                    Button { aiMeal = true } label: { Image(systemName: "sparkles").font(.title2).foregroundStyle(Color.wellnessOnInk).frame(width: 52, height: 52).background(Color.wellnessInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous)) }
+                        .buttonStyle(PressableStyle()).accessibilityLabel("ארוחה מתמונה עם AI").accessibilityIdentifier("ai-meal")
                     Button { scanning = true } label: { Image(systemName: "barcode.viewfinder").font(.title2).foregroundStyle(Color.wellnessOnInk).frame(width: 52, height: 52).background(Color.wellnessInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous)) }
                         .buttonStyle(PressableStyle()).accessibilityLabel("סריקת ברקוד")
                     HStack {
@@ -59,6 +62,7 @@ struct AddMealSheet: View {
                 guard !Task.isCancelled else { return }
                 await run(text, barcode: nil)
             }
+            .sheet(isPresented: $aiMeal) { AIMealSheet { dismiss() }.environmentObject(store) }
             .sheet(item: $picked) { choice in PortionSheet(food: choice.food) { dismiss() }.presentationDetents([.large]) }
             .fullScreenCover(isPresented: $scanning) {
                 ZStack(alignment: .topLeading) {
