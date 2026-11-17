@@ -51,7 +51,7 @@ struct WorkoutsScreen: View {
                         }.buttonStyle(PressableStyle()).accessibilityIdentifier("workout-\(workout.id)")
                     }
                 }.padding(22)
-            }.wellnessScreen().toolbar(.hidden, for: .navigationBar)
+            }.wellnessScreen().safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }.toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $trainer) { TrainerSheet().environmentObject(store) }
             .sheet(isPresented: $creating) { PlanEditorSheet().environmentObject(store) }
             .confirmationDialog("להעביר את התוכנית לארכיון?", isPresented: Binding(get: { planToArchive != nil }, set: { if !$0 { planToArchive = nil } }), titleVisibility: .visible) {

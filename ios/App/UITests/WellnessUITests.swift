@@ -4,7 +4,18 @@ final class WellnessUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
     private func launch(_ scenario: String) -> XCUIApplication {
         let app = XCUIApplication(); app.launchArguments = ["--ui-test-\(scenario)"]
-        app.launch(); return app
+        app.launch()
+        dismissSystemAlerts(for: app)
+        return app
+    }
+    /// The simulator can raise unrelated system dialogs (e.g. Apple ID verification) over the app; dismiss them.
+    private func dismissSystemAlerts(for app: XCUIApplication) {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        for label in ["לא כעת", "Not Now", "אל תאפשר", "Don’t Allow", "אישור", "OK"] {
+            let button = springboard.alerts.buttons[label]
+            if button.waitForExistence(timeout: 1.5) { button.tap(); break }
+        }
+        if app.state != .runningForeground { app.activate() }
     }
     private func capture(_ app: XCUIApplication, name: String) {
         let image = XCTAttachment(screenshot: app.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image)
@@ -46,6 +57,7 @@ final class WellnessUITests: XCTestCase {
         app.buttons["ביטול"].tap()
         XCTAssertFalse(app.buttons["Back"].exists, "System navigation should also use the app's Hebrew localization")
         capture(app, name: "native-meal-details")
+        app.navigationBars.buttons["BackButton"].tap()  // back from meal details to the health tabs
         app.buttons["tab-workouts"].tap()
         XCTAssertTrue(app.buttons["workout-55555555-5555-8555-8555-555555555555"].waitForExistence(timeout: 5))
         capture(app, name: "native-workouts")
@@ -156,6 +168,36 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.buttons["trainer-apply"].waitForExistence(timeout: 5), "The proposal must be shown for approval before anything is saved")
         XCTAssertTrue(app.staticTexts["שכיבות סמיכה"].exists)
         capture(app, name: "native-trainer-proposal")
+    }
+    func testHouseholdHomeShoppingChoresAndCalendar() {
+        let app = launch("home")
+        let tasksChip = app.buttons["section-a0000000-0000-4000-8000-000000000001"]
+        _ = tasksChip.waitForExistence(timeout: 10); capture(app, name: "native-home-landing")
+        XCTAssertTrue(tasksChip.exists, "The household home is the landing screen")
+        let toggle = app.buttons["task-toggle-b0000000-0000-4000-8000-000000000001"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        capture(app, name: "native-home-tasks")
+        toggle.tap()
+        let gone = NSPredicate(format: "exists == false")
+        expectation(for: gone, evaluatedWith: toggle); waitForExpectations(timeout: 5)  // moves to the completed group at once
+        app.buttons["section-a0000000-0000-4000-8000-000000000002"].tap()
+        XCTAssertTrue(app.staticTexts["חלב"].waitForExistence(timeout: 5))
+        capture(app, name: "native-home-shopping")
+        app.buttons["section-a0000000-0000-4000-8000-000000000003"].tap()
+        XCTAssertTrue(app.staticTexts["להוציא את הזבל"].waitForExistence(timeout: 5))
+        capture(app, name: "native-home-chores")
+        let notesChip = app.buttons["section-a0000000-0000-4000-8000-000000000004"]
+        if !notesChip.isHittable { app.buttons["section-a0000000-0000-4000-8000-000000000003"].swipeRight() }
+        notesChip.tap()
+        XCTAssertTrue(app.staticTexts["קוד ל-WiFi של האורחים"].waitForExistence(timeout: 5))
+        capture(app, name: "native-home-notes")
+        app.buttons["add-meal"].tap()
+        XCTAssertTrue(app.textFields["quick-add-title"].waitForExistence(timeout: 5))
+        capture(app, name: "native-home-quick-add")
+        app.buttons["ביטול"].tap()
+        app.buttons["root-calendar"].tap()
+        XCTAssertTrue(app.buttons["event-d0000000-0000-4000-8000-000000000001"].waitForExistence(timeout: 5))
+        capture(app, name: "native-calendar")
     }
     func testLoginRequiresFourDigits() {
         let app = launch("login")

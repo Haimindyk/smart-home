@@ -68,7 +68,7 @@ struct ProgressScreen: View {
                         }
                     }
                 }.padding(22)
-            }.wellnessScreen().toolbar(.hidden, for: .navigationBar).refreshable { await store.refresh() }
+            }.wellnessScreen().safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }.toolbar(.hidden, for: .navigationBar).refreshable { await store.refresh() }
         }
     }
     private func stat(_ title: String, _ value: String, _ unit: String, _ color: Color) -> some View {

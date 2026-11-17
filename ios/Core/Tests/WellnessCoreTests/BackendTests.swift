@@ -243,4 +243,30 @@ final class BackendTests: XCTestCase {
         do { _ = try await api.uploadImage(Data([1, 2, 3]), owner: owner); XCTFail("must reject non-JPEG") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
         do { _ = try await api.uploadImage(Data(), owner: owner); XCTFail("must reject empty") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
     }
+    func testHouseholdAccessIsAllowListedPagedAndGuarded() async throws {
+        let owner = owner
+        var seen: [String] = []
+        let lock = NSLock()
+        let api = try await signedInBackend { request in
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            lock.lock(); seen.append("\(request.httpMethod ?? "") \(request.url!.path)?\(request.url!.query ?? "")"); lock.unlock()
+            if request.url!.path.hasSuffix("/rpc/complete_chore") { return (204, "") }
+            if request.httpMethod == "PATCH" { return (200, "[{\"id\":\"22222222-2222-4222-8222-222222222222\",\"title\":\"x\"}]") }
+            if request.httpMethod == "POST" { return (201, "[{\"id\":\"22222222-2222-4222-8222-222222222222\"}]") }
+            return (200, "[{\"id\":\"a\"},{\"id\":\"b\"}]")
+        }
+        let rows = try await api.householdRows(table: "tasks", owner: owner, filters: [.init(name: "section_id", value: "eq.s1")], order: "position.asc")
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertTrue(seen.contains { $0.contains("deleted_at=is.null") && $0.contains("section_id=eq.s1") && $0.contains("order=position.asc") }, "soft-deleted rows must be excluded")
+        let id = "22222222-2222-4222-8222-222222222222"
+        _ = try await api.householdInsert(table: "tasks", owner: owner, fields: ["id": .string(id), "title": .string("חלב")])
+        _ = try await api.householdUpdate(table: "tasks", owner: owner, id: id, fields: ["is_completed": .bool(true)])
+        try await api.householdRPC("complete_chore", owner: owner, args: ["p_chore_id": .string(id), "p_completed_by": .string(id)])
+        for table in ["members", "activity_log", "push_subscriptions", "health_profiles"] {
+            do { _ = try await api.householdInsert(table: table, owner: owner, fields: ["id": .string(id)]); XCTFail("\(table) must not be writable") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+        }
+        do { _ = try await api.householdRows(table: "push_subscriptions", owner: owner); XCTFail("must not be readable") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+        do { _ = try await api.householdUpdate(table: "tasks", owner: owner, id: "not-a-uuid", fields: ["title": .string("x")]); XCTFail("bad id") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+        do { try await api.householdRPC("drop_everything", owner: owner, args: [:]); XCTFail("unknown rpc") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+    }
 }

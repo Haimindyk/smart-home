@@ -126,6 +126,49 @@ public actor Backend {
         guard current?.owner == expectedOwner else { throw BackendError.sessionChanged }
         return result
     }
+    // MARK: - Household tables (shared, not owner-scoped: sections, tasks, chores, events, members)
+    public static let householdReadable: Set<String> = ["sections", "tasks", "chores", "chore_completions", "family_events", "members", "activity_log"]
+    public static let householdWritable: Set<String> = ["sections", "tasks", "chores", "family_events"]
+    private static let householdRPCs: Set<String> = ["complete_chore"]
+
+    /// Reads a household table, paging up to 10,000 rows. `deleted_at is null` is applied for tables that soft-delete.
+    public func householdRows(table: String, owner: String, filters: [URLQueryItem] = [], order: String? = nil, limit: Int = 1000) async throws -> [JSONValue] {
+        guard Self.householdReadable.contains(table) else { throw BackendError.invalidResponse }
+        let softDeletes: Set<String> = ["sections", "tasks", "chores", "family_events"]
+        var rows: [JSONValue] = [], offset = 0
+        while true {
+            var query: [URLQueryItem] = [.init(name: "select", value: "*"), .init(name: "limit", value: String(limit)), .init(name: "offset", value: String(offset))] + filters
+            if softDeletes.contains(table) { query.append(.init(name: "deleted_at", value: "is.null")) }
+            if let order { query.append(.init(name: "order", value: order)) }
+            let (data, status) = try await authorized("/rest/v1/\(table)", expectedOwner: owner, query: query)
+            guard status == 200 else { throw BackendError.server(status) }
+            let batch = try json(data).arrayValue
+            rows += batch
+            if batch.count < limit { return rows }
+            offset += limit; guard offset < 10_000 else { throw BackendError.invalidResponse }
+        }
+    }
+    public func householdInsert(table: String, owner: String, fields: [String: JSONValue]) async throws -> JSONValue {
+        guard Self.householdWritable.contains(table), fields["id"]?.stringValue.flatMap({ UUID(uuidString: $0) }) != nil else { throw BackendError.invalidResponse }
+        let (data, status) = try await authorized("/rest/v1/\(table)", method: "POST", expectedOwner: owner, body: .object(fields))
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        guard let row = try json(data).arrayValue.first else { throw BackendError.invalidResponse }
+        return row
+    }
+    /// Partial update by id. Soft delete is `deleted_at` set to a timestamp.
+    public func householdUpdate(table: String, owner: String, id: String, fields: [String: JSONValue]) async throws -> JSONValue {
+        guard Self.householdWritable.contains(table), UUID(uuidString: id) != nil, !fields.isEmpty, fields["id"] == nil else { throw BackendError.invalidResponse }
+        let (data, status) = try await authorized("/rest/v1/\(table)", method: "PATCH", expectedOwner: owner, body: .object(fields), query: [.init(name: "id", value: "eq.\(id)")])
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        guard let row = try json(data).arrayValue.first else { throw BackendError.conflict }
+        return row
+    }
+    public func householdRPC(_ name: String, owner: String, args: [String: JSONValue]) async throws {
+        guard Self.householdRPCs.contains(name) else { throw BackendError.invalidResponse }
+        let (_, status) = try await authorized("/rest/v1/rpc/\(name)", method: "POST", expectedOwner: owner, body: .object(args))
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+    }
+
     public static let writableTables: Set<String> = ["meals", "water_logs", "weight_logs", "nutrition_goals", "health_profiles", "personal_foods", "recipes", "workout_plans", "workout_sessions"]
     private static let readableTables = writableTables
     private static let functions: Set<String> = ["food-lookup", "nutrition-analyze", "wellness-ai", "wellness-chat", "wellness-training"]

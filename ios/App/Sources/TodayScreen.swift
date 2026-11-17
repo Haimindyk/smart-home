@@ -50,6 +50,7 @@ struct TodayScreen: View {
                 }.padding(22).shimmer(store.loading && store.meals.isEmpty && store.goals.isEmpty)
             }
             .wellnessScreen()
+            .safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }
             .toolbar(.hidden, for: .navigationBar)
             .refreshable { await store.refresh() }
             .sensoryFeedback(.selection, trigger: store.selectedDate)

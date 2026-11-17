@@ -25,7 +25,7 @@ final class AppStore: ObservableObject {
     @Published var selection: Set<UUID> = []
     @Published var importMessage: String?
     let health = HealthReader()
-    private let backend: Backend?
+    let backend: Backend?
     private var revision = 0
     private var healthRevision = 0
     init() {
@@ -35,7 +35,7 @@ final class AppStore: ObservableObject {
             backend = nil
             phase = scenario == "--ui-test-login" ? .signedOut : .signedIn
             if phase == .signedIn {
-                session = Session(accessToken: "ui-test", refreshToken: "ui-test", owner: UITestFixtures.owner, member: "ui-test")
+                session = Session(accessToken: "ui-test", refreshToken: "ui-test", owner: UITestFixtures.owner, member: "11111111-1111-4111-8111-111111111111")
                 profile = .object(["timezone": .string("UTC"), "birthDate": .string("1990-01-01"), "aiProviderConsent": .bool(scenario == "--ui-test-coach")])
                 goals = UITestFixtures.goals(date: dateKey)
                 if scenario == "--ui-test-meal" || scenario == "--ui-test-coach" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey); plans = UITestFixtures.plans(); weightLogs = UITestFixtures.weights(zone: timeZone) }
@@ -48,6 +48,13 @@ final class AppStore: ObservableObject {
            let root = URL(string: "https://\(host)"), let key = info["SUPABASE_PUBLIC_KEY"] as? String {
             backend = try? Backend(root: root, publicKey: key, vault: KeychainVault())
         } else { backend = nil }
+    }
+    /// Real sessions open on the household home screen (like the web app); synthetic test sessions keep the health screens unless asked otherwise.
+    var startsOnHealth: Bool {
+#if DEBUG
+        if let scenario = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--ui-test-") }) { return scenario != "--ui-test-home" }
+#endif
+        return false
     }
     var timeZone: TimeZone { TimeZone(identifier: profile["timezone"].stringValue ?? "") ?? .current }
     var dateKey: String { Self.dateKey(selectedDate, zone: timeZone) }
