@@ -79,6 +79,10 @@ final class WellnessUITests: XCTestCase {
         capture(app, name: "native-ai-consent")
         app.navigationBars["ארוחה מתמונה"].buttons["סגור"].tap()
         app.navigationBars["הוספת ארוחה"].buttons["סגור"].tap()
+        app.buttons["coach-button"].tap()
+        XCTAssertTrue(app.buttons["מאשר/ת שימוש ב־AI האישי"].waitForExistence(timeout: 5), "Coach chat must require the same explicit AI consent")
+        capture(app, name: "native-coach-consent")
+        app.navigationBars["המאמן שלי"].buttons["סגור"].tap()
         app.buttons["settings-button"].tap()
         if !app.buttons["יציאה מהחשבון"].waitForExistence(timeout: 3) { app.swipeUp() }
         XCTAssertTrue(app.buttons["יציאה מהחשבון"].waitForExistence(timeout: 5))
@@ -113,6 +117,14 @@ final class WellnessUITests: XCTestCase {
         audit("add-meal")
         let report = XCTAttachment(string: findings.isEmpty ? "No findings." : findings.joined(separator: "\n"))
         report.name = "accessibility-audit-findings"; report.lifetime = .keepAlways; add(report)
+    }
+    func testCoachChatShowsConversationAndComposer() {
+        let app = launch("coach")
+        XCTAssertTrue(app.descendants(matching: .any)["calories-card"].firstMatch.waitForExistence(timeout: 15))
+        app.buttons["coach-button"].tap()
+        XCTAssertTrue(app.staticTexts["איך מגיעים לזה עם תזונה צמחונית?"].waitForExistence(timeout: 5) || app.buttons["איך מגיעים לזה עם תזונה צמחונית?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["2/20 הודעות היום"].exists)
+        capture(app, name: "native-coach-chat")
     }
     func testLoginRequiresFourDigits() {
         let app = launch("login")

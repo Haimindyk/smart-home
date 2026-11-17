@@ -26,6 +26,14 @@ enum UITestFixtures {
             return row(id: id, data: "{\"date\":\"\(f.string(from: day))\",\"weight\":\(kg)}")
         }
     }
+    static var chatState: JSONValue {
+        let json = """
+        {"used":2,"limit":20,"available":true,"version":2,"generation":"g1","turns":[
+          {"id":"t1","user_text":"כמה חלבון אני צריך ביום אם אני מתאמן שלוש פעמים בשבוע?","answer":{"reply":"בדרך כלל מומלץ בין 1.6 ל־2.2 גרם חלבון לכל קילוגרם משקל גוף למי שמתאמן באופן קבוע. אפשר לפזר אותו על פני 3–4 ארוחות. זה מידע כללי ולא תחליף לתזונאי.","exerciseIds":[],"followUps":["איך מגיעים לזה עם תזונה צמחונית?","מה לאכול אחרי אימון?"],"topic":"nutrition"},"shared_diary":false,"created_at":"2026-11-17T10:00:00Z"}
+        ]}
+        """
+        return (try? JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))) ?? .null
+    }
     static func plans() -> [HealthRow] {
         func ex(_ id: String, _ name: String, _ sets: Int, _ reps: Int, _ weight: Double, _ muscle: String) -> String {
             "{\"id\":\"\(id)\",\"name\":\"\(name)\",\"muscle\":\"\(muscle)\",\"equipment\":\"\",\"kind\":\"strength\",\"sets\":\(sets),\"reps\":\(reps),\"weight\":\(weight),\"rest\":60,\"duration\":0,\"distance\":0,\"notes\":\"\"}"

@@ -6,6 +6,7 @@ struct TodayScreen: View {
     @State private var showCalendar = false
     @State private var mealToDelete: HealthRow?
     @State private var showSettings = false
+    @State private var showCoach = false
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -21,6 +22,10 @@ struct TodayScreen: View {
                         }.frame(minHeight: 44).accessibilityLabel("בחירת תאריך").accessibilityIdentifier("date-picker")
                     }
                         Spacer()
+                        Button { showCoach = true } label: {
+                            Image(systemName: "sparkles").font(.title3).foregroundStyle(.flame).frame(width: 48, height: 48)
+                                .background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline))
+                        }.buttonStyle(PressableStyle()).accessibilityLabel("המאמן שלי").accessibilityIdentifier("coach-button")
                         Button { showSettings = true } label: {
                             Image(systemName: "gearshape.fill").font(.title3).foregroundStyle(Color.wellnessInk).frame(width: 48, height: 48)
                                 .background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline))
@@ -51,6 +56,7 @@ struct TodayScreen: View {
             .confirmationDialog("למחוק את הארוחה?", isPresented: Binding(get: { mealToDelete != nil }, set: { if !$0 { mealToDelete = nil } }), titleVisibility: .visible) {
                 Button("מחיקה", role: .destructive) { if let meal = mealToDelete { Task { _ = await store.deleteMeal(meal) } }; mealToDelete = nil }
             }
+            .sheet(isPresented: $showCoach) { CoachChatView().environmentObject(store) }
             .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
             .sheet(isPresented: $showCalendar) {
                 NavigationStack {

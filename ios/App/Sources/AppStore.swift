@@ -36,9 +36,9 @@ final class AppStore: ObservableObject {
             phase = scenario == "--ui-test-login" ? .signedOut : .signedIn
             if phase == .signedIn {
                 session = Session(accessToken: "ui-test", refreshToken: "ui-test", owner: UITestFixtures.owner, member: "ui-test")
-                profile = .object(["timezone": .string("UTC"), "birthDate": .string("1990-01-01")])
+                profile = .object(["timezone": .string("UTC"), "birthDate": .string("1990-01-01"), "aiProviderConsent": .bool(scenario == "--ui-test-coach")])
                 goals = UITestFixtures.goals(date: dateKey)
-                if scenario == "--ui-test-meal" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey); plans = UITestFixtures.plans(); weightLogs = UITestFixtures.weights(zone: timeZone) }
+                if scenario == "--ui-test-meal" || scenario == "--ui-test-coach" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey); plans = UITestFixtures.plans(); weightLogs = UITestFixtures.weights(zone: timeZone) }
             }
             return
         }
@@ -307,6 +307,17 @@ final class AppStore: ObservableObject {
             let saved = try await backend.save(table: "health_profiles", owner: owner, payload: .object(fields), existing: row)
             if session?.owner == owner { profileRow = saved; profile = saved.data }
         }
+    }
+    /// Calls an allow-listed edge function as the signed-in owner. Returns the server's error code on failure.
+    func call(_ function: String, _ body: JSONValue) async -> Result<JSONValue, BackendError> {
+#if DEBUG
+        if backend == nil, session?.accessToken == "ui-test", function == "wellness-chat" { return .success(UITestFixtures.chatState) }
+#endif
+        guard let owner = session?.owner, let backend else { return .failure(.sessionRequired) }
+        do {
+            let result = try await backend.invoke(function, body: body, owner: owner)
+            return session?.owner == owner ? .success(result) : .failure(.sessionChanged)
+        } catch let error as BackendError { return .failure(error) } catch { return .failure(.connection) }
     }
     func analyzeMeal(jpeg: Data, description: String) async -> MealAnalysis? {
         guard aiEligible, aiConsented, let owner = session?.owner, let backend else { return nil }

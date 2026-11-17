@@ -30,18 +30,7 @@ struct AIMealSheet: View {
         ContentUnavailableView("ה־AI זמין מגיל 18", systemImage: "person.crop.circle.badge.exclamationmark",
             description: Text("השלם תאריך לידה בפרופיל באפליקציה הרגילה כדי להפעיל המלצות AI. אפשר להמשיך להוסיף ארוחות ידנית."))
     }
-    private var consent: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Image(systemName: "sparkles").font(.largeTitle).foregroundStyle(.flame)
-            Text("אישור שימוש ב־AI").font(.title2.bold())
-            Text("אישור שימוש ב־AI שולח את תוכן הבקשה הדרוש ל־Cloudflare. התוצאות דורשות בדיקה ואישור שלך.")
-            Text("שם, PIN ופרופיל גוף מלא אינם נשלחים אוטומטית. אין שימוש בתוכן לאימון המודלים. אפשר לבטל בהגדרות.").foregroundStyle(.secondary)
-            Spacer()
-            Button { Task { _ = await store.grantAIConsent() } } label: {
-                if store.busy { ProgressView().tint(Color.wellnessOnInk) } else { Text("מאשר/ת שימוש ב־AI האישי") }
-            }.buttonStyle(PrimaryButton()).disabled(store.busy)
-        }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
+    private var consent: some View { AIConsentView() }
     private var capture: some View {
         VStack(spacing: 18) {
             if let imageData, let image = UIImage(data: imageData) {
@@ -109,5 +98,22 @@ struct AIMealSheet: View {
         guard let imageData else { return }
         analyzing = true; defer { analyzing = false }
         if let result = await store.analyzeMeal(jpeg: imageData, description: note.trimmingCharacters(in: .whitespacesAndNewlines)) { items = result.items; analysis = result }
+    }
+}
+
+/// Shared consent / eligibility gate (same wording and rules as the web app).
+struct AIConsentView: View {
+    @EnvironmentObject private var store: AppStore
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Image(systemName: "sparkles").font(.largeTitle).foregroundStyle(.flame)
+            Text("אישור שימוש ב־AI").font(.title2.bold())
+            Text("אישור שימוש ב־AI שולח את תוכן הבקשה הדרוש ל־Cloudflare. התוצאות דורשות בדיקה ואישור שלך.")
+            Text("שם, PIN ופרופיל גוף מלא אינם נשלחים אוטומטית. אין שימוש בתוכן לאימון המודלים. אפשר לבטל בהגדרות.").foregroundStyle(.secondary)
+            Spacer()
+            Button { Task { _ = await store.grantAIConsent() } } label: {
+                if store.busy { ProgressView().tint(Color.wellnessOnInk) } else { Text("מאשר/ת שימוש ב־AI האישי") }
+            }.buttonStyle(PrimaryButton()).disabled(store.busy)
+        }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
