@@ -5,10 +5,12 @@ struct TodayScreen: View {
     @EnvironmentObject private var store: AppStore
     @State private var showCalendar = false
     @State private var mealToDelete: HealthRow?
+    @State private var showSettings = false
     var body: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 24) {
+                    HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("היום שלך").font(.largeTitle.bold())
                         Button { showCalendar = true } label: {
@@ -18,7 +20,13 @@ struct TodayScreen: View {
                             }.foregroundStyle(.secondary)
                         }.frame(minHeight: 44).accessibilityLabel("בחירת תאריך").accessibilityIdentifier("date-picker")
                     }
-                    DayRail().daySwipe(store)
+                        Spacer()
+                        Button { showSettings = true } label: {
+                            Image(systemName: "gearshape.fill").font(.title3).foregroundStyle(Color.wellnessInk).frame(width: 48, height: 48)
+                                .background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline))
+                        }.buttonStyle(PressableStyle()).accessibilityLabel("הגדרות").accessibilityIdentifier("settings-button")
+                    }
+                    DayRail().dynamicTypeSize(...DynamicTypeSize.xxxLarge).daySwipe(store)
                     CalorieCard().daySwipe(store)
                     SummaryCarousel()
                     HStack {
@@ -43,6 +51,7 @@ struct TodayScreen: View {
             .confirmationDialog("למחוק את הארוחה?", isPresented: Binding(get: { mealToDelete != nil }, set: { if !$0 { mealToDelete = nil } }), titleVisibility: .visible) {
                 Button("מחיקה", role: .destructive) { if let meal = mealToDelete { Task { _ = await store.deleteMeal(meal) } }; mealToDelete = nil }
             }
+            .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
             .sheet(isPresented: $showCalendar) {
                 NavigationStack {
                     DatePicker("תאריך", selection: $store.selectedDate, displayedComponents: .date)
@@ -80,7 +89,7 @@ private struct DayRail: View {
                         VStack(spacing: 8) {
                             Text(day, format: .dateTime.weekday(.narrow)).font(.caption).foregroundStyle(future ? Color.primary.opacity(0.28) : Color.secondary)
                             Text(day, format: .dateTime.day()).font(.title3.weight(.semibold).monospacedDigit())
-                                .foregroundStyle(future ? Color.primary.opacity(0.28) : Color.wellnessInk)
+                                .foregroundStyle(future ? Color.primary.opacity(0.28) : Color.wellnessInk).lineLimit(1).minimumScaleFactor(0.6)
                             Circle().fill(calendar.isDateInToday(day) ? Color.kcalAmber : .clear).frame(width: 4, height: 4)
                         }.frame(maxWidth: .infinity).padding(.vertical, 10)
                             .background { if selected { RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.wellnessInk, lineWidth: 1.5) } }
@@ -106,7 +115,7 @@ private struct CalorieCard: View {
                     .font(.system(size: 54, weight: .heavy)).minimumScaleFactor(0.6)
                     .contentTransition(.numericText(value: remaining ?? consumed))
                     .animation(.snappy, value: consumed)
-                Text(remaining == nil ? "קלוריות נאכלו" : "קלוריות נותרו").font(.title3).foregroundStyle(.secondary)
+                Text(remaining == nil ? "קלוריות נאכלו" : "קלוריות נותרו").font(.title3).foregroundStyle(.secondary).lineLimit(2).minimumScaleFactor(0.7)
                 if let target {
                     if let remaining, remaining < 0 {
                         Text("חרגת ב־\(Int((-remaining).rounded())) קק״ל").font(.caption.weight(.semibold)).foregroundStyle(Color.kcalAmber)
@@ -127,6 +136,7 @@ private struct CalorieCard: View {
 private struct SummaryCarousel: View {
     @EnvironmentObject private var store: AppStore
     @State private var page = 0
+    @ScaledMetric(relativeTo: .body) private var height: CGFloat = 172
     private var hasActivity: Bool { store.steps != nil }
     var body: some View {
         VStack(spacing: 14) {
@@ -139,7 +149,7 @@ private struct SummaryCarousel: View {
                 WaterCard().padding(.vertical, 8).tag(1)
                 if hasActivity { StepsCard().padding(.vertical, 8).tag(2) }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never)).frame(height: 172)
+            .tabViewStyle(.page(indexDisplayMode: .never)).frame(height: height)
             .sensoryFeedback(.selection, trigger: page)
             HStack(spacing: 7) {
                     ForEach(0..<(hasActivity ? 3 : 2), id: \.self) { index in

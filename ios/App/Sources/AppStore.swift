@@ -37,7 +37,7 @@ final class AppStore: ObservableObject {
                 session = Session(accessToken: "ui-test", refreshToken: "ui-test", owner: UITestFixtures.owner, member: "ui-test")
                 profile = .object(["timezone": .string("UTC")])
                 goals = UITestFixtures.goals(date: dateKey)
-                if scenario == "--ui-test-meal" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey) }
+                if scenario == "--ui-test-meal" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey); weightLogs = UITestFixtures.weights(zone: timeZone) }
             }
             return
         }
@@ -208,6 +208,26 @@ final class AppStore: ObservableObject {
         let item: JSONValue = .object(["id": .string(UUID().uuidString.lowercased()), "food": food, "quantity": .number(quantity)])
         let payload: JSONValue = .object(["date": .string(date), "kind": .string(kind), "name": .string(name), "items": .array([item]), "imagePath": .null])
         return await write("לא הצלחנו לשמור את הארוחה.") { backend, owner in
+            let row = try await backend.save(table: "meals", owner: owner, payload: payload)
+            if session?.owner == owner { meals.append(row) }
+        }
+    }
+    /// Latest distinct meals (by name), newest first, for one-tap re-logging.
+    var recentMeals: [HealthRow] {
+        var seen = Set<String>()
+        return meals.sorted { ($0.data["date"].stringValue ?? "") > ($1.data["date"].stringValue ?? "") }.filter { meal in
+            let name = meal.data["name"].stringValue?.isEmpty == false ? meal.data["name"].stringValue! : (meal.data["items"].arrayValue.first?["food"]["name"].stringValue ?? meal.id)
+            return seen.insert(name).inserted
+        }.prefix(8).map { $0 }
+    }
+    func relogMeal(_ source: HealthRow, kind: String) async -> Bool {
+        let items = source.data["items"].arrayValue.map { item -> JSONValue in
+            guard case .object(var fields) = item else { return item }
+            fields["id"] = .string(UUID().uuidString.lowercased()); return .object(fields)
+        }
+        guard !items.isEmpty else { return false }
+        let payload: JSONValue = .object(["date": .string(dateKey), "kind": .string(kind), "name": .string(source.data["name"].stringValue ?? ""), "items": .array(items), "imagePath": source.data["imagePath"]])
+        return await write("לא הצלחנו להוסיף את הארוחה.") { backend, owner in
             let row = try await backend.save(table: "meals", owner: owner, payload: payload)
             if session?.owner == owner { meals.append(row) }
         }

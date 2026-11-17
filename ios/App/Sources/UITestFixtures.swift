@@ -16,6 +16,16 @@ enum UITestFixtures {
     static func meals(date: String) -> [HealthRow] {
         row(id: "33333333-3333-4333-8333-333333333333", data: "{\"date\":\"\(date)\",\"kind\":\"lunch\",\"name\":\"ארוחת בדיקה\",\"imagePath\":null,\"items\":[{\"id\":\"44444444-4444-4444-8444-444444444444\",\"quantity\":100,\"food\":{\"id\":\"test-tuna\",\"name\":\"טונה\",\"basis\":\"g\",\"source\":\"manual\",\"per100\":{\"kcal\":150,\"protein\":25,\"carbs\":0,\"fat\":5}}}]}")
     }
+    static func weights(zone: TimeZone) -> [HealthRow] {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = zone; f.dateFormat = "yyyy-MM-dd"
+        let values = [82.4, 82.1, 82.3, 81.8, 81.5, 81.6, 81.2]
+        return values.enumerated().flatMap { index, kg -> [HealthRow] in
+            let day = calendar.date(byAdding: .day, value: index - values.count + 1, to: Date()) ?? Date()
+            let id = String(format: "77777777-7777-4777-8777-%012d", index)
+            return row(id: id, data: "{\"date\":\"\(f.string(from: day))\",\"weight\":\(kg)}")
+        }
+    }
     static func workouts(date: String) -> [HealthRow] {
         row(id: "55555555-5555-8555-8555-555555555555", data: "{\"date\":\"\(date)\",\"name\":\"הליכה לבדיקה\",\"status\":\"completed\",\"quick\":true,\"startedAt\":\"\(date)T08:00:00Z\",\"exercises\":[],\"appleHealth\":{\"uuid\":\"66666666-6666-4666-8666-666666666666\",\"sourceName\":\"Test Watch\",\"durationSeconds\":1800,\"activityType\":52,\"energyKcal\":null,\"distanceMeters\":2500}}")
     }

@@ -29,6 +29,14 @@ struct AddMealSheet: View {
                         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
                 }
                 if searching { ProgressView().padding(.top, 30) }
+                else if results.isEmpty && !searched && query.isEmpty && !store.recentMeals.isEmpty {
+                    ScrollView { LazyVStack(alignment: .leading, spacing: 10) {
+                        Text("אחרונים").sectionTitle()
+                        ForEach(store.recentMeals) { meal in
+                            Button { Task { if await store.relogMeal(meal, kind: currentKind()) { dismiss() } } } label: { RecentRow(meal: meal) }.buttonStyle(PressableStyle())
+                        }
+                    } }.sensoryFeedback(.success, trigger: store.meals.count)
+                }
                 else if results.isEmpty {
                     ContentUnavailableView(searched ? "לא נמצאו מוצרים" : "מה אכלת?", systemImage: searched ? "questionmark.circle" : "fork.knife",
                         description: Text(searched ? "נסה שם אחר או סרוק ברקוד." : "חפש מוצר או סרוק ברקוד כדי להוסיף ארוחה."))
@@ -61,11 +69,30 @@ struct AddMealSheet: View {
             }
         }
     }
+    private func currentKind() -> String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        return hour < 11 ? "breakfast" : hour < 16 ? "lunch" : hour < 21 ? "dinner" : "snack"
+    }
     private func run(_ text: String, barcode: String?) async {
         searching = true; defer { searching = false }
         let foods = await store.searchFoods(query: text, barcode: barcode)
         results = (foods ?? []).map { FoodChoice(food: $0) }; searched = true
         if barcode != nil, results.count == 1 { picked = results.first }
+    }
+}
+
+private struct RecentRow: View {
+    let meal: HealthRow
+    var body: some View {
+        let name = meal.data["name"].stringValue.flatMap { $0.isEmpty ? nil : $0 } ?? (meal.data["items"].arrayValue.first?["food"]["name"].stringValue ?? "ארוחה")
+        HStack(spacing: 14) {
+            Image(systemName: "arrow.counterclockwise").font(.headline).foregroundStyle(Color.wellnessOnInk).frame(width: 40, height: 40).background(Color.wellnessInk, in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name).font(.headline).foregroundStyle(Color.wellnessInk).lineLimit(2).multilineTextAlignment(.leading)
+                Text(meal.data["items"].arrayValue.compactMap { $0["food"]["name"].stringValue }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            VStack(spacing: 1) { Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded()))").font(.headline).foregroundStyle(Color.wellnessInk); Text("קק״ל").font(.caption2).foregroundStyle(.secondary) }
+        }.wellnessCard(padding: 14).accessibilityElement(children: .combine).accessibilityHint("מוסיף את הארוחה שוב להיום")
     }
 }
 

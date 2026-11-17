@@ -59,9 +59,14 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.buttons["סריקת ברקוד"].exists)
         capture(app, name: "native-add-meal")
         app.buttons["סגור"].tap()
-        app.buttons["tab-settings"].tap()
+        app.buttons["settings-button"].tap()
+        if !app.buttons["יציאה מהחשבון"].waitForExistence(timeout: 3) { app.swipeUp() }
         XCTAssertTrue(app.buttons["יציאה מהחשבון"].waitForExistence(timeout: 5))
         capture(app, name: "native-settings")
+        app.buttons["סיום"].tap()
+        app.buttons["tab-progress"].tap()
+        XCTAssertTrue(app.staticTexts["ההתקדמות שלך"].waitForExistence(timeout: 5))
+        capture(app, name: "native-progress")
     }
     func testLoginRequiresFourDigits() {
         let app = launch("login")

@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SettingsScreen: View {
     @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    var isSheet = false
     @State private var confirmLogout = false
     @State private var weightText = ""
     var body: some View {
@@ -30,7 +32,8 @@ struct SettingsScreen: View {
                     Button("רענון נתונים") { Task { await store.refresh() } }.disabled(store.loading)
                     Button("יציאה מהחשבון", role: .destructive) { confirmLogout = true }
                 }
-            }.wellnessList().navigationTitle("הגדרות")
+            }.wellnessList().navigationTitle("הגדרות").navigationBarTitleDisplayMode(isSheet ? .inline : .large)
+                .toolbar { if isSheet { ToolbarItem(placement: .confirmationAction) { Button("סיום") { dismiss() } } } }
                 .confirmationDialog("לצאת מהחשבון?", isPresented: $confirmLogout, titleVisibility: .visible) {
                     Button("יציאה", role: .destructive) { Task { await store.logout() } }
                 }

@@ -82,8 +82,8 @@ private struct LoginScreen: View {
 }
 
 private enum HomeTab: String, CaseIterable {
-    case today = "היום", workouts = "אימונים", health = "פעילות", settings = "הגדרות"
-    var icon: String { switch self { case .today: "house.fill"; case .workouts: "dumbbell.fill"; case .health: "heart.text.square.fill"; case .settings: "gearshape.fill" } }
+    case today = "היום", workouts = "אימונים", health = "פעילות", progress = "התקדמות"
+    var icon: String { switch self { case .today: "house.fill"; case .workouts: "dumbbell.fill"; case .health: "heart.text.square.fill"; case .progress: "chart.xyaxis.line" } }
 }
 private struct HomeShell: View {
     @State private var tab: HomeTab = .today
@@ -97,7 +97,7 @@ private struct HomeShell: View {
             case .today: TodayScreen()
             case .workouts: WorkoutsScreen()
             case .health: ActivityScreen()
-            case .settings: SettingsScreen()
+            case .progress: ProgressScreen()
             }
         }
         .transition(.opacity)
@@ -111,7 +111,7 @@ private struct HomeShell: View {
                     } label: {
                         VStack(spacing: 5) {
                             Image(systemName: item.icon).font(.title3).symbolEffect(.bounce, value: tab == item)
-                            Text(item.rawValue).font(.caption.weight(.semibold))
+                            Text(item.rawValue).font(.caption.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.7)
                         }
                         .foregroundStyle(tab == item ? Color.wellnessInk : Color.wellnessInk.opacity(0.62))
                         .frame(maxWidth: .infinity).padding(.vertical, 11)
@@ -134,6 +134,7 @@ private struct HomeShell: View {
             }.buttonStyle(PressableStyle()).accessibilityLabel("הוספת ארוחה").accessibilityIdentifier("add-meal")
             }
             .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 5)
+            .dynamicTypeSize(...DynamicTypeSize.xLarge)
         }
         .sheet(isPresented: $adding) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }
     }
