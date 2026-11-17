@@ -4,6 +4,7 @@ import WellnessCore
 struct TodayScreen: View {
     @EnvironmentObject private var store: AppStore
     @State private var showCalendar = false
+    @State private var mealToDelete: HealthRow?
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -29,7 +30,8 @@ struct TodayScreen: View {
                         ContentUnavailableView("עוד אין ארוחות ביום הזה", systemImage: "fork.knife", description: Text("הארוחות שלך מהחשבון יופיעו כאן."))
                     } else {
                         ForEach(store.dayMeals) { meal in
-                            NavigationLink { MealDetail(meal: meal) } label: { MealCard(meal: meal) }.buttonStyle(PressableStyle()).accessibilityIdentifier("meal-\(meal.id)")
+                            NavigationLink { MealDetail(meal: meal) } label: { MealCard(meal: meal) }.buttonStyle(PressableStyle())
+                                .contextMenu { Button(role: .destructive) { mealToDelete = meal } label: { Label("מחיקת הארוחה", systemImage: "trash") } }.accessibilityIdentifier("meal-\(meal.id)")
                         }
                     }
                 }.padding(22)
@@ -38,6 +40,9 @@ struct TodayScreen: View {
             .toolbar(.hidden, for: .navigationBar)
             .refreshable { await store.refresh() }
             .sensoryFeedback(.selection, trigger: store.selectedDate)
+            .confirmationDialog("למחוק את הארוחה?", isPresented: Binding(get: { mealToDelete != nil }, set: { if !$0 { mealToDelete = nil } }), titleVisibility: .visible) {
+                Button("מחיקה", role: .destructive) { if let meal = mealToDelete { Task { _ = await store.deleteMeal(meal) } }; mealToDelete = nil }
+            }
             .sheet(isPresented: $showCalendar) {
                 NavigationStack {
                     DatePicker("תאריך", selection: $store.selectedDate, displayedComponents: .date)
@@ -131,19 +136,42 @@ private struct SummaryCarousel: View {
                     NutrientCard(title: "פחמימות", nutrient: "carbs", symbol: "carrot.fill", color: .carbsGold)
                     NutrientCard(title: "שומן", nutrient: "fat", symbol: "drop.fill", color: .fatCoral)
                 }.padding(.vertical, 8).tag(0)
-                if hasActivity { StepsCard().padding(.vertical, 8).tag(1) }
+                WaterCard().padding(.vertical, 8).tag(1)
+                if hasActivity { StepsCard().padding(.vertical, 8).tag(2) }
             }
             .tabViewStyle(.page(indexDisplayMode: .never)).frame(height: 172)
             .sensoryFeedback(.selection, trigger: page)
-            if hasActivity {
-                HStack(spacing: 7) {
-                    ForEach(0..<2, id: \.self) { index in
+            HStack(spacing: 7) {
+                    ForEach(0..<(hasActivity ? 3 : 2), id: \.self) { index in
                         Capsule().fill(index == page ? Color.wellnessInk : Color.black.opacity(0.18))
                             .frame(width: index == page ? 22 : 7, height: 7)
                     }
                 }.animation(.snappy, value: page).environment(\.layoutDirection, .rightToLeft).accessibilityHidden(true)
-            }
         }
+    }
+}
+
+private struct WaterCard: View {
+    @EnvironmentObject private var store: AppStore
+    var body: some View {
+        let total = store.dayWater, target = store.waterTarget
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("מים").font(.subheadline).foregroundStyle(.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(Int(total), format: .number).font(.system(size: 38, weight: .heavy).monospacedDigit()).contentTransition(.numericText(value: total))
+                    Text("/ \(Int(target)) מ״ל").font(.caption).foregroundStyle(.secondary)
+                }.animation(.snappy, value: total)
+                HStack(spacing: 10) {
+                    Button { Task { await store.addWater(250) } } label: { Label("250", systemImage: "plus").font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(height: 40).background(Color.proteinBlue.opacity(0.14), in: Capsule()).foregroundStyle(Color.proteinBlue) }
+                        .buttonStyle(PressableStyle()).accessibilityLabel("הוסף 250 מיליליטר מים")
+                    Button { Task { await store.undoWater() } } label: { Image(systemName: "arrow.uturn.backward").frame(width: 40, height: 40).background(Color.wellnessChip, in: Circle()).foregroundStyle(Color.wellnessInk) }
+                        .buttonStyle(PressableStyle()).disabled(store.dayWaterLogs.isEmpty).accessibilityLabel("ביטול הכוס האחרונה")
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            ProgressRing(value: total, target: target, color: .proteinBlue, symbol: "drop.fill", lineWidth: 8).frame(width: 84, height: 84)
+        }.wellnessCard().sensoryFeedback(.impact(weight: .medium), trigger: store.dayWaterLogs.count)
+            .accessibilityElement(children: .contain)
     }
 }
 

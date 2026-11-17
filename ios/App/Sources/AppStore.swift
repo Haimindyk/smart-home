@@ -16,6 +16,8 @@ final class AppStore: ObservableObject {
     @Published private(set) var plans: [HealthRow] = []
     @Published private(set) var workouts: [HealthRow] = []
     @Published private(set) var profile: JSONValue = .null
+    @Published private(set) var waterLogs: [HealthRow] = []
+    @Published private(set) var weightLogs: [HealthRow] = []
     @Published private(set) var candidates: [AppleWorkout] = []
     @Published private(set) var steps: Double?
     @Published private(set) var healthLoaded = false
@@ -91,9 +93,13 @@ final class AppStore: ObservableObject {
             async let p = backend.rows(table: "workout_plans", owner: owner)
             async let w = backend.rows(table: "workout_sessions", owner: owner)
             async let h = backend.rows(table: "health_profiles", owner: owner)
+            async let wl = backend.rows(table: "water_logs", owner: owner)
+            async let wt = backend.rows(table: "weight_logs", owner: owner)
             let snapshot = try await (m, g, p, w, h)
+            let extras = try await (wl, wt)
             guard request == revision, session?.owner == owner else { return }
             meals = snapshot.0; goals = snapshot.1; plans = snapshot.2; workouts = snapshot.3; profile = snapshot.4.first?.data ?? .null
+            waterLogs = extras.0; weightLogs = extras.1
             candidates = pendingAppleWorkouts(candidates, existing: importedIDs)
             selection.formIntersection(Set(candidates.map(\.id)))
         } catch { if request == revision, session?.owner == owner { self.error = Self.message(error) } }
@@ -137,7 +143,7 @@ final class AppStore: ObservableObject {
     }
     func logout() async {
         revision += 1; healthRevision += 1
-        session = nil; meals = []; goals = []; plans = []; workouts = []; profile = .null
+        session = nil; meals = []; goals = []; plans = []; workouts = []; profile = .null; waterLogs = []; weightLogs = []
         candidates = []; selection = []; steps = nil; healthLoaded = false; importMessage = nil; error = nil
         busy = false; loading = false; phase = .signingOut
         await backend?.signOut()
@@ -153,6 +159,64 @@ final class AppStore: ObservableObject {
             workouts.removeAll { $0.id == row.id }
             return true
         } catch { if session?.owner == owner { self.error = "לא הצלחנו למחוק את האימון. רענן את הנתונים ונסה שוב." }; return false }
+    }
+    // MARK: - Writes (same rows and edge functions as the web app)
+    var waterTarget: Double { profile["waterTarget"].doubleValue ?? 2000 }
+    var dayWaterLogs: [HealthRow] { waterLogs.filter { $0.data["date"].stringValue == dateKey } }
+    var dayWater: Double { dayWaterLogs.reduce(0) { $0 + ($1.data["amount"].doubleValue ?? 0) } }
+    var latestWeight: Double? { weightLogs.max { ($0.data["date"].stringValue ?? "") < ($1.data["date"].stringValue ?? "") }?.data["weight"].doubleValue }
+
+    private func write(_ failure: String, _ work: (Backend, String) async throws -> Void) async -> Bool {
+        guard let owner = session?.owner, let backend else { return false }
+        do { try await work(backend, owner); return session?.owner == owner }
+        catch { if session?.owner == owner { self.error = error as? BackendError == .conflict ? "הנתון השתנה במקום אחר. רענן ונסה שוב." : failure }; return false }
+    }
+    func addWater(_ ml: Int) async {
+        let date = dateKey
+        _ = await write("לא הצלחנו לשמור את המים.") { backend, owner in
+            let row = try await backend.save(table: "water_logs", owner: owner, payload: .object(["date": .string(date), "amount": .number(Double(ml))]))
+            if session?.owner == owner { waterLogs.append(row) }
+        }
+    }
+    func undoWater() async {
+        guard let last = dayWaterLogs.last else { return }
+        _ = await write("לא הצלחנו לבטל את הכוס האחרונה.") { backend, owner in
+            try await backend.softDelete(table: "water_logs", row: last, owner: owner)
+            if session?.owner == owner { waterLogs.removeAll { $0.id == last.id } }
+        }
+    }
+    func logWeight(_ kg: Double) async -> Bool {
+        guard kg >= 20, kg <= 400 else { return false }
+        let date = dateKey
+        return await write("לא הצלחנו לשמור את המשקל.") { backend, owner in
+            let row = try await backend.save(table: "weight_logs", owner: owner, payload: .object(["date": .string(date), "weight": .number((kg * 10).rounded() / 10)]))
+            if session?.owner == owner { weightLogs.append(row) }
+        }
+    }
+    func searchFoods(query: String, barcode: String? = nil) async -> [JSONValue]? {
+        guard let owner = session?.owner, let backend else { return nil }
+        var body: [String: JSONValue] = ["query": .string(query), "labelOnly": .bool(false)]
+        if let barcode { body["barcode"] = .string(barcode) }
+        do {
+            let result = try await backend.invoke("food-lookup", body: .object(body), owner: owner)
+            return session?.owner == owner ? result["foods"].arrayValue : nil
+        } catch { if session?.owner == owner { self.error = "החיפוש לא הושלם. בדוק חיבור ונסה שוב." }; return nil }
+    }
+    func saveMeal(kind: String, name: String, food: JSONValue, quantity: Double) async -> Bool {
+        guard quantity > 0, quantity <= 10_000 else { return false }
+        let date = dateKey
+        let item: JSONValue = .object(["id": .string(UUID().uuidString.lowercased()), "food": food, "quantity": .number(quantity)])
+        let payload: JSONValue = .object(["date": .string(date), "kind": .string(kind), "name": .string(name), "items": .array([item]), "imagePath": .null])
+        return await write("לא הצלחנו לשמור את הארוחה.") { backend, owner in
+            let row = try await backend.save(table: "meals", owner: owner, payload: payload)
+            if session?.owner == owner { meals.append(row) }
+        }
+    }
+    func deleteMeal(_ row: HealthRow) async -> Bool {
+        await write("לא הצלחנו למחוק את הארוחה.") { backend, owner in
+            try await backend.softDelete(table: "meals", row: row, owner: owner)
+            if session?.owner == owner { meals.removeAll { $0.id == row.id } }
+        }
     }
     func imageData(_ path: String) async -> Data? {
         guard let owner = session?.owner, let backend else { return nil }

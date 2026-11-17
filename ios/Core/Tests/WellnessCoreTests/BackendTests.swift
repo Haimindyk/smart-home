@@ -174,4 +174,56 @@ final class BackendTests: XCTestCase {
             XCTAssertThrowsError(try Backend(root: URL(string: "https://example.test")!, publicKey: key, vault: MemoryVault()))
         }
     }
+
+    private func signedInBackend(handler: @escaping MockProtocol.Handler) async throws -> Backend {
+        let owner = owner, member = member, vault = MemoryVault()
+        try vault.save(Session(accessToken: "access", refreshToken: "refresh", owner: owner, member: member))
+        let api = try backend(vault: vault, handler: handler)
+        _ = try await api.restore()
+        return api
+    }
+    func testSaveInsertsWithOwnerAndMutationIdAndUpdatesWithVersionGuard() async throws {
+        let owner = owner
+        var seen: [(String, String, String?)] = []
+        let lock = NSLock()
+        let api = try await signedInBackend { request in
+            lock.lock(); seen.append((request.httpMethod ?? "", request.url!.path, request.url!.query)); lock.unlock()
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            let body = try String(data: requestBody(request), encoding: .utf8) ?? ""
+            if request.httpMethod == "POST" {
+                XCTAssertTrue(body.contains("\"owner_user_id\":\"\(owner)\"")); XCTAssertTrue(body.contains("last_mutation_id"))
+                return (201, "[{\"id\":\"22222222-2222-4222-8222-222222222222\",\"owner_user_id\":\"\(owner)\",\"version\":1,\"data\":{\"amount\":250},\"deleted_at\":null}]")
+            }
+            XCTAssertTrue(request.url!.query!.contains("version=eq.1")); XCTAssertTrue(body.contains("\"version\":2"))
+            return (200, "[{\"id\":\"22222222-2222-4222-8222-222222222222\",\"owner_user_id\":\"\(owner)\",\"version\":2,\"data\":{\"amount\":500},\"deleted_at\":null}]")
+        }
+        let first = try await api.save(table: "water_logs", owner: owner, payload: .object(["amount": .number(250)]))
+        XCTAssertEqual(first.version, 1)
+        let second = try await api.save(table: "water_logs", owner: owner, payload: .object(["amount": .number(500)]), existing: first)
+        XCTAssertEqual(second.version, 2)
+    }
+    func testSaveRejectsUnknownTablesAndForeignRowsAndMapsConflict() async throws {
+        let owner = owner
+        let api = try await signedInBackend { request in
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            return (200, "[]")
+        }
+        do { _ = try await api.save(table: "members", owner: owner, payload: .null); XCTFail("must reject") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+        let foreign = try JSONDecoder().decode(HealthRow.self, from: Data("{\"id\":\"22222222-2222-4222-8222-222222222222\",\"owner_user_id\":\"someone-else\",\"version\":1,\"data\":{},\"deleted_at\":null}".utf8))
+        do { _ = try await api.save(table: "meals", owner: owner, payload: .null, existing: foreign); XCTFail("must reject") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+        let mine = try JSONDecoder().decode(HealthRow.self, from: Data("{\"id\":\"22222222-2222-4222-8222-222222222222\",\"owner_user_id\":\"\(owner)\",\"version\":1,\"data\":{},\"deleted_at\":null}".utf8))
+        do { _ = try await api.save(table: "meals", owner: owner, payload: .null, existing: mine); XCTFail("empty result means a concurrent edit") } catch { XCTAssertEqual(error as? BackendError, .conflict) }
+        do { try await api.softDelete(table: "meals", row: mine, owner: owner); XCTFail("empty result means a concurrent edit") } catch { XCTAssertEqual(error as? BackendError, .conflict) }
+    }
+    func testInvokeOnlyCallsKnownFunctionsAndSurfacesFunctionErrors() async throws {
+        let owner = owner
+        let api = try await signedInBackend { request in
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            XCTAssertEqual(request.url!.path, "/functions/v1/food-lookup")
+            return (200, request.url!.absoluteString.isEmpty ? "" : "{\"foods\":[]}")
+        }
+        let ok = try await api.invoke("food-lookup", body: .object(["query": .string("חלב")]), owner: owner)
+        XCTAssertEqual(ok["foods"], .array([]))
+        do { _ = try await api.invoke("pin-login", body: .null, owner: owner); XCTFail("must reject") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+    }
 }

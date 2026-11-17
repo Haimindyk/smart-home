@@ -83,6 +83,8 @@ private enum HomeTab: String, CaseIterable {
 private struct HomeShell: View {
     @State private var tab: HomeTab = .today
     @Namespace private var pill
+    @State private var adding = false
+    @EnvironmentObject private var store: AppStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         Group {
@@ -122,5 +124,13 @@ private struct HomeShell: View {
             .shadow(color: .black.opacity(0.08), radius: 18, y: 6)
             .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 5)
         }
+        .overlay(alignment: .bottomLeading) {
+            Button { adding = true } label: {
+                Image(systemName: "plus").font(.title2.weight(.bold)).foregroundStyle(.white)
+                    .frame(width: 62, height: 62).background(Color.wellnessInk, in: Circle()).shadow(color: .black.opacity(0.2), radius: 14, y: 6)
+            }.buttonStyle(PressableStyle()).padding(.leading, 20).padding(.bottom, 80)
+                .accessibilityLabel("הוספת ארוחה").accessibilityIdentifier("add-meal")
+        }
+        .sheet(isPresented: $adding) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }
     }
 }

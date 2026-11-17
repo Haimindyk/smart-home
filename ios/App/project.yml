@@ -35,6 +35,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSCameraUsageDescription: המצלמה משמשת רק לסריקת ברקוד של מוצר כדי להוסיף אותו לארוחה. התמונה לא נשמרת.
         NSHealthUpdateUsageDescription: האפליקציה לא כותבת נתונים ל־Apple Health; ההרשאה נדרשת על ידי Apple עבור גישת HealthKit לקריאה בלבד.
         NSHealthShareUsageDescription: הצגת פעילות וייבוא אימונים שתבחר מ־Apple Health לחשבון שלך. לא נכתוב נתונים ל־Apple Health.
         SUPABASE_HOST: $(SUPABASE_HOST)
