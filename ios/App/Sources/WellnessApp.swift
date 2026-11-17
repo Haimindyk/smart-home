@@ -3,10 +3,12 @@ import SwiftUI
 @main
 struct WellnessApp: App {
     @StateObject private var store = AppStore()
+    init() {}
     @Environment(\.scenePhase) private var scenePhase
     var body: some Scene {
         WindowGroup {
             AppRoot()
+                .task { PhoneConnectivity.shared.start(store: store) }
                 .environmentObject(store)
                 .environment(\.layoutDirection, .rightToLeft)
                 .environment(\.locale, Locale(identifier: "he_IL"))

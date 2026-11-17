@@ -103,6 +103,7 @@ final class AppStore: ObservableObject {
             waterLogs = extras.0; weightLogs = extras.1
             candidates = pendingAppleWorkouts(candidates, existing: importedIDs)
             selection.formIntersection(Set(candidates.map(\.id)))
+            publishToWatch()
         } catch { if request == revision, session?.owner == owner { self.error = Self.message(error) } }
     }
     func readHealth() async {
@@ -161,6 +162,23 @@ final class AppStore: ObservableObject {
             return true
         } catch { if session?.owner == owner { self.error = "לא הצלחנו למחוק את האימון. רענן את הנתונים ונסה שוב." }; return false }
     }
+    // MARK: - Apple Watch
+    func watchSummary() -> WatchSummary {
+        WatchSummary(date: dateKey, kcalConsumed: nutrientTotal(meals: dayMeals, nutrient: "kcal"), kcalTarget: goal["kcal"].doubleValue,
+                     waterML: dayWater, waterTarget: waterTarget, steps: steps, updatedAt: Date())
+    }
+    /// Sends today's numbers to the watch. Always today (not the browsed date), so the watch is never confusing.
+    func publishToWatch() {
+        guard session != nil, phase == .signedIn else { return }
+        let saved = selectedDate
+        let today = Self.dateKey(Date(), zone: timeZone)
+        let meals = meals.filter { $0.data["date"].stringValue == today }
+        let water = waterLogs.filter { $0.data["date"].stringValue == today }.reduce(0.0) { $0 + ($1.data["amount"].doubleValue ?? 0) }
+        _ = saved
+        PhoneConnectivity.shared.push(WatchSummary(date: today, kcalConsumed: nutrientTotal(meals: meals, nutrient: "kcal"), kcalTarget: goals.filter { ($0.data["date"].stringValue ?? "9999") <= today }.max { ($0.data["date"].stringValue ?? "") < ($1.data["date"].stringValue ?? "") }?.data["kcal"].doubleValue,
+                                                      waterML: water, waterTarget: waterTarget, steps: steps, updatedAt: Date()))
+    }
+
     // MARK: - Writes (same rows and edge functions as the web app)
     var waterTarget: Double { profile["waterTarget"].doubleValue ?? 2000 }
     var dayWaterLogs: [HealthRow] { waterLogs.filter { $0.data["date"].stringValue == dateKey } }
@@ -169,7 +187,7 @@ final class AppStore: ObservableObject {
 
     private func write(_ failure: String, _ work: (Backend, String) async throws -> Void) async -> Bool {
         guard let owner = session?.owner, let backend else { return false }
-        do { try await work(backend, owner); return session?.owner == owner }
+        do { try await work(backend, owner); let ok = session?.owner == owner; if ok { publishToWatch() }; return ok }
         catch { if session?.owner == owner { self.error = error as? BackendError == .conflict ? "הנתון השתנה במקום אחר. רענן ונסה שוב." : failure }; return false }
     }
     func addWater(_ ml: Int) async {
