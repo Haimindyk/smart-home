@@ -165,6 +165,14 @@ export const payloadSchemas = {
     archived: z.boolean().default(false),
   }),
   workout_sessions: z.object({
+    appleHealth: z.object({
+      uuid: z.string().uuid(),
+      sourceName: z.string().max(200),
+      activityType: z.number().int().nonnegative().finite(),
+      durationSeconds: z.number().finite().positive().max(604800),
+      energyKcal: z.number().finite().min(0).max(100000).nullable(),
+      distanceMeters: z.number().finite().min(0).max(10000000).nullable(),
+    }).optional(),
     feedback:z.object({energy:z.number().int().min(1).max(5),rir:z.number().int().min(0).max(5).nullable(),pain:z.boolean()}).optional(),
     programNotes: z.string().max(8000).optional(),
     date: dateSchema,
