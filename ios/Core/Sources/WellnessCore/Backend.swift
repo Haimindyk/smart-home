@@ -127,8 +127,8 @@ public actor Backend {
         return result
     }
     // MARK: - Household tables (shared, not owner-scoped: sections, tasks, chores, events, members)
-    public static let householdReadable: Set<String> = ["sections", "tasks", "chores", "chore_completions", "family_events", "members", "activity_log", "barcode_products"]
-    public static let householdWritable: Set<String> = ["sections", "tasks", "chores", "family_events"]
+    public static let householdReadable: Set<String> = ["sections", "tasks", "chores", "chore_completions", "family_events", "members", "activity_log", "barcode_products", "ai_suggestions", "ai_private_messages"]
+    public static let householdWritable: Set<String> = ["sections", "tasks", "chores", "family_events", "ai_suggestions", "ai_private_messages"]
     private static let householdRPCs: Set<String> = ["complete_chore"]
 
     /// Reads a household table, paging up to 10,000 rows. `deleted_at is null` is applied for tables that soft-delete.

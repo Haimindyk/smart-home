@@ -177,6 +177,10 @@ final class WellnessUITests: XCTestCase {
         let toggle = app.buttons["task-toggle-b0000000-0000-4000-8000-000000000001"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         capture(app, name: "native-home-tasks")
+        let apply = app.buttons["suggestion-apply-e0000000-0000-4000-8000-000000000001"]
+        XCTAssertTrue(apply.exists, "Open assistant suggestions are shown with an apply button")
+        apply.tap()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: apply); waitForExpectations(timeout: 5)
         toggle.tap()
         let gone = NSPredicate(format: "exists == false")
         expectation(for: gone, evaluatedWith: toggle); waitForExpectations(timeout: 5)  // moves to the completed group at once

@@ -15,6 +15,8 @@ final class HomeStore: ObservableObject {
     @Published var error: String?
     @Published var selectedSectionID: String?
     @Published var activity: [HActivity] = []
+    @Published var suggestions: [HSuggestion] = []
+    @Published var notes: [HPrivateNote] = []
     private weak var app: AppStore?
     private var revision = 0
     func bind(_ app: AppStore) { self.app = app }
@@ -41,15 +43,19 @@ final class HomeStore: ObservableObject {
             async let c = backend.householdRows(table: "chores", owner: owner, order: "next_due_at.asc")
             async let e = backend.householdRows(table: "family_events", owner: owner, order: "event_date.asc")
             async let m = backend.householdRows(table: "members", owner: owner, order: "display_name.asc")
+            async let sg = backend.householdRows(table: "ai_suggestions", owner: owner, filters: [.init(name: "status", value: "eq.open")], order: "created_at.desc", limit: 20, singlePage: true)
+            async let pn = backend.householdRows(table: "ai_private_messages", owner: owner, filters: [.init(name: "member_id", value: "eq.\(app.session?.member ?? "")"), .init(name: "read_at", value: "is.null")], order: "created_at.desc", limit: 20, singlePage: true)
             let result = try await (s, t, c, e, m)
+            let assistant = (try? await (sg, pn)) ?? ([], [])
             guard request == revision, app.session?.owner == owner else { return }
             sections = result.0.compactMap(HSection.init).sorted { $0.position < $1.position }
             tasks = result.1.compactMap(HTask.init); chores = result.2.compactMap(HChore.init)
             events = result.3.compactMap(HEvent.init); members = result.4.compactMap(HMember.init)
+            suggestions = assistant.0.compactMap(HSuggestion.init); notes = assistant.1.compactMap(HPrivateNote.init)
             if selectedSectionID == nil || !sections.contains(where: { $0.id == selectedSectionID }) { selectedSectionID = sections.first?.id }
         } catch { if request == revision, app.session?.owner == owner { self.error = "לא הצלחנו לטעון את נתוני הבית. אפשר למשוך לרענון." } }
     }
-    func reset() { revision += 1; sections = []; tasks = []; chores = []; events = []; members = []; selectedSectionID = nil; error = nil }
+    func reset() { revision += 1; sections = []; tasks = []; chores = []; events = []; members = []; suggestions = []; notes = []; selectedSectionID = nil; error = nil }
 
     func loadActivity() async {
         guard let app, let owner = app.session?.owner else { return }
@@ -105,6 +111,46 @@ final class HomeStore: ObservableObject {
         else { before = siblings[target].position; after = target + 1 < siblings.count ? siblings[target + 1].position : nil }
         guard let position = try? FractionalIndex.between(before, after) else { return }
         await update(task, fields: ["position": .string(position)]) { $0.position = position }
+    }
+
+    // MARK: Assistant suggestions and notes
+    func dismiss(_ suggestion: HSuggestion) async {
+        let backup = suggestions; suggestions.removeAll { $0.id == suggestion.id }
+        _ = await run("לא הצלחנו לדחות את ההצעה.", rollback: { [weak self] in self?.suggestions = backup }) { backend, owner in
+            _ = try await backend.householdUpdate(table: "ai_suggestions", owner: owner, id: suggestion.id, fields: ["status": .string("dismissed")])
+        }
+    }
+    func markRead(_ note: HPrivateNote) async {
+        let backup = notes; notes.removeAll { $0.id == note.id }
+        _ = await run("לא הצלחנו לסמן את ההודעה כנקראה.", rollback: { [weak self] in self?.notes = backup }) { backend, owner in
+            _ = try await backend.householdUpdate(table: "ai_private_messages", owner: owner, id: note.id, fields: ["read_at": .string(DateParsing.iso(Date()))])
+        }
+    }
+    /// Applies the proposed action through the same writes a person would make, then marks the suggestion applied.
+    func apply(_ suggestion: HSuggestion) async {
+        let a = suggestion.action
+        switch a.str("type") ?? "" {
+        case "create_task":
+            guard let section = sections.first(where: { $0.id == a.str("sectionId") }), let title = a.str("title") else { await dismiss(suggestion); return }
+            await addTask(title: title, section: section, quantity: a.num("quantity"))
+        case "create_chore":
+            guard let section = sections.first(where: { $0.id == a.str("sectionId") }), let title = a.str("title") else { await dismiss(suggestion); return }
+            await addChore(title: title, section: section, freq: ["daily", "weekly", "monthly"].contains(a.str("freq") ?? "") ? a.str("freq")! : "weekly", interval: 1)
+        case "create_family_event":
+            guard let title = a.str("title"), let day = DateParsing.day(a.str("eventDate"), zone: timeZone) else { await dismiss(suggestion); return }
+            await saveEvent(id: nil, title: title, kind: a.str("kind") ?? "other", date: day, yearly: a.str("kind") == "birthday", notes: "", emoji: nil)
+        case "complete_chore":
+            if let chore = chores.first(where: { $0.id == a.str("choreId") }) { await complete(chore) }
+        case "toggle_task_completed":
+            if let task = tasks.first(where: { $0.id == a.str("taskId") }) { await toggle(task) }
+        case "create_section":
+            if let name = a.str("name") { await addSection(name: name, emoji: a.str("emoji") ?? "", kind: ["tasks", "shopping", "chores", "info"].contains(a.str("kind") ?? "") ? a.str("kind")! : "tasks") }
+        default: await dismiss(suggestion); return
+        }
+        let backup = suggestions; suggestions.removeAll { $0.id == suggestion.id }
+        _ = await run("לא הצלחנו לסמן את ההצעה כמיושמת.", rollback: { [weak self] in self?.suggestions = backup }) { backend, owner in
+            _ = try await backend.householdUpdate(table: "ai_suggestions", owner: owner, id: suggestion.id, fields: ["status": .string("applied")])
+        }
     }
 
     // MARK: Sections

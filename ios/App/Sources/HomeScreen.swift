@@ -52,6 +52,7 @@ struct HomeScreen: View {
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         hero
+                        AssistantCards()
                         if home.sections.isEmpty && !home.loading { ContentUnavailableView("אין עדיין מדורים", systemImage: "square.grid.2x2", description: Text("צור מדור חדש בתפריט ⋯.")) }
                         ForEach(home.sections) { SectionPanel(section: $0).id($0.id) }
                         Color.clear.frame(height: 110)
@@ -463,5 +464,45 @@ struct TaskEditorSheet: View {
             if section.kind == "shopping" { t.quantity = qty; t.unit = unit.isEmpty ? nil : unit }
         }
         dismiss()
+    }
+}
+
+/// Proactive assistant cards: open suggestions (apply or dismiss) and private notes for me (dismiss = mark read).
+struct AssistantCards: View {
+    @EnvironmentObject private var home: HomeStore
+    @State private var applying: String?
+    var body: some View {
+        VStack(spacing: 10) {
+            ForEach(home.suggestions) { s in
+                card(emoji: s.emoji ?? "💡", text: s.summary, ring: Color.wellnessPrimary.opacity(0.3), id: s.id) {
+                    HStack(spacing: 6) {
+                        if s.isApplicable {
+                            Button { applying = s.id; Task { await home.apply(s); applying = nil } } label: { Text("הוספה").font(.hb(.subheadline, .semibold)).lineLimit(1).fixedSize().padding(.horizontal, 14).frame(minHeight: 40).foregroundStyle(Color.wellnessOnPrimary).background(Color.wellnessPrimary, in: Capsule()) }
+                                .buttonStyle(PressableStyle()).disabled(applying == s.id).accessibilityIdentifier("suggestion-apply-\(s.id)")
+                        }
+                        dismissButton { Task { await home.dismiss(s) } }
+                    }
+                }
+            }
+            ForEach(home.notes) { n in
+                card(emoji: "💜", text: n.summary, ring: Color(red: 0.85, green: 0.27, blue: 0.94).opacity(0.3), id: n.id) { dismissButton { Task { await home.markRead(n) } } }
+            }
+        }
+    }
+    private func card<Trailing: View>(emoji: String, text: String, ring: Color, id: String, @ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack(spacing: 12) {
+            Text(emoji).font(.system(size: 22)).accessibilityHidden(true)
+            Text(text).font(.hb(.subheadline)).foregroundStyle(Color.wellnessInk).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading).layoutPriority(0)
+            trailing().layoutPriority(1)
+        }
+        .padding(14)
+        .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(ring, lineWidth: 1.2))
+        .shadow(color: .black.opacity(0.05), radius: 1, y: 1).shadow(color: .black.opacity(0.08), radius: 10, y: 5)
+        .transition(.scale.combined(with: .opacity)).accessibilityElement(children: .contain)
+    }
+    private func dismissButton(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.wellnessSecondary).frame(width: 40, height: 40).contentShape(Rectangle()) }
+            .buttonStyle(.plain).accessibilityLabel("סגירה")
     }
 }

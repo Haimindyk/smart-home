@@ -103,3 +103,21 @@ struct HActivity: Identifiable, Equatable {
         actorID = j.str("actor_id"); createdAt = DateParsing.timestamp(j.str("created_at"))
     }
 }
+
+struct HSuggestion: Identifiable, Equatable {
+    let id: String; var emoji: String?; var summary: String; var action: JSONValue
+    init?(_ j: JSONValue) {
+        guard let id = j.str("id"), let summary = j.str("summary") else { return nil }
+        self.id = id; emoji = j.str("emoji"); self.summary = summary; action = j["action"]
+    }
+    /// Action types the app can apply itself (the same vocabulary as the web app's applyProposedAction).
+    var isApplicable: Bool { ["create_task", "create_chore", "create_family_event", "complete_chore", "toggle_task_completed", "create_section"].contains(action.str("type") ?? "") }
+}
+
+struct HPrivateNote: Identifiable, Equatable {
+    let id: String; var memberID: String; var summary: String
+    init?(_ j: JSONValue) {
+        guard let id = j.str("id"), let member = j.str("member_id"), let summary = j.str("summary") else { return nil }
+        self.id = id; memberID = member; self.summary = summary
+    }
+}

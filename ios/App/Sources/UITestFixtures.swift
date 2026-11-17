@@ -79,6 +79,8 @@ extension HomeStore {
         let soon = ymd.string(from: day.addingTimeInterval(5 * 86_400)), later = ymd.string(from: day.addingTimeInterval(11 * 86_400))
         events = [j("{\"id\":\"d0000000-0000-4000-8000-000000000001\",\"title\":\"יום הולדת לנועה\",\"emoji\":\"🎂\",\"kind\":\"birthday\",\"event_date\":\"\(soon)\",\"recurrence\":\"yearly\"}"),
                   j("{\"id\":\"d0000000-0000-4000-8000-000000000002\",\"title\":\"בדיקת דם\",\"emoji\":\"🩺\",\"kind\":\"medical\",\"event_date\":\"\(later)\",\"recurrence\":\"none\"}")].compactMap(HEvent.init)
+        suggestions = [j("{\"id\":\"e0000000-0000-4000-8000-000000000001\",\"emoji\":\"🥛\",\"summary\":\"נגמר החלב מהקנייה האחרונה. להוסיף לרשימה?\",\"status\":\"open\",\"action\":{\"type\":\"create_task\",\"sectionId\":\"a0000000-0000-4000-8000-000000000002\",\"title\":\"חלב\"}}")].compactMap(HSuggestion.init)
+        notes = [j("{\"id\":\"e1000000-0000-4000-8000-000000000001\",\"member_id\":\"\(mid)\",\"summary\":\"שמתי לב שלא סימנת את המטלות מהיום. הכול בסדר?\"}")].compactMap(HPrivateNote.init)
         selectedSectionID = sections.first?.id
     }
 }
