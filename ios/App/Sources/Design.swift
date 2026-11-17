@@ -18,8 +18,14 @@ extension Color {
     /// Primary ink (text and filled buttons) and the color that sits on top of it.
     static let wellnessInk = adaptive((0.07, 0.07, 0.08), (0.96, 0.96, 0.97))
     static let wellnessOnInk = adaptive((1, 1, 1), (0.07, 0.07, 0.08))
+    /// Secondary text with at least 4.5:1 contrast on cards and canvas in both appearances.
+    static let wellnessSecondary = adaptive((0.30, 0.30, 0.33), (0.70, 0.70, 0.74))
     static let wellnessHairline = adaptive((0, 0, 0), (1, 1, 1), lightAlpha: 0.07, darkAlpha: 0.10)
     // Macro palette shared with the web app.
+    // Text-safe variants (>= 4.5:1 on cards); the base colors stay for rings, bars and icons.
+    static let kcalAmberText = adaptive((0.64, 0.36, 0.0), (0.96, 0.72, 0.30))
+    static let proteinBlueText = adaptive((0.13, 0.35, 0.76), (0.55, 0.72, 1.0))
+    static let fatCoralText = adaptive((0.72, 0.20, 0.20), (1.0, 0.60, 0.60))
     static let kcalAmber = Color(red: 0.91, green: 0.62, blue: 0.18)
     static let proteinBlue = Color(red: 0.36, green: 0.55, blue: 0.94)
     static let carbsGold = Color(red: 0.91, green: 0.72, blue: 0.22)

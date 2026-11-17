@@ -11,7 +11,7 @@ struct ActivityScreen: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("הפעילות שלך").font(.system(.largeTitle, design: .rounded).bold())
-                            Text("Apple Watch ו־iPhone").foregroundStyle(.secondary)
+                            Text("Apple Watch ו־iPhone").foregroundStyle(Color.wellnessSecondary)
                         }
                         Spacer()
                         Image(systemName: "heart.fill").foregroundStyle(.pink).font(.title).padding(15).background(Color.pink.opacity(0.07), in: Circle())
@@ -21,7 +21,7 @@ struct ActivityScreen: View {
                     } else if !store.healthLoaded {
                         VStack(alignment: .leading, spacing: 18) {
                             Text("האימונים שלך, במקום אחד").sectionTitle()
-                            Text("חבר את בריאות, ואז בחר אילו אימונים לייבא לחשבון שלך.").foregroundStyle(.secondary)
+                            Text("חבר את בריאות, ואז בחר אילו אימונים לייבא לחשבון שלך.").foregroundStyle(Color.wellnessSecondary)
                             Button { Task { await store.readHealth() } } label: {
                                 if store.busy { ProgressView().tint(Color.wellnessOnInk) } else { Label("חיבור ל־Apple Health", systemImage: "heart") }
                             }.buttonStyle(PrimaryButton()).disabled(store.busy)
@@ -31,7 +31,7 @@ struct ActivityScreen: View {
                             VStack(alignment: .leading, spacing: 5) {
                                 if let steps = store.steps { Text(steps, format: .number.precision(.fractionLength(0))).font(.largeTitle.bold().monospacedDigit()) }
                                 else { Text("—").font(.largeTitle.bold()) }
-                                Text("צעדים היום").foregroundStyle(.secondary)
+                                Text("צעדים היום").foregroundStyle(Color.wellnessSecondary)
                             }
                             Spacer()
                             Image(systemName: "figure.walk").font(.largeTitle).foregroundStyle(.orange)
@@ -46,20 +46,20 @@ struct ActivityScreen: View {
                         if store.candidates.isEmpty {
                             ContentUnavailableView("אין אימונים חדשים לייבוא", systemImage: "checkmark.circle", description: Text("ייתכן שכל האימונים כבר יובאו, שאין נתונים או שלא ניתנה הרשאת קריאה בבריאות."))
                         } else {
-                            Text("בחר אימונים מה־30 ימים האחרונים").font(.subheadline).foregroundStyle(.secondary)
+                            Text("בחר אימונים מה־30 ימים האחרונים").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
                             ForEach(store.candidates) { workout in
                                 Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { if store.selection.contains(workout.id) { store.selection.remove(workout.id) } else { store.selection.insert(workout.id) } } } label: {
                                     HStack(spacing: 14) {
-                                        Image(systemName: store.selection.contains(workout.id) ? "checkmark.circle.fill" : "circle").font(.title2).foregroundStyle(store.selection.contains(workout.id) ? Color.wellnessInk : .secondary).symbolEffect(.bounce, value: store.selection.contains(workout.id))
+                                        Image(systemName: store.selection.contains(workout.id) ? "checkmark.circle.fill" : "circle").font(.title2).foregroundStyle(store.selection.contains(workout.id) ? Color.wellnessInk : Color.wellnessSecondary).symbolEffect(.bounce, value: store.selection.contains(workout.id))
                                         VStack(alignment: .leading, spacing: 6) {
                                             Text(workout.name).font(.headline)
-                                            Text(workout.start, format: .dateTime.day().month(.abbreviated).hour().minute()).font(.subheadline).foregroundStyle(.secondary)
+                                            Text(workout.start, format: .dateTime.day().month(.abbreviated).hour().minute()).font(.subheadline).foregroundStyle(Color.wellnessSecondary)
                                             HStack(spacing: 10) {
                                                 Text("\(Int((workout.duration / 60).rounded())) דק׳")
                                                 if let energy = workout.energyKcal { Text("\(Int(energy.rounded())) קק״ל") }
                                                 if let distance = workout.distanceMeters { Text("\(distance / 1000, specifier: "%.1f") ק״מ") }
-                                            }.font(.caption).foregroundStyle(.secondary)
-                                            Text(workout.sourceName).font(.caption2).foregroundStyle(.secondary)
+                                            }.font(.caption).foregroundStyle(Color.wellnessSecondary)
+                                            Text(workout.sourceName).font(.caption2).foregroundStyle(Color.wellnessSecondary)
                                         }.frame(maxWidth: .infinity, alignment: .leading)
                                     }.wellnessCard()
                                 }.buttonStyle(PressableStyle()).disabled(store.busy)
@@ -73,7 +73,7 @@ struct ActivityScreen: View {
                         }
                     }
                     if let message = store.importMessage { Label(message, systemImage: "checkmark.circle.fill").foregroundStyle(.green).sensoryFeedback(.success, trigger: message) }
-                    Button { privacy = true } label: { Text("מה נשמר בחשבון?").font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
+                    Button { privacy = true } label: { Text("מה נשמר בחשבון?").font(.footnote).foregroundStyle(Color.wellnessSecondary).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
                 }.padding(22)
             }.wellnessScreen().toolbar(.hidden, for: .navigationBar).refreshable { await store.readHealth() }
                 .sheet(isPresented: $privacy) { HealthPrivacySheet() }

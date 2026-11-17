@@ -31,7 +31,7 @@ struct ActiveWorkoutView: View {
                                 update(exIndex, setIndex, reps: reps, weight: weight, done: done, rest: Int(exercise["rest"].doubleValue ?? 90))
                             }
                         }
-                        if let notes = exercise["notes"].stringValue, !notes.isEmpty { Text(notes).font(.footnote).foregroundStyle(.secondary) }
+                        if let notes = exercise["notes"].stringValue, !notes.isEmpty { Text(notes).font(.footnote).foregroundStyle(Color.wellnessSecondary) }
                     }
                 }
                 if isActive {
@@ -84,11 +84,11 @@ private struct SetRow: View {
     var body: some View {
         let reps = set["reps"].doubleValue ?? 0, weight = set["weight"].doubleValue ?? 0, done = set["done"].boolValue == true
         HStack(spacing: 8) {
-            Text("\(index + 1)").font(.headline.monospacedDigit()).foregroundStyle(.secondary).frame(width: 22)
+            Text("\(index + 1)").font(.headline.monospacedDigit()).foregroundStyle(Color.wellnessSecondary).frame(width: 22)
             control(value: weight, unit: "ק״ג", label: "משקל", step: 2.5) { onChange(reps, max(0, $0), done) }
             control(value: reps, unit: "חזרות", label: "חזרות", step: 1) { onChange(max(0, $0), weight, done) }
             Button { onChange(reps, weight, !done) } label: {
-                Image(systemName: done ? "checkmark.circle.fill" : "circle").font(.title).foregroundStyle(done ? Color.wellnessInk : Color.secondary)
+                Image(systemName: done ? "checkmark.circle.fill" : "circle").font(.title).foregroundStyle(done ? Color.wellnessInk : Color.wellnessSecondary)
                     .symbolEffect(.bounce, value: done).frame(width: 44, height: 44)
             }.buttonStyle(.plain).disabled(!enabled).accessibilityLabel(done ? "סט \(index + 1) הושלם" : "סמן סט \(index + 1) כהושלם")
         }.padding(.vertical, 4)
@@ -98,7 +98,7 @@ private struct SetRow: View {
         VStack(spacing: 6) {
             VStack(spacing: 0) {
                 Text(value, format: .number.precision(.fractionLength(0...1))).font(.title3.weight(.bold).monospacedDigit()).contentTransition(.numericText(value: value))
-                Text(unit).font(.caption2).foregroundStyle(.secondary)
+                Text(unit).font(.caption2).foregroundStyle(Color.wellnessSecondary)
             }.accessibilityElement(children: .combine)
             HStack(spacing: 8) {
                 stepButton("minus") { set(value - step) }.accessibilityLabel("הפחת \(label)")

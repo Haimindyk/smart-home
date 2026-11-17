@@ -58,7 +58,7 @@ struct CoachChatView: View {
                                 }
                             }
                         }
-                        if sending { HStack(spacing: 8) { ProgressView(); Text("המאמן חושב…").font(.footnote).foregroundStyle(.secondary) }.id("typing") }
+                        if sending { HStack(spacing: 8) { ProgressView(); Text("המאמן חושב…").font(.footnote).foregroundStyle(Color.wellnessSecondary) }.id("typing") }
                         Color.clear.frame(height: 1).id("end")
                     }.padding(16)
                 }
@@ -74,7 +74,7 @@ struct CoachChatView: View {
         VStack(alignment: .leading, spacing: 10) {
             Label("שאל על תזונה, אימונים וטכניקה", systemImage: "sparkles").font(.headline)
             Text("מידע כללי ב־AI, לא תחליף לתזונאי או לאיש מקצוע רפואי. השיחה פרטית ונשמרת עד 30 יום; רק ההודעות האחרונות נשלחות. סיכום יומן נשלח רק בסימון שלך, ללא תמונות, שם או הערות אישיות. הצ׳אט לא משנה יומן או תוכנית.")
-                .font(.footnote).foregroundStyle(.secondary)
+                .font(.footnote).foregroundStyle(Color.wellnessSecondary)
         }.wellnessCard()
     }
     private func bubble(_ message: String, mine: Bool) -> some View {
@@ -97,7 +97,7 @@ struct CoachChatView: View {
                     Image(systemName: "arrow.up").font(.headline.weight(.bold)).foregroundStyle(Color.wellnessOnInk).frame(width: 46, height: 46).background(Color.wellnessInk.opacity(canSend ? 1 : 0.3), in: Circle())
                 }.buttonStyle(PressableStyle()).disabled(!canSend).accessibilityLabel("שליחה")
             }
-            if limit > 0 { Text("\(used)/\(limit) הודעות היום").font(.caption2).foregroundStyle(.secondary) }
+            if limit > 0 { Text("\(used)/\(limit) הודעות היום").font(.caption2).foregroundStyle(Color.wellnessSecondary) }
         }.padding(.horizontal, 16).padding(.vertical, 10).background(Color.wellnessCanvas)
     }
     private var canSend: Bool { !sending && available && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (limit == 0 || used < limit) }

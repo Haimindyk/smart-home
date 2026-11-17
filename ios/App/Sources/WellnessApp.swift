@@ -59,7 +59,7 @@ private struct LoginScreen: View {
             Image(systemName: "heart.fill").font(.largeTitle.weight(.semibold)).imageScale(.large).foregroundStyle(.flame).padding(30).background(Color.wellnessCard, in: Circle()).shadow(color: .black.opacity(0.06), radius: 18, y: 8)
             VStack(spacing: 8) {
                 Text("טוב שחזרת").font(.system(.largeTitle, design: .rounded).bold())
-                Text("אותו קוד, אותם נתונים").foregroundStyle(.secondary)
+                Text("אותו קוד, אותם נתונים").foregroundStyle(Color.wellnessSecondary)
             }
             HStack(spacing: 14) {
                 ForEach(0..<4, id: \.self) { index in

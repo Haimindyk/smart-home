@@ -19,9 +19,9 @@ struct WorkoutsScreen: View {
                                 Image(systemName: "dumbbell.fill").font(.title2).padding(14).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(plan.data["name"].stringValue ?? "תוכנית אימון").font(.headline)
-                                    Text("\(plan.data["exercises"].arrayValue.count) תרגילים").font(.subheadline).foregroundStyle(.secondary)
+                                    Text("\(plan.data["exercises"].arrayValue.count) תרגילים").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
-                                Image(systemName: "chevron.left").foregroundStyle(.secondary).font(.caption)
+                                Image(systemName: "chevron.left").foregroundStyle(Color.wellnessSecondary).font(.caption)
                             }.wellnessCard()
                         }.buttonStyle(PressableStyle()).accessibilityIdentifier("plan-\(plan.id)")
                     }
@@ -32,10 +32,10 @@ struct WorkoutsScreen: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(workout.data["name"].stringValue ?? "אימון").font(.headline)
-                                    Text(workout.data["date"].stringValue ?? "").font(.subheadline).foregroundStyle(.secondary)
+                                    Text(workout.data["date"].stringValue ?? "").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                                 if workout.data["appleHealth"] != .null { Image(systemName: "heart.fill").foregroundStyle(.pink).accessibilityLabel("Apple Health") }
-                                Text(statusName(workout.data["status"].stringValue)).font(.caption).foregroundStyle(.secondary)
+                                Text(statusName(workout.data["status"].stringValue)).font(.caption).foregroundStyle(Color.wellnessSecondary)
                             }.wellnessCard()
                         }.buttonStyle(PressableStyle()).accessibilityIdentifier("workout-\(workout.id)")
                     }
@@ -55,11 +55,11 @@ private struct PlanDetail: View {
             ForEach(Array(plan.data["exercises"].arrayValue.enumerated()), id: \.offset) { _, exercise in
                 VStack(alignment: .leading, spacing: 8) {
                     Text(exercise["name"].stringValue ?? "תרגיל").font(.headline)
-                    Text("\(Int(exercise["sets"].doubleValue ?? 0)) סטים · \(Int(exercise["reps"].doubleValue ?? 0)) חזרות").font(.subheadline).foregroundStyle(.secondary)
+                    Text("\(Int(exercise["sets"].doubleValue ?? 0)) סטים · \(Int(exercise["reps"].doubleValue ?? 0)) חזרות").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
                     if exercise["loadUnknown"].boolValue != true, let weight = exercise["weight"].doubleValue, weight > 0 {
-                        Text("\(weight, specifier: "%g") ק״ג").font(.subheadline).foregroundStyle(.secondary)
+                        Text("\(weight, specifier: "%g") ק״ג").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
                     }
-                    if let notes = exercise["notes"].stringValue, !notes.isEmpty { Text(notes).font(.footnote).foregroundStyle(.secondary) }
+                    if let notes = exercise["notes"].stringValue, !notes.isEmpty { Text(notes).font(.footnote).foregroundStyle(Color.wellnessSecondary) }
                 }.padding(.vertical, 8)
             }
         }.listStyle(.insetGrouped).wellnessList().navigationTitle(plan.data["name"].stringValue ?? "תוכנית").navigationBarTitleDisplayMode(.inline)
@@ -92,8 +92,8 @@ private struct WorkoutDetail: View {
                         HStack {
                             Text("סט \(index + 1)")
                             Spacer()
-                            Text("\(Int(set["reps"].doubleValue ?? 0)) חזרות · \(set["weight"].doubleValue ?? 0, specifier: "%g") ק״ג").foregroundStyle(.secondary)
-                            Image(systemName: set["done"].boolValue == true ? "checkmark.circle.fill" : "circle").foregroundStyle(.secondary)
+                            Text("\(Int(set["reps"].doubleValue ?? 0)) חזרות · \(set["weight"].doubleValue ?? 0, specifier: "%g") ק״ג").foregroundStyle(Color.wellnessSecondary)
+                            Image(systemName: set["done"].boolValue == true ? "checkmark.circle.fill" : "circle").foregroundStyle(Color.wellnessSecondary)
                         }
                     }
                 }

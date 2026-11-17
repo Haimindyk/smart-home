@@ -24,9 +24,9 @@ struct AddMealSheet: View {
                     Button { scanning = true } label: { Image(systemName: "barcode.viewfinder").font(.title2).foregroundStyle(Color.wellnessOnInk).frame(width: 52, height: 52).background(Color.wellnessInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous)) }
                         .buttonStyle(PressableStyle()).accessibilityLabel("סריקת ברקוד")
                     HStack {
-                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                        Image(systemName: "magnifyingglass").foregroundStyle(Color.wellnessSecondary)
                         TextField("חיפוש מוצר לפי שם…", text: $query).submitLabel(.search)
-                        if !query.isEmpty { Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) } }
+                        if !query.isEmpty { Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Color.wellnessSecondary) } }
                     }.padding(.horizontal, 14).frame(height: 52)
                         .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
@@ -93,9 +93,9 @@ private struct RecentRow: View {
             Image(systemName: "arrow.counterclockwise").font(.headline).foregroundStyle(Color.wellnessOnInk).frame(width: 40, height: 40).background(Color.wellnessInk, in: Circle())
             VStack(alignment: .leading, spacing: 4) {
                 Text(name).font(.headline).foregroundStyle(Color.wellnessInk).lineLimit(2).multilineTextAlignment(.leading)
-                Text(meal.data["items"].arrayValue.compactMap { $0["food"]["name"].stringValue }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(meal.data["items"].arrayValue.compactMap { $0["food"]["name"].stringValue }.joined(separator: " · ")).font(.caption).foregroundStyle(Color.wellnessSecondary).lineLimit(1)
             }.frame(maxWidth: .infinity, alignment: .leading)
-            VStack(spacing: 1) { Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded()))").font(.headline).foregroundStyle(Color.wellnessInk); Text("קק״ל").font(.caption2).foregroundStyle(.secondary) }
+            VStack(spacing: 1) { Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded()))").font(.headline).foregroundStyle(Color.wellnessInk); Text("קק״ל").font(.caption2).foregroundStyle(Color.wellnessSecondary) }
         }.wellnessCard(padding: 14).accessibilityElement(children: .combine).accessibilityHint("מוסיף את הארוחה שוב להיום")
     }
 }
@@ -108,9 +108,9 @@ private struct FoodRow: View {
             Image(systemName: "plus").font(.headline).foregroundStyle(Color.wellnessOnInk).frame(width: 40, height: 40).background(Color.wellnessInk, in: Circle())
             VStack(alignment: .leading, spacing: 5) {
                 Text(food["name"].stringValue ?? "מוצר").font(.headline).foregroundStyle(Color.wellnessInk).lineLimit(2).multilineTextAlignment(.leading)
-                Text("חלבון \(fmt(per["protein"])) ג׳ · פחמימות \(fmt(per["carbs"])) ג׳ · שומן \(fmt(per["fat"])) ג׳").font(.caption).foregroundStyle(.secondary)
+                Text("חלבון \(fmt(per["protein"])) ג׳ · פחמימות \(fmt(per["carbs"])) ג׳ · שומן \(fmt(per["fat"])) ג׳").font(.caption).foregroundStyle(Color.wellnessSecondary)
             }.frame(maxWidth: .infinity, alignment: .leading)
-            VStack(spacing: 1) { Text(fmt(per["kcal"])).font(.headline).foregroundStyle(Color.wellnessInk); Text("קק״ל ל־100").font(.caption2).foregroundStyle(.secondary) }
+            VStack(spacing: 1) { Text(fmt(per["kcal"])).font(.headline).foregroundStyle(Color.wellnessInk); Text("קק״ל ל־100").font(.caption2).foregroundStyle(Color.wellnessSecondary) }
         }.wellnessCard(padding: 14)
     }
     private func fmt(_ v: JSONValue) -> String { String(Int((v.doubleValue ?? 0).rounded())) }
@@ -135,9 +135,9 @@ private struct PortionSheet: View {
                     macro("פחמימות", total("carbs"), .carbsGold); macro("שומן", total("fat"), .fatCoral)
                 }
                 VStack(spacing: 14) {
-                    Text("כמות").font(.subheadline).foregroundStyle(.secondary)
+                    Text("כמות").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
                     HStack(spacing: 22) {
-                        stepper("plus", 10); VStack { Text(quantity, format: .number.precision(.fractionLength(0))).font(.system(size: bigNumber, weight: .heavy).monospacedDigit()).contentTransition(.numericText(value: quantity)); Text(unit).foregroundStyle(.secondary) }.frame(minWidth: 96)
+                        stepper("plus", 10); VStack { Text(quantity, format: .number.precision(.fractionLength(0))).font(.system(size: bigNumber, weight: .heavy).monospacedDigit()).contentTransition(.numericText(value: quantity)); Text(unit).foregroundStyle(Color.wellnessSecondary) }.frame(minWidth: 96)
                         stepper("minus", -10)
                     }
                     if let serving = food["servingSize"].doubleValue, serving > 0 {
@@ -162,7 +162,7 @@ private struct PortionSheet: View {
         }
     }
     private func macro(_ title: String, _ value: Double, _ color: Color) -> some View {
-        VStack(spacing: 4) { Text(Int(value.rounded()), format: .number).font(.title3.bold()).foregroundStyle(color).contentTransition(.numericText(value: value)); Text(title).font(.caption2).foregroundStyle(.secondary) }
+        VStack(spacing: 4) { Text(Int(value.rounded()), format: .number).font(.title3.bold()).foregroundStyle(color).contentTransition(.numericText(value: value)); Text(title).font(.caption2).foregroundStyle(Color.wellnessSecondary) }
             .frame(maxWidth: .infinity).padding(.vertical, 12).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     private func stepper(_ icon: String, _ delta: Double) -> some View {

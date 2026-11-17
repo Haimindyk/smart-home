@@ -24,7 +24,7 @@ struct EditMealSheet: View {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(item["food"]["name"].stringValue ?? "רכיב").font(.headline)
-                                Text("\(Int((item["quantity"].doubleValue ?? 0).rounded())) \(item["food"]["basis"].stringValue == "ml" ? "מ״ל" : "גרם")").font(.subheadline).foregroundStyle(.secondary)
+                                Text("\(Int((item["quantity"].doubleValue ?? 0).rounded())) \(item["food"]["basis"].stringValue == "ml" ? "מ״ל" : "גרם")").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
                             }.frame(maxWidth: .infinity, alignment: .leading)
                             Stepper("", onIncrement: { change(index, 10) }, onDecrement: { change(index, -10) }).labelsHidden()
                         }

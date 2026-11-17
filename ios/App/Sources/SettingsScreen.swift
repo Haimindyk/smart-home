@@ -12,7 +12,7 @@ struct SettingsScreen: View {
                 Section("החשבון שלך") {
                     LabeledContent("אזור זמן", value: store.timeZone.identifier)
                     LabeledContent("גרסה", value: "0.1.0")
-                    Text("הארוחות, התוכניות והאימונים מסונכרנים עם החשבון הקיים.").foregroundStyle(.secondary)
+                    Text("הארוחות, התוכניות והאימונים מסונכרנים עם החשבון הקיים.").foregroundStyle(Color.wellnessSecondary)
                 }
                 Section("משקל") {
                     if let weight = store.latestWeight { LabeledContent("משקל אחרון", value: String(format: "%.1f ק״ג", weight)) }
