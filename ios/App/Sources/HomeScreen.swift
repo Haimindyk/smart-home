@@ -362,7 +362,7 @@ struct TaskRow: View {
                     if notesStyle, let n = task.notes, !n.isEmpty { Text(n).font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary).lineLimit(4).multilineTextAlignment(.leading) }
                     meta
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, notesStyle ? 10 : 8).contentShape(Rectangle())
-            }.buttonStyle(.plain)
+            }.buttonStyle(.plain).accessibilityIdentifier("task-open-\(task.id)")
         }
         .padding(.horizontal, notesStyle ? 14 : 4).background(notesStyle ? Color.wellnessCard : Color.clear, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(notesStyle ? Color.wellnessHairline : .clear))

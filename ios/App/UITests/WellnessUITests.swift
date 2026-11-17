@@ -4,12 +4,17 @@ final class WellnessUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
     private func launch(_ scenario: String) -> XCUIApplication {
         let app = XCUIApplication(); app.launchArguments = ["--ui-test-\(scenario)"]
+        // Unrelated simulator system dialogs (Apple ID verification) can appear at any moment; dismiss them on the next interaction.
+        addUIInterruptionMonitor(withDescription: "system alerts") { alert in
+            for label in ["לא כעת", "Not Now", "אל תאפשר", "Don’t Allow", "אישור", "OK"] where alert.buttons[label].exists { alert.buttons[label].tap(); return true }
+            return false
+        }
         app.launch()
         dismissSystemAlerts(for: app)
         return app
     }
     /// The simulator can raise unrelated system dialogs (e.g. Apple ID verification) over the app; dismiss them.
-    private func dismissSystemAlerts(for app: XCUIApplication) {
+    func dismissSystemAlerts(for app: XCUIApplication) {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         for label in ["לא כעת", "Not Now", "אל תאפשר", "Don’t Allow", "אישור", "OK"] {
             let button = springboard.alerts.buttons[label]
@@ -225,9 +230,18 @@ final class WellnessUITests: XCTestCase {
     }
     func testHouseholdTaskEditorAddsSubtask() {
         let app = launch("home")
-        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "לשלם ארנונה")).element(boundBy: 0)
+        let row = app.buttons["task-open-b0000000-0000-4000-8000-000000000002"]
         XCTAssertTrue(row.waitForExistence(timeout: 15))
-        row.tap()
+        var scrolls = 0
+        // Nudge the page in small steps until the row sits in the middle band, clear of the header and the floating add button.
+        while (row.frame.minY > app.frame.height * 0.6 || row.frame.minY < app.frame.height * 0.28) && scrolls < 10 {
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: row.frame.minY > app.frame.height * 0.6 ? 0.7 : 0.4))
+            let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: row.frame.minY > app.frame.height * 0.6 ? 0.5 : 0.6))
+            from.press(forDuration: 0.1, thenDragTo: to); scrolls += 1
+        }
+        dismissSystemAlerts(for: app)
+        row.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)).tap()
+        dismissSystemAlerts(for: app)
         let field = app.textFields["subtask-field"]
         var tries = 0
         while !field.exists && tries < 6 { app.swipeUp(); tries += 1 }
