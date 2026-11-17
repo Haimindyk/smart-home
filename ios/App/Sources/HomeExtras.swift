@@ -22,7 +22,7 @@ struct SectionEditorSheet: View {
                     Section { Button("מחיקת המדור", role: .destructive) { confirmDelete = true }.frame(maxWidth: .infinity) } footer: { Text("המשימות והמטלות שבמדור יימחקו איתו.") }
                 }
             }
-            .scrollContentBackground(.hidden).background(Color.wellnessCanvas).navigationTitle(section == nil ? "מדור חדש" : "עריכת מדור").navigationBarTitleDisplayMode(.inline)
+            .wellnessList().navigationTitle(section == nil ? "מדור חדש" : "עריכת מדור").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("ביטול") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

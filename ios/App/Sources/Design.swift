@@ -137,5 +137,5 @@ struct Shimmer: ViewModifier {
 extension View {
     func shimmer(_ active: Bool) -> some View { modifier(Shimmer(active: active)) }
     /// Grouped list that follows the app canvas and card colors (light and dark).
-    func wellnessList() -> some View { scrollContentBackground(.hidden).background(Color.wellnessCanvas.ignoresSafeArea()) }
+    func wellnessList() -> some View { scrollContentBackground(.hidden).background(Color.wellnessCanvas.ignoresSafeArea()).font(.hb(.body)).tint(Color.wellnessPrimary).listSectionSpacing(16) }
 }

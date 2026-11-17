@@ -79,7 +79,7 @@ struct QuickAddSheet: View {
                     }
                 }
             }
-            .scrollContentBackground(.hidden).background(Color.wellnessCanvas).navigationTitle("הוספה").navigationBarTitleDisplayMode(.inline)
+            .wellnessList().navigationTitle("הוספה").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("ביטול") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("הוספה") { Task { await add() } }.disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || section == nil).accessibilityIdentifier("quick-add-save") }
@@ -194,7 +194,7 @@ struct EventEditorSheet: View {
                 Section { DatePicker("תאריך", selection: $date, displayedComponents: .date).environment(\.locale, Locale(identifier: "he_IL")); Toggle("חוזר כל שנה", isOn: $yearly).tint(Color.wellnessPrimary) }
                 if event != nil { Section { Button("מחיקה", role: .destructive) { confirmDelete = true }.frame(maxWidth: .infinity) } }
             }
-            .scrollContentBackground(.hidden).background(Color.wellnessCanvas).navigationTitle(event == nil ? "אירוע חדש" : "עריכת אירוע").navigationBarTitleDisplayMode(.inline)
+            .wellnessList().navigationTitle(event == nil ? "אירוע חדש" : "עריכת אירוע").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("ביטול") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("שמירה") { Task { await home.saveEvent(id: event?.id, title: title, kind: kind, date: date, yearly: yearly, notes: notes, emoji: event?.emoji); dismiss() } }.disabled(title.trimmingCharacters(in: .whitespaces).isEmpty).accessibilityIdentifier("event-save") }
