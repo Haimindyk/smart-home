@@ -52,6 +52,7 @@ struct HomeScreen: View {
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         hero
+                        wellnessCard
                         AssistantCards()
                         if home.sections.isEmpty && !home.loading { ContentUnavailableView("אין עדיין מדורים", systemImage: "square.grid.2x2", description: Text("צור מדור חדש בתפריט ⋯.")) }
                         ForEach(home.sections) { SectionPanel(section: $0).id($0.id) }
@@ -80,6 +81,25 @@ struct HomeScreen: View {
             }
             .alert("משהו השתבש", isPresented: Binding(get: { home.error != nil }, set: { if !$0 { home.error = nil } })) { Button("סגור", role: .cancel) {} } message: { Text(home.error ?? "") }
         }
+    }
+
+    // MARK: Wellness entry (the web app's personal space card)
+    private var wellnessCard: some View {
+        Button { home.openHealthRequested = true } label: {
+            HStack(spacing: 16) {
+                ZStack(alignment: .bottomTrailing) {
+                    Circle().fill(Color.wellnessPrimary.opacity(0.12)).overlay(Circle().strokeBorder(Color.wellnessPrimary.opacity(0.3))).frame(width: 64, height: 64)
+                        .overlay(Image(systemName: "leaf").font(.title2).foregroundStyle(Color.wellnessPrimary))
+                    Image(systemName: "dumbbell.fill").font(.caption.weight(.bold)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 28, height: 28).background(Color.wellnessPrimary, in: Circle()).offset(x: 4, y: 4)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("KH WELLNESS").font(.hb(.caption2, .semibold)).tracking(2.2).foregroundStyle(Color.amberInk)
+                    Text("זמן לעצמך").font(.hb(.title3, .bold)).foregroundStyle(Color.wellnessInk)
+                    Text("התזונה, האימונים וההתקדמות שלך").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.backward").font(.footnote.weight(.bold)).foregroundStyle(Color.wellnessSecondary)
+            }.wellnessCard(padding: 18)
+        }.buttonStyle(PressableStyle()).accessibilityIdentifier("wellness-entry").accessibilityElement(children: .combine).accessibilityHint("פותח את המרחב האישי")
     }
 
     // MARK: Hero

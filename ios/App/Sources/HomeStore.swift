@@ -6,6 +6,8 @@ import WellnessCore
 /// optimistic and rolled back if the server rejects it.
 @MainActor
 final class HomeStore: ObservableObject {
+    /// Set by the home screen's wellness card; the root shell switches to the health tab and clears it.
+    @Published var openHealthRequested = false
     @Published var sections: [HSection] = []
     @Published var tasks: [HTask] = []
     @Published var chores: [HChore] = []

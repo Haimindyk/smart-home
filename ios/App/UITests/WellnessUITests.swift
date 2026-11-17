@@ -263,6 +263,12 @@ final class WellnessUITests: XCTestCase {
         confirm.tap()
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: confirm); waitForExpectations(timeout: 5)
     }
+    func testHomeWellnessCardOpensHealth() {
+        let app = launch("home")
+        let card = app.buttons["wellness-entry"]
+        XCTAssertTrue(card.waitForExistence(timeout: 15)); card.tap()
+        XCTAssertTrue(app.buttons["tab-workouts"].waitForExistence(timeout: 10), "Wellness card should open the health module")
+    }
     func testLoginRequiresFourDigits() {
         let app = launch("login")
         let pin = app.secureTextFields.firstMatch

@@ -30,6 +30,7 @@ struct RootShell: View {
         }
         .transition(.opacity)
         .sensoryFeedback(.selection, trigger: tab)
+        .onChange(of: home.openHealthRequested) { _, requested in if requested { home.openHealthRequested = false; withAnimation(.snappy) { tab = .health } } }
         .task { home.bind(store); if !started { started = true; tab = store.startsOnHealth ? .health : .home; await home.refresh() } }
         .safeAreaInset(edge: .bottom, spacing: 0) { bar }
         .sheet(isPresented: $addingMeal) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }
