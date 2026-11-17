@@ -3,13 +3,20 @@ import WellnessCore
 
 struct WorkoutsScreen: View {
     @EnvironmentObject private var store: AppStore
+    @State private var creating = false
+    @State private var planToArchive: HealthRow?
     private var history: [HealthRow] { store.workouts.sorted { ($0.data["startedAt"].stringValue ?? "") > ($1.data["startedAt"].stringValue ?? "") } }
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     Text("האימונים שלך").font(.system(.largeTitle, design: .rounded).bold())
-                    Text("התוכניות שלי").sectionTitle()
+                    HStack {
+                        Text("התוכניות שלי").sectionTitle()
+                        Spacer()
+                        Button { creating = true } label: { Label("תוכנית חדשה", systemImage: "plus").font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(height: 40).background(Color.wellnessInk, in: Capsule()).foregroundStyle(Color.wellnessOnInk) }
+                            .buttonStyle(PressableStyle()).accessibilityIdentifier("new-plan")
+                    }
                     if store.activePlans.isEmpty {
                         ContentUnavailableView("עוד אין תוכנית", systemImage: "dumbbell", description: Text("תוכניות שתיצור בחשבון יופיעו כאן."))
                     }
@@ -24,6 +31,7 @@ struct WorkoutsScreen: View {
                                 Image(systemName: "chevron.left").foregroundStyle(Color.wellnessSecondary).font(.caption)
                             }.wellnessCard()
                         }.buttonStyle(PressableStyle()).accessibilityIdentifier("plan-\(plan.id)")
+                        .contextMenu { Button(role: .destructive) { planToArchive = plan } label: { Label("העבר לארכיון", systemImage: "archivebox") } }
                     }
                     Text("יומן האימונים").sectionTitle()
                     if history.isEmpty { ContentUnavailableView("עוד אין אימונים ביומן", systemImage: "calendar") }
@@ -40,7 +48,12 @@ struct WorkoutsScreen: View {
                         }.buttonStyle(PressableStyle()).accessibilityIdentifier("workout-\(workout.id)")
                     }
                 }.padding(22)
-            }.wellnessScreen().toolbar(.hidden, for: .navigationBar).refreshable { await store.refresh() }
+            }.wellnessScreen().toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $creating) { PlanEditorSheet().environmentObject(store) }
+            .confirmationDialog("להעביר את התוכנית לארכיון?", isPresented: Binding(get: { planToArchive != nil }, set: { if !$0 { planToArchive = nil } }), titleVisibility: .visible) {
+                Button("העבר לארכיון", role: .destructive) { if let plan = planToArchive { Task { _ = await store.archivePlan(plan) } }; planToArchive = nil }
+            } message: { Text("האימונים שכבר נרשמו נשארים ביומן.") }
+            .refreshable { await store.refresh() }
         }
     }
 }

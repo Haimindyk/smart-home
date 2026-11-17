@@ -243,6 +243,32 @@ final class AppStore: ObservableObject {
             if session?.owner == owner, let index = meals.firstIndex(where: { $0.id == row.id }) { meals[index] = saved }
         }
     }
+    // MARK: - Workout plans
+    struct PlanExercise: Identifiable, Equatable { var id = UUID(); var name = ""; var sets = 3; var reps = 10; var weight = 0.0; var rest = 90 }
+    func savePlan(name: String, days: Set<Int>, exercises: [PlanExercise]) async -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let valid = exercises.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        guard !trimmed.isEmpty, trimmed.count <= 150, !valid.isEmpty, valid.count <= 100 else { return false }
+        let list: [JSONValue] = valid.map { e in
+            .object(["id": .string(e.id.uuidString.lowercased()), "name": .string(String(e.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(150))), "muscle": .string(""), "equipment": .string(""), "kind": .string("strength"),
+                     "sets": .number(Double(min(30, max(1, e.sets)))), "reps": .number(Double(min(500, max(1, e.reps)))), "weight": .number(min(1000, max(0, e.weight))), "rest": .number(Double(min(1800, max(0, e.rest)))),
+                     "duration": .number(0), "distance": .number(0), "notes": .string("")])
+        }
+        let payload: JSONValue = .object(["name": .string(trimmed), "exercises": .array(list), "days": .array(days.sorted().map { .number(Double($0)) }), "archived": .bool(false)])
+        return await write("לא הצלחנו לשמור את התוכנית.") { backend, owner in
+            let row = try await backend.save(table: "workout_plans", owner: owner, payload: payload)
+            if session?.owner == owner { plans.append(row) }
+        }
+    }
+    func archivePlan(_ row: HealthRow) async -> Bool {
+        guard case .object(var fields) = row.data else { return false }
+        fields["archived"] = .bool(true)
+        return await write("לא הצלחנו להעביר את התוכנית לארכיון.") { backend, owner in
+            let saved = try await backend.save(table: "workout_plans", owner: owner, payload: .object(fields), existing: row)
+            if session?.owner == owner, let index = plans.firstIndex(where: { $0.id == row.id }) { plans[index] = saved }
+        }
+    }
+
     // MARK: - Live workouts
     private static func iso(_ date: Date) -> String { ISO8601DateFormatter().string(from: date) }
     /// Creates an active session from a plan: one unchecked set per planned set, same shape as the web app.
