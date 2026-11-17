@@ -38,7 +38,7 @@ struct TodayScreen: View {
                         ContentUnavailableView("עוד אין ארוחות ביום הזה", systemImage: "fork.knife", description: Text("הארוחות שלך מהחשבון יופיעו כאן."))
                     } else {
                         ForEach(store.dayMeals) { meal in
-                            NavigationLink { MealDetail(meal: meal) } label: { MealCard(meal: meal) }.buttonStyle(PressableStyle())
+                            NavigationLink { MealDetail(initial: meal) } label: { MealCard(meal: meal) }.buttonStyle(PressableStyle())
                                 .contextMenu { Button(role: .destructive) { mealToDelete = meal } label: { Label("מחיקת הארוחה", systemImage: "trash") } }.accessibilityIdentifier("meal-\(meal.id)")
                         }
                     }
@@ -265,7 +265,10 @@ private struct MealCard: View {
 }
 
 private struct MealDetail: View {
-    let meal: HealthRow
+    @EnvironmentObject private var store: AppStore
+    let initial: HealthRow
+    @State private var editing = false
+    private var meal: HealthRow { store.meals.first { $0.id == initial.id } ?? initial }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -286,6 +289,8 @@ private struct MealDetail: View {
                 }.wellnessCard()
             }.padding(22)
         }.wellnessScreen().navigationTitle(mealName(meal)).navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("עריכה") { editing = true }.accessibilityIdentifier("edit-meal") } }
+            .sheet(isPresented: $editing) { EditMealSheet(meal: meal).environmentObject(store) }
     }
 }
 

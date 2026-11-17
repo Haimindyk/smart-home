@@ -232,6 +232,16 @@ final class AppStore: ObservableObject {
             if session?.owner == owner { meals.append(row) }
         }
     }
+    /// Edits name, kind and items of an existing meal; everything else (date, photo, favorite…) is preserved.
+    func updateMeal(_ row: HealthRow, name: String, kind: String, items: [JSONValue]) async -> Bool {
+        guard !items.isEmpty, case .object(var fields) = row.data else { return false }
+        fields["name"] = .string(name); fields["kind"] = .string(kind); fields["items"] = .array(items)
+        let payload = JSONValue.object(fields)
+        return await write("לא הצלחנו לשמור את השינויים בארוחה.") { backend, owner in
+            let saved = try await backend.save(table: "meals", owner: owner, payload: payload, existing: row)
+            if session?.owner == owner, let index = meals.firstIndex(where: { $0.id == row.id }) { meals[index] = saved }
+        }
+    }
     func deleteMeal(_ row: HealthRow) async -> Bool {
         await write("לא הצלחנו למחוק את הארוחה.") { backend, owner in
             try await backend.softDelete(table: "meals", row: row, owner: owner)
