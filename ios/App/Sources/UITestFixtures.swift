@@ -34,6 +34,12 @@ enum UITestFixtures {
         """
         return (try? JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))) ?? .null
     }
+    static var assistantReply: JSONValue {
+        let json = """
+        {"reply":"בטח! הכנתי הצעה: להוסיף סבון כלים לרשימת הקניות.","proposedActions":[{"type":"create_task","sectionId":"a0000000-0000-4000-8000-000000000002","title":"סבון כלים"}]}
+        """
+        return (try? JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))) ?? .null
+    }
     static var trainerProposal: JSONValue {
         let json = """
         {"requestId":"req-1","kind":"program","message":"תוכנית ABC לשלושה ימים בשבוע, 45 דקות לאימון, עם דגש על חזה וגב.","reasons":["שלושה ימי אימון מאפשרים התאוששות בין האימונים","בחרתי תרגילים מהציוד שסימנת"],

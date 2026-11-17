@@ -39,7 +39,7 @@ struct HomeScreen: View {
     @EnvironmentObject private var store: AppStore
     @EnvironmentObject private var home: HomeStore
     @State private var showSettings = false
-    @State private var showCoach = false
+    @State private var showAssistant = false
     @State private var sheet: HomeSheet?
     @State private var jumping = false
     private var greeting: String {
@@ -68,7 +68,7 @@ struct HomeScreen: View {
             }
             .wellnessScreen().toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
-            .sheet(isPresented: $showCoach) { CoachChatView().environmentObject(store) }
+            .sheet(isPresented: $showAssistant) { AssistantSheet().environmentObject(store).environmentObject(home) }
             .sheet(item: $sheet) { which in
                 switch which {
                 case .search: SearchSheet().environmentObject(home)
@@ -111,7 +111,7 @@ struct HomeScreen: View {
                 Text("הבית").font(.hb(.title3, .bold)).padding(.leading, 6)
                 Spacer()
                 iconButton("magnifyingglass", label: "חיפוש", id: "home-search") { sheet = .search }
-                iconButton("sparkles", label: "המאמן שלי", id: "coach-button") { showCoach = true }
+                iconButton("sparkles", label: "העוזר של הבית", id: "assistant-button") { showAssistant = true }
                 Menu {
                     Button { sheet = .newSection } label: { Label("מדור חדש", systemImage: "plus.rectangle.on.rectangle") }
                     if let current = home.currentSection { Button { sheet = .editSection(current) } label: { Label("עריכת המדור", systemImage: "pencil") } }

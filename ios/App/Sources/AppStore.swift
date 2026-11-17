@@ -402,6 +402,7 @@ final class AppStore: ObservableObject {
 #if DEBUG
         if backend == nil, session?.accessToken == "ui-test" {
             if function == "wellness-chat" { return .success(UITestFixtures.chatState) }
+            if function == "assistant" { return .success(UITestFixtures.assistantReply) }
             if function == "wellness-ai" { return .success(body["action"].stringValue == "apply" ? .object(["ok": .bool(true)]) : UITestFixtures.trainerProposal) }
         }
 #endif

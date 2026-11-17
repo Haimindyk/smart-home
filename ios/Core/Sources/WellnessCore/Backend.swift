@@ -171,7 +171,7 @@ public actor Backend {
 
     public static let writableTables: Set<String> = ["meals", "water_logs", "weight_logs", "nutrition_goals", "health_profiles", "personal_foods", "recipes", "workout_plans", "workout_sessions"]
     private static let readableTables = writableTables
-    private static let functions: Set<String> = ["food-lookup", "nutrition-analyze", "wellness-ai", "wellness-chat", "wellness-training"]
+    private static let functions: Set<String> = ["food-lookup", "nutrition-analyze", "wellness-ai", "wellness-chat", "wellness-training", "assistant"]
 
     /// Inserts (existing == nil) or updates with optimistic versioning, exactly like the web store.
     @discardableResult

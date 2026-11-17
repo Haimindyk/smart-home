@@ -250,6 +250,19 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["לצלם את החשבון"].waitForExistence(timeout: 5))
         capture(app, name: "native-home-subtask")
     }
+    func testHomeAssistantProposesActionsAndWaitsForConfirmation() {
+        let app = launch("home")
+        XCTAssertTrue(app.buttons["assistant-button"].waitForExistence(timeout: 15))
+        app.buttons["assistant-button"].tap()
+        let field = app.descendants(matching: .any)["assistant-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5)); field.tap(); field.typeText("add dish soap")
+        app.buttons["assistant-send"].tap()
+        let confirm = app.buttons["assistant-confirm-0"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 12), "Proposed actions need an explicit confirmation")
+        capture(app, name: "native-home-assistant")
+        confirm.tap()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: confirm); waitForExpectations(timeout: 5)
+    }
     func testLoginRequiresFourDigits() {
         let app = launch("login")
         let pin = app.secureTextFields.firstMatch

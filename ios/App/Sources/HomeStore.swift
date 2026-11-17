@@ -126,27 +126,48 @@ final class HomeStore: ObservableObject {
             _ = try await backend.householdUpdate(table: "ai_private_messages", owner: owner, id: note.id, fields: ["read_at": .string(DateParsing.iso(Date()))])
         }
     }
-    /// Applies the proposed action through the same writes a person would make, then marks the suggestion applied.
-    func apply(_ suggestion: HSuggestion) async {
-        let a = suggestion.action
+    static let applicableActions: Set<String> = ["create_task", "create_chore", "create_family_event", "complete_chore", "toggle_task_completed", "create_section"]
+    /// Short Hebrew description of an action, shown before the person confirms it.
+    func describe(_ a: JSONValue) -> String {
+        let section = sections.first { $0.id == a.str("sectionId") }?.name
+        switch a.str("type") ?? "" {
+        case "create_task": return "להוסיף משימה: \(a.str("title") ?? "")" + (section.map { " (במדור \($0))" } ?? "")
+        case "create_chore": return "להוסיף מטלה חוזרת: \(a.str("title") ?? "")" + (section.map { " (במדור \($0))" } ?? "")
+        case "create_family_event": return "להוסיף אירוע: \(a.str("title") ?? "") ב־\(a.str("eventDate") ?? "")"
+        case "create_section": return "ליצור מדור חדש: \(a.str("name") ?? "")"
+        case "complete_chore": return "לסמן כבוצעה: \(chores.first { $0.id == a.str("choreId") }?.title ?? "מטלה")"
+        case "toggle_task_completed": return "לשנות סימון של: \(tasks.first { $0.id == a.str("taskId") }?.title ?? "משימה")"
+        default: return "פעולה לא נתמכת"
+        }
+    }
+    /// Performs one proposed action through the same writes a person would make. Returns false if it cannot be applied here.
+    @discardableResult
+    func perform(_ a: JSONValue) async -> Bool {
         switch a.str("type") ?? "" {
         case "create_task":
-            guard let section = sections.first(where: { $0.id == a.str("sectionId") }), let title = a.str("title") else { await dismiss(suggestion); return }
-            await addTask(title: title, section: section, quantity: a.num("quantity"))
+            guard let section = sections.first(where: { $0.id == a.str("sectionId") }), let title = a.str("title") else { return false }
+            await addTask(title: title, section: section, quantity: a.num("quantity")); return true
         case "create_chore":
-            guard let section = sections.first(where: { $0.id == a.str("sectionId") }), let title = a.str("title") else { await dismiss(suggestion); return }
-            await addChore(title: title, section: section, freq: ["daily", "weekly", "monthly"].contains(a.str("freq") ?? "") ? a.str("freq")! : "weekly", interval: 1)
+            guard let section = sections.first(where: { $0.id == a.str("sectionId") }), let title = a.str("title") else { return false }
+            await addChore(title: title, section: section, freq: ["daily", "weekly", "monthly"].contains(a.str("freq") ?? "") ? a.str("freq")! : "weekly", interval: 1); return true
         case "create_family_event":
-            guard let title = a.str("title"), let day = DateParsing.day(a.str("eventDate"), zone: timeZone) else { await dismiss(suggestion); return }
-            await saveEvent(id: nil, title: title, kind: a.str("kind") ?? "other", date: day, yearly: a.str("kind") == "birthday", notes: "", emoji: nil)
+            guard let title = a.str("title"), let day = DateParsing.day(a.str("eventDate"), zone: timeZone) else { return false }
+            await saveEvent(id: nil, title: title, kind: a.str("kind") ?? "other", date: day, yearly: a.str("kind") == "birthday", notes: "", emoji: nil); return true
         case "complete_chore":
-            if let chore = chores.first(where: { $0.id == a.str("choreId") }) { await complete(chore) }
+            guard let chore = chores.first(where: { $0.id == a.str("choreId") }) else { return false }
+            await complete(chore); return true
         case "toggle_task_completed":
-            if let task = tasks.first(where: { $0.id == a.str("taskId") }) { await toggle(task) }
+            guard let task = tasks.first(where: { $0.id == a.str("taskId") }) else { return false }
+            await toggle(task); return true
         case "create_section":
-            if let name = a.str("name") { await addSection(name: name, emoji: a.str("emoji") ?? "", kind: ["tasks", "shopping", "chores", "info"].contains(a.str("kind") ?? "") ? a.str("kind")! : "tasks") }
-        default: await dismiss(suggestion); return
+            guard let name = a.str("name") else { return false }
+            await addSection(name: name, emoji: a.str("emoji") ?? "", kind: ["tasks", "shopping", "chores", "info"].contains(a.str("kind") ?? "") ? a.str("kind")! : "tasks"); return true
+        default: return false
         }
+    }
+    /// Applies a suggestion, then marks it applied (or dismissed if it cannot be applied).
+    func apply(_ suggestion: HSuggestion) async {
+        guard await perform(suggestion.action) else { await dismiss(suggestion); return }
         let backup = suggestions; suggestions.removeAll { $0.id == suggestion.id }
         _ = await run("לא הצלחנו לסמן את ההצעה כמיושמת.", rollback: { [weak self] in self?.suggestions = backup }) { backend, owner in
             _ = try await backend.householdUpdate(table: "ai_suggestions", owner: owner, id: suggestion.id, fields: ["status": .string("applied")])
