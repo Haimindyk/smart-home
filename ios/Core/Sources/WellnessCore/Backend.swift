@@ -48,7 +48,7 @@ public actor Backend {
         config.urlCache = nil; config.requestCachePolicy = .reloadIgnoringLocalCacheData
         self.network = network ?? URLSession(configuration: config)
     }
-    private func raw(_ path: String, method: String = "GET", token: String? = nil, body: JSONValue? = nil, query: [URLQueryItem] = []) async throws -> (Data, Int) {
+    private func raw(_ path: String, method: String = "GET", token: String? = nil, body: JSONValue? = nil, query: [URLQueryItem] = [], binary: (Data, String)? = nil) async throws -> (Data, Int) {
         var parts = URLComponents(url: root, resolvingAgainstBaseURL: false)!
         parts.path = path; parts.queryItems = query.isEmpty ? nil : query; parts.fragment = nil
         guard let url = parts.url else { throw BackendError.configuration }
@@ -58,6 +58,7 @@ public actor Backend {
         if let token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         else if key.split(separator: ".").count == 3 { req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
         if let body { req.httpBody = try JSONEncoder().encode(body) }
+        if let binary { req.httpBody = binary.0; req.setValue(binary.1, forHTTPHeaderField: "Content-Type"); req.setValue("false", forHTTPHeaderField: "x-upsert") }
         do {
             let (data, response) = try await network.data(for: req)
             guard let response = response as? HTTPURLResponse else { throw BackendError.invalidResponse }
@@ -115,18 +116,66 @@ public actor Backend {
         let session = Session(accessToken: token, refreshToken: refresh, owner: old.owner, member: old.member)
         try vault.save(session); current = session; return session
     }
-    private func authorized(_ path: String, method: String = "GET", expectedOwner: String, body: JSONValue? = nil, query: [URLQueryItem] = []) async throws -> (Data, Int) {
+    private func authorized(_ path: String, method: String = "GET", expectedOwner: String, body: JSONValue? = nil, query: [URLQueryItem] = [], binary: (Data, String)? = nil) async throws -> (Data, Int) {
         guard var session = current, session.owner == expectedOwner else { throw BackendError.sessionRequired }
-        var result = try await raw(path, method: method, token: session.accessToken, body: body, query: query)
+        var result = try await raw(path, method: method, token: session.accessToken, body: body, query: query, binary: binary)
         if result.1 == 401 {
             session = try await refreshed(session)
-            result = try await raw(path, method: method, token: session.accessToken, body: body, query: query)
+            result = try await raw(path, method: method, token: session.accessToken, body: body, query: query, binary: binary)
         }
         guard current?.owner == expectedOwner else { throw BackendError.sessionChanged }
         return result
     }
+    public static let writableTables: Set<String> = ["meals", "water_logs", "weight_logs", "nutrition_goals", "health_profiles", "personal_foods", "recipes", "workout_plans", "workout_sessions"]
+    private static let readableTables = writableTables
+    private static let functions: Set<String> = ["food-lookup", "nutrition-analyze", "wellness-ai", "wellness-chat", "wellness-training"]
+
+    /// Inserts (existing == nil) or updates with optimistic versioning, exactly like the web store.
+    @discardableResult
+    public func save(table: String, owner: String, payload: JSONValue, existing: HealthRow? = nil, id: String? = nil) async throws -> HealthRow {
+        guard Self.writableTables.contains(table) else { throw BackendError.invalidResponse }
+        let mutation = UUID().uuidString.lowercased()
+        let data: Data, status: Int
+        if let existing {
+            guard existing.owner_user_id == owner, UUID(uuidString: existing.id) != nil else { throw BackendError.invalidResponse }
+            let body: JSONValue = .object(["data": payload, "version": .number(Double(existing.version + 1)), "last_mutation_id": .string(mutation)])
+            (data, status) = try await authorized("/rest/v1/\(table)", method: "PATCH", expectedOwner: owner, body: body,
+                query: [.init(name: "id", value: "eq.\(existing.id)"), .init(name: "owner_user_id", value: "eq.\(owner)"), .init(name: "version", value: "eq.\(existing.version)")])
+        } else {
+            let rowID = (id ?? UUID().uuidString).lowercased()
+            guard UUID(uuidString: rowID) != nil else { throw BackendError.invalidResponse }
+            let body: JSONValue = .object(["id": .string(rowID), "owner_user_id": .string(owner), "data": payload, "last_mutation_id": .string(mutation)])
+            (data, status) = try await authorized("/rest/v1/\(table)", method: "POST", expectedOwner: owner, body: body)
+        }
+        if status == 409 { throw BackendError.conflict }
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        let saved = try JSONDecoder().decode([HealthRow].self, from: data)
+        guard saved.count == 1, saved[0].owner_user_id == owner else { throw BackendError.conflict }
+        return saved[0]
+    }
+
+    /// Soft delete (sets deleted_at) guarded by the row version, so a concurrent edit is never lost.
+    public func softDelete(table: String, row: HealthRow, owner: String) async throws {
+        guard Self.writableTables.contains(table), row.owner_user_id == owner, UUID(uuidString: row.id) != nil else { throw BackendError.invalidResponse }
+        let body: JSONValue = .object(["deleted_at": .string(ISO8601DateFormatter().string(from: Date())), "version": .number(Double(row.version + 1)), "last_mutation_id": .string(UUID().uuidString.lowercased())])
+        let (data, status) = try await authorized("/rest/v1/\(table)", method: "PATCH", expectedOwner: owner, body: body,
+            query: [.init(name: "id", value: "eq.\(row.id)"), .init(name: "owner_user_id", value: "eq.\(owner)"), .init(name: "version", value: "eq.\(row.version)"), .init(name: "deleted_at", value: "is.null")])
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        guard try json(data).arrayValue.count == 1 else { throw BackendError.conflict }
+    }
+
+    /// Calls one of the existing Supabase edge functions the web app uses.
+    public func invoke(_ function: String, body: JSONValue, owner: String) async throws -> JSONValue {
+        guard Self.functions.contains(function) else { throw BackendError.invalidResponse }
+        let (data, status) = try await authorized("/functions/v1/\(function)", method: "POST", expectedOwner: owner, body: body)
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        let result = try json(data)
+        if result["error"] != .null { throw BackendError.invalidResponse }
+        return result
+    }
+
     public func rows(table: String, owner: String, extra: [URLQueryItem] = [], includeDeleted: Bool = false) async throws -> [HealthRow] {
-        guard ["meals", "nutrition_goals", "workout_plans", "workout_sessions", "health_profiles", "weight_logs"].contains(table) else { throw BackendError.invalidResponse }
+        guard Self.readableTables.contains(table) else { throw BackendError.invalidResponse }
         var rows: [HealthRow] = [], offset = 0
         while true {
             let query: [URLQueryItem] = [.init(name: "select", value: "*"), .init(name: "owner_user_id", value: "eq.\(owner)"), .init(name: "order", value: "id.asc"), .init(name: "limit", value: "500"), .init(name: "offset", value: String(offset))] + (includeDeleted ? [] : [.init(name: "deleted_at", value: "is.null")]) + extra
@@ -165,6 +214,15 @@ public actor Backend {
         guard (200..<300).contains(status) else { throw BackendError.server(status) }
         guard try json(data).arrayValue.count == 1 else { throw BackendError.conflict }
     }
+    /// Uploads a prepared JPEG to the private health-images bucket under the owner's folder and returns its path.
+    public func uploadImage(_ jpeg: Data, owner: String) async throws -> String {
+        guard !jpeg.isEmpty, jpeg.count <= 5_242_880, jpeg.starts(with: [0xFF, 0xD8, 0xFF]) else { throw BackendError.invalidResponse }
+        let path = "\(owner)/\(UUID().uuidString.lowercased()).jpg"
+        let (_, status) = try await authorized("/storage/v1/object/health-images/\(path)", method: "POST", expectedOwner: owner, binary: (jpeg, "image/jpeg"))
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        return path
+    }
+
     public func imageData(path: String, owner: String) async throws -> Data {
         guard path.count <= 500, path.hasPrefix(owner + "/"), !path.contains(".."),
               path.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "-_/ .".contains($0)) }) else { throw BackendError.invalidResponse }

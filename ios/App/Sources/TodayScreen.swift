@@ -4,28 +4,38 @@ import WellnessCore
 struct TodayScreen: View {
     @EnvironmentObject private var store: AppStore
     @State private var showCalendar = false
+    @State private var mealToDelete: HealthRow?
+    @State private var showSettings = false
+    @State private var showCoach = false
     var body: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 24) {
+                    HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("היום שלך").font(.largeTitle.bold())
                         Button { showCalendar = true } label: {
                             HStack(spacing: 6) {
                                 Text(store.selectedDate, format: .dateTime.month(.wide).year())
                                 Image(systemName: "chevron.down").font(.caption)
-                            }.foregroundStyle(.secondary)
+                            }.foregroundStyle(Color.wellnessSecondary)
                         }.frame(minHeight: 44).accessibilityLabel("בחירת תאריך").accessibilityIdentifier("date-picker")
                     }
-                    DayRail()
-                    CalorieCard()
-                    HStack(spacing: 12) {
-                        NutrientCard(title: "חלבון", nutrient: "protein", symbol: "fish.fill", color: .blue)
-                        NutrientCard(title: "פחמימות", nutrient: "carbs", symbol: "carrot.fill", color: .orange)
-                        NutrientCard(title: "שומן", nutrient: "fat", symbol: "drop.fill", color: .pink)
+                        Spacer()
+                        Button { showCoach = true } label: {
+                            Image(systemName: "sparkles").font(.title3).foregroundStyle(.flame).frame(width: 48, height: 48)
+                                .background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline))
+                        }.buttonStyle(PressableStyle()).accessibilityLabel("המאמן שלי").accessibilityIdentifier("coach-button")
+                        Button { showSettings = true } label: {
+                            Image(systemName: "gearshape.fill").font(.title3).foregroundStyle(Color.wellnessInk).frame(width: 48, height: 48)
+                                .background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline))
+                        }.buttonStyle(PressableStyle()).accessibilityLabel("הגדרות").accessibilityIdentifier("settings-button")
                     }
+                    DayRail().daySwipe(store)
+                    CalorieCard().daySwipe(store)
+                    SummaryCarousel()
                     HStack {
-                        Text("הארוחות שלך").font(.title2.bold())
+                        Text("הארוחות שלך").sectionTitle()
                         Spacer()
                         if store.loading { ProgressView().accessibilityLabel("מעדכן ארוחות") }
                     }.padding(.top, 8)
@@ -33,14 +43,21 @@ struct TodayScreen: View {
                         ContentUnavailableView("עוד אין ארוחות ביום הזה", systemImage: "fork.knife", description: Text("הארוחות שלך מהחשבון יופיעו כאן."))
                     } else {
                         ForEach(store.dayMeals) { meal in
-                            NavigationLink { MealDetail(meal: meal) } label: { MealCard(meal: meal) }.buttonStyle(.plain).accessibilityIdentifier("meal-\(meal.id)")
+                            NavigationLink { MealDetail(initial: meal) } label: { MealCard(meal: meal) }.buttonStyle(PressableStyle())
+                                .contextMenu { Button(role: .destructive) { mealToDelete = meal } label: { Label("מחיקת הארוחה", systemImage: "trash") } }.accessibilityIdentifier("meal-\(meal.id)")
                         }
                     }
-                }.padding(22)
+                }.padding(22).shimmer(store.loading && store.meals.isEmpty && store.goals.isEmpty)
             }
-            .background(Color.wellnessCanvas.opacity(0.35))
+            .wellnessScreen()
             .toolbar(.hidden, for: .navigationBar)
             .refreshable { await store.refresh() }
+            .sensoryFeedback(.selection, trigger: store.selectedDate)
+            .confirmationDialog("למחוק את הארוחה?", isPresented: Binding(get: { mealToDelete != nil }, set: { if !$0 { mealToDelete = nil } }), titleVisibility: .visible) {
+                Button("מחיקה", role: .destructive) { if let meal = mealToDelete { Task { _ = await store.deleteMeal(meal) } }; mealToDelete = nil }
+            }
+            .sheet(isPresented: $showCoach) { CoachChatView().environmentObject(store) }
+            .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
             .sheet(isPresented: $showCalendar) {
                 NavigationStack {
                     DatePicker("תאריך", selection: $store.selectedDate, displayedComponents: .date)
@@ -64,50 +81,143 @@ private struct DayRail: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack {
-                Button { shift(-7) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }.accessibilityLabel("שבוע קודם")
+                Button { withAnimation(.snappy) { shift(-7) } } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }.accessibilityLabel("שבוע קודם")
                 Spacer()
-                if !calendar.isDateInToday(store.selectedDate) { Button("היום") { store.selectedDate = Date() }.font(.caption.bold()).frame(minHeight: 44) }
+                if !calendar.isDateInToday(store.selectedDate) { Button("היום") { withAnimation(.snappy) { store.selectedDate = Date() } }.font(.caption.bold()).padding(.horizontal, 14).frame(minHeight: 44).background(Color.wellnessCard, in: Capsule()).foregroundStyle(Color.wellnessInk) }
                 Spacer()
-                Button { shift(7) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }.accessibilityLabel("שבוע הבא")
-            }.foregroundStyle(.secondary)
-            HStack(spacing: 5) {
+                Button { withAnimation(.snappy) { shift(7) } } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }.accessibilityLabel("שבוע הבא")
+            }.foregroundStyle(Color.wellnessSecondary)
+            ViewThatFits(in: .horizontal) {
+                dayCells(scrolling: false)
+                ScrollView(.horizontal, showsIndicators: false) { dayCells(scrolling: true) }
+            }
+        }
+    }
+    @ViewBuilder private func dayCells(scrolling: Bool) -> some View {
+        HStack(spacing: 5) {
                 ForEach(days, id: \.self) { day in
                     let selected = calendar.isDate(day, inSameDayAs: store.selectedDate)
-                    Button { store.selectedDate = day } label: {
+                    let future = day > Date() && !calendar.isDateInToday(day)
+                    Button { withAnimation(.snappy) { store.selectedDate = day } } label: {
                         VStack(spacing: 8) {
-                            Text(day, format: .dateTime.weekday(.narrow)).font(.caption).foregroundStyle(.secondary)
-                            Text(day, format: .dateTime.day()).font(.title3.bold().monospacedDigit())
-                            Circle().fill(selected ? Color.orange : .clear).frame(width: 4, height: 4)
-                        }.frame(maxWidth: .infinity).padding(.vertical, 10)
-                            .background(selected ? Color.white : .clear, in: Capsule())
-                            .overlay(Capsule().strokeBorder(selected ? Color.black : .clear, lineWidth: 1.4))
-                    }
+                            Text(day, format: .dateTime.weekday(.narrow)).font(.caption).foregroundStyle(future ? Color.primary.opacity(0.5) : Color.wellnessSecondary)
+                            Text(day, format: .dateTime.day()).font(.title3.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(future ? Color.primary.opacity(0.5) : Color.wellnessInk).lineLimit(1)
+                            Circle().fill(calendar.isDateInToday(day) ? Color.kcalAmber : .clear).frame(width: 4, height: 4)
+                        }.frame(maxWidth: scrolling ? nil : .infinity).frame(minWidth: scrolling ? 56 : 0).padding(.vertical, 10)
+                            .background { if selected { RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.wellnessInk, lineWidth: 1.5) } }
+                    }.buttonStyle(.plain)
                     .accessibilityLabel(day.formatted(.dateTime.weekday(.wide).day().month(.wide)))
                     .accessibilityAddTraits(selected ? [.isSelected] : [])
                 }
             }
-        }
+
     }
+
     private func shift(_ amount: Int) { if let date = calendar.date(byAdding: .day, value: amount, to: store.selectedDate) { store.selectedDate = date } }
 }
 
 private struct CalorieCard: View {
     @EnvironmentObject private var store: AppStore
+    @ScaledMetric(relativeTo: .largeTitle) private var bigNumber: CGFloat = 54
     private var consumed: Double { nutrientTotal(meals: store.dayMeals, nutrient: "kcal") }
     private var target: Double? { store.goal["kcal"].doubleValue }
     var body: some View {
+        let remaining = target.map { $0 - consumed }
         HStack(spacing: 20) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(consumed, format: .number.precision(.fractionLength(0))).font(.system(size: 48, weight: .bold, design: .rounded)).minimumScaleFactor(0.6)
-                Text("קלוריות נאכלו").foregroundStyle(.secondary)
-                if let target { Text("מתוך \(Int(target)) קק״ל").font(.caption).foregroundStyle(.secondary) }
-                else { Text("יעד יומי עדיין לא הוגדר").font(.caption).foregroundStyle(.secondary) }
+                Text(remaining.map { max(0, $0) } ?? consumed, format: .number.precision(.fractionLength(0)))
+                    .font(.system(size: bigNumber, weight: .heavy)).minimumScaleFactor(0.6)
+                    .contentTransition(.numericText(value: remaining ?? consumed))
+                    .animation(.snappy, value: consumed)
+                Text(remaining == nil ? "קלוריות נאכלו" : "קלוריות נותרו").font(.title3).foregroundStyle(Color.wellnessSecondary).lineLimit(2).minimumScaleFactor(0.7)
+                if let target {
+                    if let remaining, remaining < 0 {
+                        Text("חרגת ב־\(Int((-remaining).rounded())) קק״ל").font(.caption.weight(.semibold)).foregroundStyle(Color.kcalAmberText)
+                    } else {
+                        Text("נאכלו \(Int(consumed.rounded())) מתוך \(Int(target))").font(.caption).foregroundStyle(Color.wellnessSecondary)
+                    }
+                } else { Text("יעד יומי עדיין לא הוגדר").font(.caption).foregroundStyle(Color.wellnessSecondary) }
             }.frame(maxWidth: .infinity, alignment: .leading)
-            ProgressRing(value: consumed, target: target, color: .orange, symbol: "flame.fill").frame(width: 88, height: 88)
-        }.wellnessCard().accessibilityElement(children: .ignore)
+            ProgressRing(value: consumed, target: target, color: .kcalAmber, symbol: "flame.fill", lineWidth: 9).frame(width: 96, height: 96)
+        }.wellnessCard(padding: 24).accessibilityElement(children: .ignore)
             .accessibilityLabel("קלוריות נאכלו")
             .accessibilityValue("\(Int(consumed.rounded()))\(target.map { " מתוך \(Int($0))" } ?? "")")
             .accessibilityIdentifier("calories-card")
+    }
+}
+
+/// Two swipeable pages (macros, activity) with page dots, like the web app's summary cards.
+private struct SummaryCarousel: View {
+    @EnvironmentObject private var store: AppStore
+    @State private var page = 0
+    @ScaledMetric(relativeTo: .body) private var height: CGFloat = 172
+    private var hasActivity: Bool { store.steps != nil }
+    @ViewBuilder private var macroCards: some View {
+        NutrientCard(title: "חלבון", nutrient: "protein", symbol: "fish.fill", color: .proteinBlue)
+        NutrientCard(title: "פחמימות", nutrient: "carbs", symbol: "carrot.fill", color: .carbsGold)
+        NutrientCard(title: "שומן", nutrient: "fat", symbol: "drop.fill", color: .fatCoral)
+    }
+    var body: some View {
+        VStack(spacing: 14) {
+            TabView(selection: $page) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { macroCards }
+                    ScrollView { VStack(spacing: 10) { macroCards } }
+                }.padding(.vertical, 8).tag(0)
+                WaterCard().padding(.vertical, 8).tag(1)
+                if hasActivity { StepsCard().padding(.vertical, 8).tag(2) }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never)).frame(height: height)
+            .sensoryFeedback(.selection, trigger: page)
+            HStack(spacing: 7) {
+                    ForEach(0..<(hasActivity ? 3 : 2), id: \.self) { index in
+                        Capsule().fill(index == page ? Color.wellnessInk : Color.primary.opacity(0.18))
+                            .frame(width: index == page ? 22 : 7, height: 7)
+                    }
+                }.animation(.snappy, value: page).environment(\.layoutDirection, .rightToLeft).accessibilityHidden(true)
+        }
+    }
+}
+
+private struct WaterCard: View {
+    @EnvironmentObject private var store: AppStore
+    @ScaledMetric(relativeTo: .title) private var waterNumber: CGFloat = 38
+    var body: some View {
+        let total = store.dayWater, target = store.waterTarget
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("מים").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(Int(total), format: .number).font(.system(size: waterNumber, weight: .heavy).monospacedDigit()).contentTransition(.numericText(value: total))
+                    Text("/ \(Int(target)) מ״ל").font(.caption).foregroundStyle(Color.wellnessSecondary)
+                }.animation(.snappy, value: total)
+                HStack(spacing: 10) {
+                    Button { Task { await store.addWater(250) } } label: { Label("250", systemImage: "plus").font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(height: 40).background(Color.proteinBlue.opacity(0.14), in: Capsule()).foregroundStyle(Color.proteinBlueText) }
+                        .buttonStyle(PressableStyle()).accessibilityLabel("הוסף 250 מיליליטר מים")
+                    Button { Task { await store.undoWater() } } label: { Image(systemName: "arrow.uturn.backward").frame(width: 40, height: 40).background(Color.wellnessChip, in: Circle()).foregroundStyle(Color.wellnessInk) }
+                        .buttonStyle(PressableStyle()).disabled(store.dayWaterLogs.isEmpty).accessibilityLabel("ביטול הכוס האחרונה")
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            ProgressRing(value: total, target: target, color: .proteinBlue, symbol: "drop.fill", lineWidth: 8).frame(width: 84, height: 84)
+        }.wellnessCard().sensoryFeedback(.impact(weight: .medium), trigger: store.dayWaterLogs.count)
+            .accessibilityElement(children: .contain)
+    }
+}
+
+private struct StepsCard: View {
+    @EnvironmentObject private var store: AppStore
+    @ScaledMetric(relativeTo: .title) private var stepsNumber: CGFloat = 40
+    var body: some View {
+        let steps = store.steps ?? 0
+        HStack(spacing: 18) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("צעדים").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
+                Text(steps, format: .number.precision(.fractionLength(0))).font(.system(size: stepsNumber, weight: .heavy).monospacedDigit())
+                Text("היום · Apple Health").font(.caption).foregroundStyle(Color.wellnessSecondary)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            ProgressRing(value: steps, target: 10_000, color: .wellnessInk, symbol: "figure.walk", lineWidth: 8).frame(width: 84, height: 84)
+        }.wellnessCard().accessibilityElement(children: .combine)
     }
 }
 
@@ -117,28 +227,23 @@ private struct NutrientCard: View {
     var body: some View {
         let value = nutrientTotal(meals: store.dayMeals, nutrient: nutrient)
         let target = store.goal[nutrient].doubleValue
-        VStack(spacing: 12) {
-            ProgressRing(value: value, target: target, color: color, symbol: symbol).frame(width: 42, height: 42)
+        let left = target.map { $0 - value }
+        VStack(spacing: 10) {
+            ProgressRing(value: value, target: target, color: color, symbol: symbol, lineWidth: 5).frame(width: 46, height: 46)
             VStack(spacing: 3) {
-                Text("\(Int(value.rounded())) ג׳").font(.headline).minimumScaleFactor(0.7)
-                Text(title).font(.caption).foregroundStyle(.secondary)
-                if let target { Text("מתוך \(Int(target)) ג׳").font(.caption2).foregroundStyle(.secondary) }
+                Text("\(Int(value.rounded())) ג׳").font(.headline.weight(.bold))
+                    .contentTransition(.numericText(value: value)).animation(.snappy, value: value)
+                Text(title).font(.caption).foregroundStyle(Color.wellnessSecondary)
+                if let left {
+                    Text(left >= 0 ? "נותרו \(Int(left.rounded())) ג׳" : "חרגת ב־\(Int((-left).rounded())) ג׳")
+                        .font(.caption2.weight(.medium)).foregroundStyle(left >= 0 ? Color.wellnessSecondary : Color.kcalAmberText)
+                }
             }
         }.frame(maxWidth: .infinity).padding(.vertical, 18).padding(.horizontal, 5)
-            .background(.white, in: RoundedRectangle(cornerRadius: 22)).shadow(color: .black.opacity(0.04), radius: 12, y: 5)
+            .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.wellnessHairline))
+            .shadow(color: .black.opacity(0.04), radius: 12, y: 4)
             .accessibilityElement(children: .combine)
-    }
-}
-
-struct ProgressRing: View {
-    let value: Double; let target: Double?; let color: Color; let symbol: String
-    private var progress: Double { guard let target, target > 0, value.isFinite else { return 0 }; return min(1, max(0, value / target)) }
-    var body: some View {
-        ZStack {
-            Circle().stroke(color.opacity(0.13), lineWidth: 5)
-            Circle().trim(from: 0, to: progress).stroke(color, style: StrokeStyle(lineWidth: 5, lineCap: .round)).rotationEffect(.degrees(-90))
-            Image(systemName: symbol).foregroundStyle(color).font(.title3)
-        }.environment(\.layoutDirection, .leftToRight).accessibilityHidden(true)
     }
 }
 
@@ -147,19 +252,22 @@ private struct MealCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                PrivateMealPhoto(meal: meal, thumbnail: true).frame(width: 60, height: 64).clipShape(RoundedRectangle(cornerRadius: 14))
+                PrivateMealPhoto(meal: meal, thumbnail: true).frame(width: 60, height: 64).clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(mealName(meal)).font(.headline).lineLimit(2)
-                    Text(meal.data["items"].arrayValue.compactMap { $0["food"]["name"].stringValue }.joined(separator: " · ")).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                    Text(meal.data["items"].arrayValue.compactMap { $0["food"]["name"].stringValue }.joined(separator: " · ")).font(.subheadline).foregroundStyle(Color.wellnessSecondary).lineLimit(2)
                 }
                 Spacer(minLength: 2)
                 Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded()))").font(.title3.bold())
-                Text("קק״ל").font(.caption).foregroundStyle(.secondary)
+                Text("קק״ל").font(.caption).foregroundStyle(Color.wellnessSecondary)
             }
             HStack {
-                ForEach([("חלבון", "protein"), ("פחמימות", "carbs"), ("שומן", "fat")], id: \.0) { item in
-                    Text("\(item.0) \(Int(nutrientTotal(meals: [meal], nutrient: item.1).rounded())) ג׳")
-                        .font(.caption2).frame(maxWidth: .infinity).padding(.vertical, 6).background(Color.wellnessCanvas, in: Capsule())
+                ForEach([("חלבון", "protein", "fish.fill", Color.proteinBlue), ("פחמימות", "carbs", "carrot.fill", Color.carbsGold), ("שומן", "fat", "drop.fill", Color.fatCoral)], id: \.0) { item in
+                    HStack(spacing: 5) {
+                        Text("\(Int(nutrientTotal(meals: [meal], nutrient: item.1).rounded())) ג׳")
+                        Image(systemName: item.2).foregroundStyle(item.3)
+                    }.font(.caption.weight(.medium)).frame(maxWidth: .infinity).padding(.vertical, 8).background(Color.wellnessChip, in: Capsule())
+                        .accessibilityLabel("\(item.0) \(Int(nutrientTotal(meals: [meal], nutrient: item.1).rounded())) גרם")
                 }
             }
         }.wellnessCard().accessibilityElement(children: .combine)
@@ -167,7 +275,10 @@ private struct MealCard: View {
 }
 
 private struct MealDetail: View {
-    let meal: HealthRow
+    @EnvironmentObject private var store: AppStore
+    let initial: HealthRow
+    @State private var editing = false
+    private var meal: HealthRow { store.meals.first { $0.id == initial.id } ?? initial }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -178,16 +289,18 @@ private struct MealDetail: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(item["food"]["name"].stringValue ?? "רכיב").font(.headline)
-                                Text("\(Int((item["quantity"].doubleValue ?? 0).rounded())) \(item["food"]["basis"].stringValue == "ml" ? "מ״ל" : "גרם")").foregroundStyle(.secondary)
+                                Text("\(Int((item["quantity"].doubleValue ?? 0).rounded())) \(item["food"]["basis"].stringValue == "ml" ? "מ״ל" : "גרם")").foregroundStyle(Color.wellnessSecondary)
                             }
                             Spacer()
-                            if item["food"]["source"].stringValue == "ai" { Text("הערכה").font(.caption).foregroundStyle(.secondary) }
+                            if item["food"]["source"].stringValue == "ai" { Text("הערכה").font(.caption).foregroundStyle(Color.wellnessSecondary) }
                         }.padding(.vertical, 16)
                         Divider()
                     }
                 }.wellnessCard()
             }.padding(22)
-        }.background(Color.wellnessCanvas.opacity(0.35)).navigationTitle(mealName(meal)).navigationBarTitleDisplayMode(.inline)
+        }.wellnessScreen().navigationTitle(mealName(meal)).navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("עריכה") { editing = true }.accessibilityIdentifier("edit-meal") } }
+            .sheet(isPresented: $editing) { EditMealSheet(meal: meal).environmentObject(store) }
     }
 }
 
@@ -210,7 +323,7 @@ private struct PrivateMealPhoto: View {
                 if thumbnail { Image(uiImage: image).resizable().scaledToFill() }
                 else { Image(uiImage: image).resizable().scaledToFit() }
             } else {
-                Color.wellnessCanvas.overlay(Image(systemName: "fork.knife").foregroundStyle(.secondary)).frame(minHeight: thumbnail ? 64 : 160)
+                Color.wellnessChip.overlay(Image(systemName: "fork.knife").foregroundStyle(Color.wellnessSecondary)).frame(minHeight: thumbnail ? 64 : 160)
             }
         }
         .accessibilityLabel("תמונת הארוחה")
@@ -218,5 +331,13 @@ private struct PrivateMealPhoto: View {
             image = nil
             if let path = mealPhotoPath(meal), let data = await store.imageData(path), !Task.isCancelled { image = UIImage(data: data) }
         }
+    }
+}
+
+extension AppStore {
+    /// Moves the selected day by whole days in the store's time zone.
+    func moveDay(_ amount: Int) {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
+        if let date = calendar.date(byAdding: .day, value: amount, to: selectedDate) { selectedDate = date }
     }
 }
