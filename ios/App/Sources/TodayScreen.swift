@@ -34,7 +34,7 @@ struct TodayScreen: View {
                                 .contextMenu { Button(role: .destructive) { mealToDelete = meal } label: { Label("מחיקת הארוחה", systemImage: "trash") } }.accessibilityIdentifier("meal-\(meal.id)")
                         }
                     }
-                }.padding(22)
+                }.padding(22).shimmer(store.loading && store.meals.isEmpty && store.goals.isEmpty)
             }
             .wellnessScreen()
             .toolbar(.hidden, for: .navigationBar)
@@ -68,7 +68,7 @@ private struct DayRail: View {
             HStack {
                 Button { withAnimation(.snappy) { shift(-7) } } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }.accessibilityLabel("שבוע קודם")
                 Spacer()
-                if !calendar.isDateInToday(store.selectedDate) { Button("היום") { withAnimation(.snappy) { store.selectedDate = Date() } }.font(.caption.bold()).padding(.horizontal, 14).frame(minHeight: 44).background(.white, in: Capsule()).foregroundStyle(Color.wellnessInk) }
+                if !calendar.isDateInToday(store.selectedDate) { Button("היום") { withAnimation(.snappy) { store.selectedDate = Date() } }.font(.caption.bold()).padding(.horizontal, 14).frame(minHeight: 44).background(Color.wellnessCard, in: Capsule()).foregroundStyle(Color.wellnessInk) }
                 Spacer()
                 Button { withAnimation(.snappy) { shift(7) } } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }.accessibilityLabel("שבוע הבא")
             }.foregroundStyle(.secondary)
@@ -78,9 +78,9 @@ private struct DayRail: View {
                     let future = day > Date() && !calendar.isDateInToday(day)
                     Button { withAnimation(.snappy) { store.selectedDate = day } } label: {
                         VStack(spacing: 8) {
-                            Text(day, format: .dateTime.weekday(.narrow)).font(.caption).foregroundStyle(future ? Color.black.opacity(0.25) : Color.secondary)
+                            Text(day, format: .dateTime.weekday(.narrow)).font(.caption).foregroundStyle(future ? Color.primary.opacity(0.28) : Color.secondary)
                             Text(day, format: .dateTime.day()).font(.title3.weight(.semibold).monospacedDigit())
-                                .foregroundStyle(future ? Color.black.opacity(0.25) : Color.wellnessInk)
+                                .foregroundStyle(future ? Color.primary.opacity(0.28) : Color.wellnessInk)
                             Circle().fill(calendar.isDateInToday(day) ? Color.kcalAmber : .clear).frame(width: 4, height: 4)
                         }.frame(maxWidth: .infinity).padding(.vertical, 10)
                             .background { if selected { RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.wellnessInk, lineWidth: 1.5) } }
@@ -143,7 +143,7 @@ private struct SummaryCarousel: View {
             .sensoryFeedback(.selection, trigger: page)
             HStack(spacing: 7) {
                     ForEach(0..<(hasActivity ? 3 : 2), id: \.self) { index in
-                        Capsule().fill(index == page ? Color.wellnessInk : Color.black.opacity(0.18))
+                        Capsule().fill(index == page ? Color.wellnessInk : Color.primary.opacity(0.18))
                             .frame(width: index == page ? 22 : 7, height: 7)
                     }
                 }.animation(.snappy, value: page).environment(\.layoutDirection, .rightToLeft).accessibilityHidden(true)
@@ -209,8 +209,8 @@ private struct NutrientCard: View {
                 }
             }
         }.frame(maxWidth: .infinity).padding(.vertical, 18).padding(.horizontal, 5)
-            .background(.white, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.black.opacity(0.07)))
+            .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.wellnessHairline))
             .shadow(color: .black.opacity(0.04), radius: 12, y: 4)
             .accessibilityElement(children: .combine)
     }

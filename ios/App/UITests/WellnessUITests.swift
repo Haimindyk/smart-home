@@ -51,6 +51,18 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["הנתונים שלך"].waitForExistence(timeout: 5))
         capture(app, name: "native-health-privacy")
     }
+    func testAddMealSettingsAndWaterScreens() {
+        let app = launch("meal")
+        XCTAssertTrue(app.descendants(matching: .any)["calories-card"].firstMatch.waitForExistence(timeout: 15))
+        app.buttons["add-meal"].tap()
+        XCTAssertTrue(app.textFields["חיפוש מוצר לפי שם…"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["סריקת ברקוד"].exists)
+        capture(app, name: "native-add-meal")
+        app.buttons["סגור"].tap()
+        app.buttons["tab-settings"].tap()
+        XCTAssertTrue(app.buttons["יציאה מהחשבון"].waitForExistence(timeout: 5))
+        capture(app, name: "native-settings")
+    }
     func testLoginRequiresFourDigits() {
         let app = launch("login")
         let pin = app.secureTextFields.firstMatch

@@ -30,7 +30,7 @@ struct SettingsScreen: View {
                     Button("רענון נתונים") { Task { await store.refresh() } }.disabled(store.loading)
                     Button("יציאה מהחשבון", role: .destructive) { confirmLogout = true }
                 }
-            }.navigationTitle("הגדרות")
+            }.wellnessList().navigationTitle("הגדרות")
                 .confirmationDialog("לצאת מהחשבון?", isPresented: $confirmLogout, titleVisibility: .visible) {
                     Button("יציאה", role: .destructive) { Task { await store.logout() } }
                 }

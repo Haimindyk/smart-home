@@ -1,12 +1,24 @@
 import SwiftUI
 
 /// Shared look & feel: warm canvas, soft white cards, rounded numerals, springy touch feedback.
+private func adaptive(_ light: (Double, Double, Double), _ dark: (Double, Double, Double), lightAlpha: Double = 1, darkAlpha: Double = 1) -> Color {
+    Color(UIColor { traits in
+        let c = traits.userInterfaceStyle == .dark ? dark : light
+        return UIColor(red: c.0, green: c.1, blue: c.2, alpha: traits.userInterfaceStyle == .dark ? darkAlpha : lightAlpha)
+    })
+}
+
 extension Color {
-    /// Screen background (warm off-white).
-    static let wellnessCanvas = Color(red: 0.961, green: 0.957, blue: 0.945)
-    /// Inner chips and placeholders that sit on top of a white card.
-    static let wellnessChip = Color(red: 0.945, green: 0.941, blue: 0.929)
-    static let wellnessInk = Color(red: 0.07, green: 0.07, blue: 0.08)
+    /// Screen background: warm off-white in light mode, near-black in dark mode.
+    static let wellnessCanvas = adaptive((0.961, 0.957, 0.945), (0.039, 0.039, 0.043))
+    /// Card surface.
+    static let wellnessCard = adaptive((1, 1, 1), (0.105, 0.105, 0.115))
+    /// Inner chips and placeholders that sit on top of a card.
+    static let wellnessChip = adaptive((0.945, 0.941, 0.929), (0.18, 0.18, 0.195))
+    /// Primary ink (text and filled buttons) and the color that sits on top of it.
+    static let wellnessInk = adaptive((0.07, 0.07, 0.08), (0.96, 0.96, 0.97))
+    static let wellnessOnInk = adaptive((1, 1, 1), (0.07, 0.07, 0.08))
+    static let wellnessHairline = adaptive((0, 0, 0), (1, 1, 1), lightAlpha: 0.07, darkAlpha: 0.10)
     // Macro palette shared with the web app.
     static let kcalAmber = Color(red: 0.91, green: 0.62, blue: 0.18)
     static let proteinBlue = Color(red: 0.36, green: 0.55, blue: 0.94)
@@ -21,8 +33,8 @@ extension ShapeStyle where Self == LinearGradient {
 extension View {
     func wellnessCard(padding: CGFloat = 20) -> some View {
         self.padding(padding)
-            .background(.white, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Color.black.opacity(0.07)))
+            .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Color.wellnessHairline))
             .shadow(color: .black.opacity(0.04), radius: 14, y: 5)
     }
 
@@ -49,7 +61,7 @@ struct PrimaryButton: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.headline).frame(maxWidth: .infinity).frame(minHeight: 56)
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.wellnessOnInk)
             .background(Color.wellnessInk.opacity(enabled ? 1 : 0.3), in: Capsule())
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
             .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.72), value: configuration.isPressed)
@@ -83,4 +95,30 @@ extension View {
             withAnimation(.snappy) { store.moveDay(drag.translation.width < 0 ? 1 : -1) }
         })
     }
+}
+
+/// Shimmering placeholder used while the first load is in flight.
+struct Shimmer: ViewModifier {
+    let active: Bool
+    @State private var phase: CGFloat = -1
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    func body(content: Content) -> some View {
+        content
+            .redacted(reason: active ? .placeholder : [])
+            .overlay {
+                if active && !reduceMotion {
+                    GeometryReader { geo in
+                        LinearGradient(colors: [.clear, Color.white.opacity(0.35), .clear], startPoint: .leading, endPoint: .trailing)
+                            .frame(width: geo.size.width * 0.6).offset(x: phase * geo.size.width * 1.6)
+                            .onAppear { withAnimation(.linear(duration: 1.3).repeatForever(autoreverses: false)) { phase = 1 } }
+                    }.allowsHitTesting(false).blendMode(.plusLighter).clipped()
+                }
+            }
+            .allowsHitTesting(!active)
+    }
+}
+extension View {
+    func shimmer(_ active: Bool) -> some View { modifier(Shimmer(active: active)) }
+    /// Grouped list that follows the app canvas and card colors (light and dark).
+    func wellnessList() -> some View { scrollContentBackground(.hidden).background(Color.wellnessCanvas.ignoresSafeArea()) }
 }

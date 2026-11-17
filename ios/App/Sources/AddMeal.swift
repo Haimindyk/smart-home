@@ -18,15 +18,15 @@ struct AddMealSheet: View {
         NavigationStack {
             VStack(spacing: 16) {
                 HStack(spacing: 10) {
-                    Button { scanning = true } label: { Image(systemName: "barcode.viewfinder").font(.title2).foregroundStyle(.white).frame(width: 52, height: 52).background(Color.wellnessInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous)) }
+                    Button { scanning = true } label: { Image(systemName: "barcode.viewfinder").font(.title2).foregroundStyle(Color.wellnessOnInk).frame(width: 52, height: 52).background(Color.wellnessInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous)) }
                         .buttonStyle(PressableStyle()).accessibilityLabel("סריקת ברקוד")
                     HStack {
                         Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                         TextField("חיפוש מוצר לפי שם…", text: $query).submitLabel(.search)
                         if !query.isEmpty { Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) } }
                     }.padding(.horizontal, 14).frame(height: 52)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.black.opacity(0.08)))
+                        .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
                 }
                 if searching { ProgressView().padding(.top, 30) }
                 else if results.isEmpty {
@@ -74,7 +74,7 @@ private struct FoodRow: View {
     var body: some View {
         let per = food["per100"]
         HStack(spacing: 14) {
-            Image(systemName: "plus").font(.headline).foregroundStyle(.white).frame(width: 40, height: 40).background(Color.wellnessInk, in: Circle())
+            Image(systemName: "plus").font(.headline).foregroundStyle(Color.wellnessOnInk).frame(width: 40, height: 40).background(Color.wellnessInk, in: Circle())
             VStack(alignment: .leading, spacing: 5) {
                 Text(food["name"].stringValue ?? "מוצר").font(.headline).foregroundStyle(Color.wellnessInk).lineLimit(2).multilineTextAlignment(.leading)
                 Text("חלבון \(fmt(per["protein"])) ג׳ · פחמימות \(fmt(per["carbs"])) ג׳ · שומן \(fmt(per["fat"])) ג׳").font(.caption).foregroundStyle(.secondary)
@@ -116,7 +116,7 @@ private struct PortionSheet: View {
                     Text("בוקר").tag("breakfast"); Text("צהריים").tag("lunch"); Text("ערב").tag("dinner"); Text("נשנוש").tag("snack")
                 }.pickerStyle(.segmented)
                 Button { Task { if await store.saveMeal(kind: kind, name: food["name"].stringValue ?? "", food: food, quantity: quantity) { dismiss(); onSaved() } } } label: {
-                    if store.busy { ProgressView().tint(.white) } else { Label("הוסף לארוחה", systemImage: "plus.circle") }
+                    if store.busy { ProgressView().tint(Color.wellnessOnInk) } else { Label("הוסף לארוחה", systemImage: "plus.circle") }
                 }.buttonStyle(PrimaryButton())
             }.padding(20) }
             .wellnessScreen().navigationTitle("פרטי מוצר").navigationBarTitleDisplayMode(.inline)

@@ -59,7 +59,7 @@ private struct PlanDetail: View {
                     if let notes = exercise["notes"].stringValue, !notes.isEmpty { Text(notes).font(.footnote).foregroundStyle(.secondary) }
                 }.padding(.vertical, 8)
             }
-        }.listStyle(.insetGrouped).navigationTitle(plan.data["name"].stringValue ?? "תוכנית").navigationBarTitleDisplayMode(.inline)
+        }.listStyle(.insetGrouped).wellnessList().navigationTitle(plan.data["name"].stringValue ?? "תוכנית").navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -99,7 +99,7 @@ private struct WorkoutDetail: View {
                     Button("מחיקת האימון מהחשבון", role: .destructive) { confirmDelete = true }.disabled(store.busy)
                 } footer: { Text("האימון המקורי ב־Apple Health יישאר במכשיר.") }
             }
-        }.navigationTitle(workout.data["name"].stringValue ?? "אימון").navigationBarTitleDisplayMode(.inline)
+        }.wellnessList().navigationTitle(workout.data["name"].stringValue ?? "אימון").navigationBarTitleDisplayMode(.inline)
             .confirmationDialog("למחוק את האימון המיובא?", isPresented: $confirmDelete, titleVisibility: .visible) {
                 Button("מחיקה", role: .destructive) { Task { if await store.removeImportedWorkout(workout) { dismiss() } } }
             }

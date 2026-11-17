@@ -10,11 +10,10 @@ struct WellnessApp: App {
                 .environmentObject(store)
                 .environment(\.layoutDirection, .rightToLeft)
                 .environment(\.locale, Locale(identifier: "he_IL"))
-                .preferredColorScheme(.light)
-                .tint(.black)
+                .tint(Color.wellnessInk)
                 .overlay {
                     // Keep meals and Health data out of the app-switcher snapshot.
-                    if scenePhase != .active { Color.white.ignoresSafeArea().overlay(Image(systemName: "heart.fill").font(.largeTitle)) }
+                    if scenePhase != .active { Color.wellnessCanvas.ignoresSafeArea().overlay(Image(systemName: "heart.fill").font(.largeTitle)) }
                 }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active, store.phase == .signedIn { Task { await store.refresh() } }
@@ -57,19 +56,25 @@ private struct LoginScreen: View {
     var body: some View {
         VStack(spacing: 26) {
             Spacer()
-            Image(systemName: "heart.fill").font(.system(size: 40)).foregroundStyle(.flame).padding(30).background(.white, in: Circle()).shadow(color: .black.opacity(0.06), radius: 18, y: 8)
+            Image(systemName: "heart.fill").font(.system(size: 40)).foregroundStyle(.flame).padding(30).background(Color.wellnessCard, in: Circle()).shadow(color: .black.opacity(0.06), radius: 18, y: 8)
             VStack(spacing: 8) {
                 Text("טוב שחזרת").font(.system(.largeTitle, design: .rounded).bold())
                 Text("אותו קוד, אותם נתונים").foregroundStyle(.secondary)
             }
+            HStack(spacing: 14) {
+                ForEach(0..<4, id: \.self) { index in
+                    Circle().fill(index < pin.count ? Color.wellnessInk : Color.primary.opacity(0.15)).frame(width: 14, height: 14)
+                        .scaleEffect(index < pin.count ? 1.15 : 1).animation(.spring(response: 0.25, dampingFraction: 0.6), value: pin.count)
+                }
+            }.accessibilityHidden(true).sensoryFeedback(.selection, trigger: pin.count)
             SecureField("הקוד האישי שלך", text: $pin)
                 .keyboardType(.numberPad).textContentType(.password)
                 .multilineTextAlignment(.center).font(.title2.monospacedDigit())
-                .padding(22).background(.white, in: RoundedRectangle(cornerRadius: 22, style: .continuous)).shadow(color: .black.opacity(0.04), radius: 12, y: 4)
+                .padding(22).background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous)).shadow(color: .black.opacity(0.04), radius: 12, y: 4)
                 .privacySensitive()
                 .onChange(of: pin) { _, value in pin = String(value.filter { $0.isASCII && $0.isNumber }.prefix(4)) }
             Button { Task { let code = pin; pin = ""; await store.login(code) } } label: {
-                if store.busy { ProgressView().tint(.white) } else { Text("כניסה") }
+                if store.busy { ProgressView().tint(Color.wellnessOnInk) } else { Text("כניסה") }
             }.buttonStyle(PrimaryButton()).disabled(pin.count != 4 || store.busy)
             Spacer(); Spacer()
         }.padding(28).frame(maxWidth: 480).frame(maxWidth: .infinity).wellnessScreen()
@@ -98,6 +103,7 @@ private struct HomeShell: View {
         .transition(.opacity)
         .sensoryFeedback(.selection, trigger: tab)
         .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack(spacing: 12) {
             HStack(spacing: 2) {
                 ForEach(HomeTab.allCases, id: \.self) { item in
                     Button {
@@ -110,7 +116,7 @@ private struct HomeShell: View {
                         .foregroundStyle(tab == item ? Color.wellnessInk : Color.wellnessInk.opacity(0.62))
                         .frame(maxWidth: .infinity).padding(.vertical, 11)
                         .background {
-                            if tab == item { Capsule().fill(Color.black.opacity(0.07)).matchedGeometryEffect(id: "pill", in: pill) }
+                            if tab == item { Capsule().fill(Color.primary.opacity(0.08)).matchedGeometryEffect(id: "pill", in: pill) }
                         }
                         .contentShape(Capsule())
                     }
@@ -120,16 +126,14 @@ private struct HomeShell: View {
                 }
             }
             .padding(6).background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(Color.black.opacity(0.06)))
+            .overlay(Capsule().strokeBorder(Color.wellnessHairline))
             .shadow(color: .black.opacity(0.08), radius: 18, y: 6)
-            .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 5)
-        }
-        .overlay(alignment: .bottomLeading) {
             Button { adding = true } label: {
-                Image(systemName: "plus").font(.title2.weight(.bold)).foregroundStyle(.white)
-                    .frame(width: 62, height: 62).background(Color.wellnessInk, in: Circle()).shadow(color: .black.opacity(0.2), radius: 14, y: 6)
-            }.buttonStyle(PressableStyle()).padding(.leading, 20).padding(.bottom, 80)
-                .accessibilityLabel("הוספת ארוחה").accessibilityIdentifier("add-meal")
+                Image(systemName: "plus").font(.title2.weight(.bold)).foregroundStyle(Color.wellnessOnInk)
+                    .frame(width: 66, height: 66).background(Color.wellnessInk, in: Circle()).shadow(color: .black.opacity(0.18), radius: 12, y: 5)
+            }.buttonStyle(PressableStyle()).accessibilityLabel("הוספת ארוחה").accessibilityIdentifier("add-meal")
+            }
+            .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 5)
         }
         .sheet(isPresented: $adding) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }
     }

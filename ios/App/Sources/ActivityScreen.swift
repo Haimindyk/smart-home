@@ -23,7 +23,7 @@ struct ActivityScreen: View {
                             Text("האימונים שלך, במקום אחד").sectionTitle()
                             Text("חבר את בריאות, ואז בחר אילו אימונים לייבא לחשבון שלך.").foregroundStyle(.secondary)
                             Button { Task { await store.readHealth() } } label: {
-                                if store.busy { ProgressView().tint(.white) } else { Label("חיבור ל־Apple Health", systemImage: "heart") }
+                                if store.busy { ProgressView().tint(Color.wellnessOnInk) } else { Label("חיבור ל־Apple Health", systemImage: "heart") }
                             }.buttonStyle(PrimaryButton()).disabled(store.busy)
                         }.wellnessCard()
                     } else {
@@ -67,7 +67,7 @@ struct ActivityScreen: View {
                                     .accessibilityAddTraits(store.selection.contains(workout.id) ? [.isSelected] : [])
                             }
                             Button { Task { await store.importSelected() } } label: {
-                                if store.busy { ProgressView().tint(.white) }
+                                if store.busy { ProgressView().tint(Color.wellnessOnInk) }
                                 else { Text(store.selection.isEmpty ? "בחר אימונים לייבוא" : "ייבוא \(store.selection.count) אימונים") }
                             }.buttonStyle(PrimaryButton()).disabled(store.selection.isEmpty || store.busy)
                         }
@@ -94,7 +94,7 @@ private struct HealthPrivacySheet: View {
                     Text("אין כתיבה לבריאות או סנכרון ברקע. אפשר לשנות הרשאות ביישום בריאות. ביטול הרשאה אינו מוחק אימונים שכבר ייבאת; אפשר למחוק אותם מיומן האימונים כאן.")
                     Text("מוצגים עד 500 אימונים מ־30 הימים האחרונים. הרשאת קריאה שנדחתה עשויה להיראות כמו רשימה ריקה — כך Apple מגינה על הפרטיות.")
                 }
-            }.navigationTitle("הנתונים שלך").navigationBarTitleDisplayMode(.inline)
+            }.wellnessList().navigationTitle("הנתונים שלך").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("סגור") { dismiss() } } }
         }
     }
