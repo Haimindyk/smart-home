@@ -23,7 +23,13 @@ targets:
   SmartHomeWellness:
     type: application
     platform: iOS
-    sources: [Sources]
+    sources:
+      - Sources
+      - path: Resources/Exercises
+        type: folder
+        buildPhase: resources
+      - path: Resources/exercise-demos.json
+        buildPhase: resources
     info:
       path: Config/Info.plist
       properties:

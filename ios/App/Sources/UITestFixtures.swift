@@ -47,7 +47,7 @@ enum UITestFixtures {
         func ex(_ id: String, _ name: String, _ sets: Int, _ reps: Int, _ weight: Double, _ muscle: String) -> String {
             "{\"id\":\"\(id)\",\"name\":\"\(name)\",\"muscle\":\"\(muscle)\",\"equipment\":\"\",\"kind\":\"strength\",\"sets\":\(sets),\"reps\":\(reps),\"weight\":\(weight),\"rest\":60,\"duration\":0,\"distance\":0,\"notes\":\"\"}"
         }
-        let exercises = [ex("88888888-8888-4888-8888-888888888881", "לחיצת חזה", 3, 8, 40, "חזה"), ex("88888888-8888-4888-8888-888888888882", "סקוואט", 3, 10, 60, "רגליים")].joined(separator: ",")
+        let exercises = [ex("88888888-8888-4888-8888-888888888881", "פרפר בכבלים", 3, 8, 40, "חזה"), ex("88888888-8888-4888-8888-888888888882", "פולי עליון לגב", 3, 10, 60, "גב")].joined(separator: ",")
         return row(id: "99999999-9999-4999-8999-999999999999", data: "{\"name\":\"פלג גוף עליון\",\"exercises\":[\(exercises)],\"days\":[1,3],\"archived\":false}")
     }
     static func workouts(date: String) -> [HealthRow] {

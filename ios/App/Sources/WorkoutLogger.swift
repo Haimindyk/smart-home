@@ -10,6 +10,7 @@ struct ActiveWorkoutView: View {
     @State private var restEnd: Date?
     @State private var saving = false
     @State private var confirmFinish = false
+    @State private var demoItem: DemoRef?
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private var exercises: [JSONValue] { row.data["exercises"].arrayValue }
     private var doneSets: Int { exercises.flatMap { $0["performed"].arrayValue }.filter { $0["done"].boolValue == true }.count }
@@ -25,13 +26,21 @@ struct ActiveWorkoutView: View {
                     }.accessibilityElement(children: .combine)
                 }
                 ForEach(Array(exercises.enumerated()), id: \.offset) { exIndex, exercise in
-                    Section(exercise["name"].stringValue ?? "תרגיל") {
+                    Section {
                         ForEach(Array(exercise["performed"].arrayValue.enumerated()), id: \.offset) { setIndex, set in
                             SetRow(index: setIndex, set: set, enabled: isActive) { reps, weight, done in
                                 update(exIndex, setIndex, reps: reps, weight: weight, done: done, rest: Int(exercise["rest"].doubleValue ?? 90))
                             }
                         }
                         if let notes = exercise["notes"].stringValue, !notes.isEmpty { Text(notes).font(.footnote).foregroundStyle(Color.wellnessSecondary) }
+                    } header: {
+                        HStack {
+                            Text(exercise["name"].stringValue ?? "תרגיל")
+                            Spacer()
+                            if let found = ExerciseDemos.resolve(name: exercise["name"].stringValue ?? "", catalogId: exercise["catalogId"].stringValue) {
+                                Button { demoItem = DemoRef(name: exercise["name"].stringValue ?? "תרגיל", demo: found) } label: { Label("הדגמה", systemImage: "play.rectangle").font(.footnote.weight(.semibold)).frame(minHeight: 44) }.accessibilityIdentifier("workout-demo-\(found.id)")
+                            }
+                        }
                     }
                 }
                 if isActive {
@@ -49,6 +58,7 @@ struct ActiveWorkoutView: View {
                 if left <= 0 { self.restEnd = nil; rest = nil; UINotificationFeedbackGenerator().notificationOccurred(.success) } else { rest = left }
             }
             .sensoryFeedback(.success, trigger: doneSets) { old, new in new > old }
+            .sheet(item: $demoItem) { ExerciseDemoSheet(name: $0.name, demo: $0.demo) }
         }
         .interactiveDismissDisabled(saving)
     }
@@ -112,3 +122,5 @@ private struct SetRow: View {
         }.buttonStyle(.plain).disabled(!enabled)
     }
 }
+
+private struct DemoRef: Identifiable { let name: String; let demo: ExerciseDemo; var id: String { demo.id } }

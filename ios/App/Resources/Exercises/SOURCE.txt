@@ -1,0 +1,3 @@
+Source: https://github.com/yuhonas/free-exercise-db
+License: Unlicense / public domain, see LICENSE.txt.
+Two demonstration frames per exercise; educational reference, not individualized medical guidance.

@@ -69,7 +69,7 @@ struct CatalogPicker: View {
                         Section(ExerciseCatalog.muscleLabels[muscle] ?? muscle) {
                             ForEach(items) { item in
                                 Button { onPick(item); dismiss() } label: {
-                                    HStack { VStack(alignment: .leading, spacing: 3) { Text(item.he).font(.headline).foregroundStyle(Color.wellnessInk); Text(item.equipmentHe).font(.caption).foregroundStyle(Color.wellnessSecondary) }; Spacer(); Image(systemName: "plus.circle").foregroundStyle(Color.wellnessSecondary) }
+                                    HStack(spacing: 12) { if let d = ExerciseDemos.resolve(name: item.he, catalogId: item.id) { ExerciseThumb(demo: d, size: 44) }; VStack(alignment: .leading, spacing: 3) { Text(item.he).font(.headline).foregroundStyle(Color.wellnessInk); Text(item.equipmentHe).font(.caption).foregroundStyle(Color.wellnessSecondary) }; Spacer(); Image(systemName: "plus.circle").foregroundStyle(Color.wellnessSecondary) }
                                 }.accessibilityElement(children: .combine).accessibilityIdentifier("catalog-\(item.id)")
                             }
                         }
