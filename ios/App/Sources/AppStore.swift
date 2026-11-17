@@ -244,15 +244,28 @@ final class AppStore: ObservableObject {
         }
     }
     // MARK: - Workout plans
-    struct PlanExercise: Identifiable, Equatable { var id = UUID(); var name = ""; var sets = 3; var reps = 10; var weight = 0.0; var rest = 90 }
+    struct PlanExercise: Identifiable, Equatable { var id = UUID(); var name = ""; var catalogId: String?; var muscle = ""; var equipment = ""; var sets = 3; var reps = 10; var weight = 0.0; var rest = 90 }
     func savePlan(name: String, days: Set<Int>, exercises: [PlanExercise]) async -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let valid = exercises.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         guard !trimmed.isEmpty, trimmed.count <= 150, !valid.isEmpty, valid.count <= 100 else { return false }
-        let list: [JSONValue] = valid.map { e in
-            .object(["id": .string(e.id.uuidString.lowercased()), "name": .string(String(e.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(150))), "muscle": .string(""), "equipment": .string(""), "kind": .string("strength"),
-                     "sets": .number(Double(min(30, max(1, e.sets)))), "reps": .number(Double(min(500, max(1, e.reps)))), "weight": .number(min(1000, max(0, e.weight))), "rest": .number(Double(min(1800, max(0, e.rest)))),
-                     "duration": .number(0), "distance": .number(0), "notes": .string("")])
+        var list: [JSONValue] = []
+        for e in valid {
+            var fields: [String: JSONValue] = [:]
+            fields["id"] = .string(e.id.uuidString.lowercased())
+            fields["name"] = .string(String(e.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(150)))
+            fields["muscle"] = .string(String(e.muscle.prefix(80)))
+            fields["equipment"] = .string(String(e.equipment.prefix(80)))
+            fields["kind"] = .string("strength")
+            fields["sets"] = .number(Double(min(30, max(1, e.sets))))
+            fields["reps"] = .number(Double(min(500, max(1, e.reps))))
+            fields["weight"] = .number(min(1000, max(0, e.weight)))
+            fields["rest"] = .number(Double(min(1800, max(0, e.rest))))
+            fields["duration"] = .number(0)
+            fields["distance"] = .number(0)
+            fields["notes"] = .string("")
+            if let catalogId = e.catalogId { fields["catalogId"] = .string(catalogId) }
+            list.append(.object(fields))
         }
         let payload: JSONValue = .object(["name": .string(trimmed), "exercises": .array(list), "days": .array(days.sorted().map { .number(Double($0)) }), "archived": .bool(false)])
         return await write("לא הצלחנו לשמור את התוכנית.") { backend, owner in

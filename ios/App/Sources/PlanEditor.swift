@@ -8,6 +8,7 @@ struct PlanEditorSheet: View {
     @State private var name = ""
     @State private var days: Set<Int> = []
     @State private var exercises: [AppStore.PlanExercise] = [.init()]
+    @State private var picking = false
     private let dayNames = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"]
     private var canSave: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && exercises.contains { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } && !store.busy }
     var body: some View {
@@ -36,14 +37,49 @@ struct PlanEditorSheet: View {
                         }.padding(.vertical, 10)
                         .swipeActions { if exercises.count > 1 { Button(role: .destructive) { exercises.removeAll { $0.id == exercise.id } } label: { Label("הסרה", systemImage: "trash") } } }
                     }
-                    Button { withAnimation { exercises.append(.init()) } } label: { Label("הוסף תרגיל", systemImage: "plus.circle.fill") }.disabled(exercises.count >= 100)
+                    Button { picking = true } label: { Label("בחר תרגיל מהקטלוג", systemImage: "list.bullet.rectangle.fill") }.disabled(exercises.count >= 100).accessibilityIdentifier("pick-exercise")
+                    Button { withAnimation { exercises.append(.init()) } } label: { Label("הוסף תרגיל חופשי", systemImage: "plus.circle.fill") }.disabled(exercises.count >= 100)
                 } header: { Text("תרגילים") } footer: { Text("החלק תרגיל הצידה כדי להסיר אותו.") }
             }
+            .sheet(isPresented: $picking) { CatalogPicker { picked in withAnimation { if exercises.count == 1, exercises[0].name.isEmpty { exercises = [] }; exercises.append(.init(name: picked.he, catalogId: picked.id, muscle: picked.muscleHe, equipment: picked.equipmentHe)) } } }
             .wellnessList().navigationTitle("תוכנית חדשה").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("ביטול") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("שמירה") { Task { if await store.savePlan(name: name, days: days, exercises: exercises) { dismiss() } } }.disabled(!canSave).accessibilityIdentifier("save-plan") }
             }
+        }
+    }
+}
+
+/// Searchable list of the curated exercise catalog shared with the web app.
+struct CatalogPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    let onPick: (CatalogExercise) -> Void
+    @State private var query = ""
+    private var filtered: [CatalogExercise] {
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        return ExerciseCatalog.all.filter { q.isEmpty || $0.he.contains(q) || $0.en.lowercased().contains(q) || $0.muscleHe.contains(q) }
+    }
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(ExerciseCatalog.muscleOrder, id: \.self) { muscle in
+                    let items = filtered.filter { $0.muscle == muscle }
+                    if !items.isEmpty {
+                        Section(ExerciseCatalog.muscleLabels[muscle] ?? muscle) {
+                            ForEach(items) { item in
+                                Button { onPick(item); dismiss() } label: {
+                                    HStack { VStack(alignment: .leading, spacing: 3) { Text(item.he).font(.headline).foregroundStyle(Color.wellnessInk); Text(item.equipmentHe).font(.caption).foregroundStyle(Color.wellnessSecondary) }; Spacer(); Image(systemName: "plus.circle").foregroundStyle(Color.wellnessSecondary) }
+                                }.accessibilityElement(children: .combine).accessibilityIdentifier("catalog-\(item.id)")
+                            }
+                        }
+                    }
+                }
+            }
+            .wellnessList().searchable(text: $query, prompt: "חיפוש תרגיל או שריר")
+            .navigationTitle("קטלוג תרגילים").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("סגור") { dismiss() } } }
+            .overlay { if filtered.isEmpty { ContentUnavailableView.search(text: query) } }
         }
     }
 }
