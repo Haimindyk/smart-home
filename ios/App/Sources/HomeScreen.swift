@@ -134,6 +134,13 @@ struct HomeScreen: View {
                     .background(Color.amberTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous)).accessibilityHidden(true)
                 Text("הבית").font(.hb(.title3, .bold)).padding(.leading, 6)
                 Spacer()
+                Menu {
+                    Button { sheet = .members } label: { Label("בני הבית", systemImage: "person.2") }
+                    Button { showSettings = true } label: { Label("הגדרות", systemImage: "gearshape") }
+                } label: {
+                    HStack(spacing: 4) { MemberAvatar(member: home.me, size: 32); Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Color.wellnessSecondary) }
+                        .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+                }.accessibilityLabel("החשבון שלי").accessibilityIdentifier("home-account")
                 iconButton("magnifyingglass", label: "חיפוש", id: "home-search") { sheet = .search }
                 iconButton("sparkles", label: "העוזר של הבית", id: "assistant-button") { showAssistant = true }
                 Menu {
