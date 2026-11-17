@@ -10,7 +10,7 @@ struct TodayScreen: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 24) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("היום שלך").font(.hb(.largeTitle, .bold))
@@ -80,13 +80,13 @@ private struct DayRail: View {
         return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0 - weekday + 1, to: start) }
     }
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 2) {
             HStack {
-                Button { withAnimation(.snappy) { shift(-7) } } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }.accessibilityLabel("שבוע קודם")
+                Button { withAnimation(.snappy) { shift(-7) } } label: { Image(systemName: "chevron.right").frame(width: 44, height: 32) }.accessibilityLabel("שבוע קודם")
                 Spacer()
                 if !calendar.isDateInToday(store.selectedDate) { Button("היום") { withAnimation(.snappy) { store.selectedDate = Date() } }.font(.hb(.caption, .bold)).padding(.horizontal, 14).frame(minHeight: 44).background(Color.wellnessCard, in: Capsule()).foregroundStyle(Color.wellnessInk) }
                 Spacer()
-                Button { withAnimation(.snappy) { shift(7) } } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }.accessibilityLabel("שבוע הבא")
+                Button { withAnimation(.snappy) { shift(7) } } label: { Image(systemName: "chevron.left").frame(width: 44, height: 32) }.accessibilityLabel("שבוע הבא")
             }.foregroundStyle(Color.wellnessSecondary)
             ViewThatFits(in: .horizontal) {
                 dayCells(scrolling: false)

@@ -110,6 +110,6 @@ struct HealthTabBar: View {
                         .accessibilityIdentifier("tab-\(String(describing: item))")
                 }
             }.padding(.horizontal, 20).padding(.vertical, 8)
-        }.background(Color.wellnessCanvas)
+        }.frame(height: 58).background(Color.wellnessCanvas)
     }
 }

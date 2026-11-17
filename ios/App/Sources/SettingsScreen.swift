@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsScreen: View {
     @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var home: HomeStore
     @Environment(\.dismiss) private var dismiss
     var isSheet = false
     @State private var confirmLogout = false
@@ -9,9 +10,17 @@ struct SettingsScreen: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    HStack(spacing: 16) {
+                        MemberAvatar(member: home.me, size: 64)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(home.me?.name ?? "החשבון שלי").font(.hb(.title2, .bold)).tracking(-0.4)
+                            Text("גרסה 0.1.0").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary)
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }.padding(.vertical, 8).accessibilityElement(children: .combine)
+                }
                 Section("החשבון שלך") {
                     LabeledContent("אזור זמן", value: store.timeZone.identifier)
-                    LabeledContent("גרסה", value: "0.1.0")
                     Text("הארוחות, התוכניות והאימונים מסונכרנים עם החשבון הקיים.").foregroundStyle(Color.wellnessSecondary)
                 }
                 Section("משקל") {
