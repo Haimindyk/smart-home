@@ -10,7 +10,7 @@ struct ActivityScreen: View {
                 VStack(alignment: .leading, spacing: 24) {
                     HStack {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("הפעילות שלך").font(.largeTitle.bold())
+                            Text("הפעילות שלך").font(.system(.largeTitle, design: .rounded).bold())
                             Text("Apple Watch ו־iPhone").foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -20,7 +20,7 @@ struct ActivityScreen: View {
                         ContentUnavailableView("Apple Health לא זמין במכשיר הזה", systemImage: "heart.slash")
                     } else if !store.healthLoaded {
                         VStack(alignment: .leading, spacing: 18) {
-                            Text("האימונים שלך, במקום אחד").font(.title2.bold())
+                            Text("האימונים שלך, במקום אחד").sectionTitle()
                             Text("חבר את בריאות, ואז בחר אילו אימונים לייבא לחשבון שלך.").foregroundStyle(.secondary)
                             Button { Task { await store.readHealth() } } label: {
                                 if store.busy { ProgressView().tint(.white) } else { Label("חיבור ל־Apple Health", systemImage: "heart") }
@@ -37,7 +37,7 @@ struct ActivityScreen: View {
                             Image(systemName: "figure.walk").font(.largeTitle).foregroundStyle(.orange)
                         }.wellnessCard().accessibilityElement(children: .combine)
                         HStack {
-                            Text("אימונים אחרונים").font(.title2.bold())
+                            Text("אימונים אחרונים").sectionTitle()
                             Spacer()
                             Button { Task { await store.readHealth() } } label: {
                                 if store.busy { ProgressView() } else { Image(systemName: "arrow.clockwise") }
@@ -48,9 +48,9 @@ struct ActivityScreen: View {
                         } else {
                             Text("בחר אימונים מה־30 ימים האחרונים").font(.subheadline).foregroundStyle(.secondary)
                             ForEach(store.candidates) { workout in
-                                Button { if store.selection.contains(workout.id) { store.selection.remove(workout.id) } else { store.selection.insert(workout.id) } } label: {
+                                Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { if store.selection.contains(workout.id) { store.selection.remove(workout.id) } else { store.selection.insert(workout.id) } } } label: {
                                     HStack(spacing: 14) {
-                                        Image(systemName: store.selection.contains(workout.id) ? "checkmark.circle.fill" : "circle").font(.title2)
+                                        Image(systemName: store.selection.contains(workout.id) ? "checkmark.circle.fill" : "circle").font(.title2).foregroundStyle(store.selection.contains(workout.id) ? Color.wellnessInk : .secondary).symbolEffect(.bounce, value: store.selection.contains(workout.id))
                                         VStack(alignment: .leading, spacing: 6) {
                                             Text(workout.name).font(.headline)
                                             Text(workout.start, format: .dateTime.day().month(.abbreviated).hour().minute()).font(.subheadline).foregroundStyle(.secondary)
@@ -62,7 +62,8 @@ struct ActivityScreen: View {
                                             Text(workout.sourceName).font(.caption2).foregroundStyle(.secondary)
                                         }.frame(maxWidth: .infinity, alignment: .leading)
                                     }.wellnessCard()
-                                }.buttonStyle(.plain).disabled(store.busy)
+                                }.buttonStyle(PressableStyle()).disabled(store.busy)
+                                    .sensoryFeedback(.selection, trigger: store.selection)
                                     .accessibilityAddTraits(store.selection.contains(workout.id) ? [.isSelected] : [])
                             }
                             Button { Task { await store.importSelected() } } label: {
@@ -71,10 +72,10 @@ struct ActivityScreen: View {
                             }.buttonStyle(PrimaryButton()).disabled(store.selection.isEmpty || store.busy)
                         }
                     }
-                    if let message = store.importMessage { Label(message, systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
+                    if let message = store.importMessage { Label(message, systemImage: "checkmark.circle.fill").foregroundStyle(.green).sensoryFeedback(.success, trigger: message) }
                     Button("מה נשמר בחשבון?") { privacy = true }.font(.footnote).foregroundStyle(.secondary)
                 }.padding(22)
-            }.background(Color.wellnessCanvas.opacity(0.35)).toolbar(.hidden, for: .navigationBar)
+            }.wellnessScreen().toolbar(.hidden, for: .navigationBar).refreshable { await store.readHealth() }
                 .sheet(isPresented: $privacy) { HealthPrivacySheet() }
         }
     }

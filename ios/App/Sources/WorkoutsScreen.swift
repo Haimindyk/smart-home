@@ -8,24 +8,24 @@ struct WorkoutsScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    Text("האימונים שלך").font(.largeTitle.bold())
-                    Text("התוכניות שלי").font(.title2.bold())
+                    Text("האימונים שלך").font(.system(.largeTitle, design: .rounded).bold())
+                    Text("התוכניות שלי").sectionTitle()
                     if store.activePlans.isEmpty {
                         ContentUnavailableView("עוד אין תוכנית", systemImage: "dumbbell", description: Text("תוכניות שתיצור בחשבון יופיעו כאן."))
                     }
                     ForEach(store.activePlans) { plan in
                         NavigationLink { PlanDetail(plan: plan) } label: {
                             HStack(spacing: 16) {
-                                Image(systemName: "dumbbell.fill").font(.title2).padding(14).background(Color.wellnessCanvas, in: RoundedRectangle(cornerRadius: 16))
+                                Image(systemName: "dumbbell.fill").font(.title2).padding(14).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(plan.data["name"].stringValue ?? "תוכנית אימון").font(.headline)
                                     Text("\(plan.data["exercises"].arrayValue.count) תרגילים").font(.subheadline).foregroundStyle(.secondary)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                                 Image(systemName: "chevron.left").foregroundStyle(.secondary).font(.caption)
                             }.wellnessCard()
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(PressableStyle())
                     }
-                    Text("יומן האימונים").font(.title2.bold())
+                    Text("יומן האימונים").sectionTitle()
                     if history.isEmpty { ContentUnavailableView("עוד אין אימונים ביומן", systemImage: "calendar") }
                     ForEach(history) { workout in
                         NavigationLink { WorkoutDetail(workout: workout) } label: {
@@ -37,10 +37,10 @@ struct WorkoutsScreen: View {
                                 if workout.data["appleHealth"] != .null { Image(systemName: "heart.fill").foregroundStyle(.pink).accessibilityLabel("Apple Health") }
                                 Text(statusName(workout.data["status"].stringValue)).font(.caption).foregroundStyle(.secondary)
                             }.wellnessCard()
-                        }.buttonStyle(.plain).accessibilityIdentifier("workout-\(workout.id)")
+                        }.buttonStyle(PressableStyle()).accessibilityIdentifier("workout-\(workout.id)")
                     }
                 }.padding(22)
-            }.background(Color.wellnessCanvas.opacity(0.35)).toolbar(.hidden, for: .navigationBar).refreshable { await store.refresh() }
+            }.wellnessScreen().toolbar(.hidden, for: .navigationBar).refreshable { await store.refresh() }
         }
     }
 }
