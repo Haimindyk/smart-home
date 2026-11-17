@@ -105,10 +105,10 @@ private struct HomeShell: View {
                             Image(systemName: item.icon).font(.title3).symbolEffect(.bounce, value: tab == item)
                             Text(item.rawValue).font(.caption.weight(.semibold))
                         }
-                        .foregroundStyle(tab == item ? Color.white : Color.wellnessInk.opacity(0.6))
+                        .foregroundStyle(tab == item ? Color.wellnessInk : Color.wellnessInk.opacity(0.62))
                         .frame(maxWidth: .infinity).padding(.vertical, 11)
                         .background {
-                            if tab == item { Capsule().fill(Color.wellnessInk).matchedGeometryEffect(id: "pill", in: pill) }
+                            if tab == item { Capsule().fill(Color.black.opacity(0.07)).matchedGeometryEffect(id: "pill", in: pill) }
                         }
                         .contentShape(Capsule())
                     }
