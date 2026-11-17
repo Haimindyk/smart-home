@@ -19,11 +19,17 @@ extension Color {
     }
 }
 
+enum HomeSheet: Identifiable {
+    case search, newSection, editSection(HSection), history, members
+    var id: String { switch self { case .search: "search"; case .newSection: "new"; case .editSection(let s): "edit-\(s.id)"; case .history: "history"; case .members: "members" } }
+}
+
 struct HomeScreen: View {
     @EnvironmentObject private var store: AppStore
     @EnvironmentObject private var home: HomeStore
     @State private var showSettings = false
     @State private var showCoach = false
+    @State private var sheet: HomeSheet?
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
         return hour < 5 ? "לילה טוב" : hour < 12 ? "בוקר טוב" : hour < 18 ? "צהריים טובים" : hour < 22 ? "ערב טוב" : "לילה טוב"
@@ -49,6 +55,15 @@ struct HomeScreen: View {
             }
             .wellnessScreen().toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
+            .sheet(item: $sheet) { which in
+                switch which {
+                case .search: SearchSheet().environmentObject(home)
+                case .newSection: SectionEditorSheet(section: nil).environmentObject(home)
+                case .editSection(let section): SectionEditorSheet(section: section).environmentObject(home)
+                case .history: HistorySheet().environmentObject(home)
+                case .members: MembersSheet().environmentObject(home)
+                }
+            }
             .sheet(isPresented: $showCoach) { CoachChatView().environmentObject(store) }
             .alert("משהו השתבש", isPresented: Binding(get: { home.error != nil }, set: { if !$0 { home.error = nil } })) { Button("סגור", role: .cancel) {} } message: { Text(home.error ?? "") }
         }
@@ -62,7 +77,18 @@ struct HomeScreen: View {
                 Text(Date(), format: .dateTime.weekday(.wide).day().month(.wide)).font(.footnote).foregroundStyle(Color.wellnessSecondary)
             }.frame(maxWidth: .infinity, alignment: .leading)
             roundButton("sparkles", tint: .flame, label: "המאמן שלי", id: "coach-button") { showCoach = true }
-            roundButton("gearshape.fill", tint: Color.wellnessInk, label: "הגדרות", id: "settings-button") { showSettings = true }
+            Menu {
+                Button { sheet = .search } label: { Label("חיפוש", systemImage: "magnifyingglass") }
+                Button { sheet = .newSection } label: { Label("מדור חדש", systemImage: "plus.rectangle.on.rectangle") }
+                if let current = home.currentSection { Button { sheet = .editSection(current) } label: { Label("עריכת המדור", systemImage: "pencil") } }
+                Button { sheet = .history } label: { Label("היסטוריה", systemImage: "clock.arrow.circlepath") }
+                Button { sheet = .members } label: { Label("בני הבית", systemImage: "person.2") }
+                Divider()
+                Button { showSettings = true } label: { Label("הגדרות", systemImage: "gearshape") }
+            } label: {
+                Image(systemName: "ellipsis").font(.title3).foregroundStyle(Color.wellnessInk).frame(width: 46, height: 46)
+                    .background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline))
+            }.accessibilityLabel("עוד אפשרויות").accessibilityIdentifier("home-menu")
         }.padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 12)
     }
     private func roundButton<S: ShapeStyle>(_ icon: String, tint: S, label: String, id: String, action: @escaping () -> Void) -> some View {

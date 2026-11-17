@@ -132,7 +132,7 @@ public actor Backend {
     private static let householdRPCs: Set<String> = ["complete_chore"]
 
     /// Reads a household table, paging up to 10,000 rows. `deleted_at is null` is applied for tables that soft-delete.
-    public func householdRows(table: String, owner: String, filters: [URLQueryItem] = [], order: String? = nil, limit: Int = 1000) async throws -> [JSONValue] {
+    public func householdRows(table: String, owner: String, filters: [URLQueryItem] = [], order: String? = nil, limit: Int = 1000, singlePage: Bool = false) async throws -> [JSONValue] {
         guard Self.householdReadable.contains(table) else { throw BackendError.invalidResponse }
         let softDeletes: Set<String> = ["sections", "tasks", "chores", "family_events"]
         var rows: [JSONValue] = [], offset = 0
@@ -144,7 +144,7 @@ public actor Backend {
             guard status == 200 else { throw BackendError.server(status) }
             let batch = try json(data).arrayValue
             rows += batch
-            if batch.count < limit { return rows }
+            if singlePage || batch.count < limit { return rows }
             offset += limit; guard offset < 10_000 else { throw BackendError.invalidResponse }
         }
     }

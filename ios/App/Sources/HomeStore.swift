@@ -14,6 +14,7 @@ final class HomeStore: ObservableObject {
     @Published private(set) var loading = false
     @Published var error: String?
     @Published var selectedSectionID: String?
+    @Published var activity: [HActivity] = []
     private weak var app: AppStore?
     private var revision = 0
     func bind(_ app: AppStore) { self.app = app }
@@ -49,6 +50,51 @@ final class HomeStore: ObservableObject {
         } catch { if request == revision, app.session?.owner == owner { self.error = "לא הצלחנו לטעון את נתוני הבית. אפשר למשוך לרענון." } }
     }
     func reset() { revision += 1; sections = []; tasks = []; chores = []; events = []; members = []; selectedSectionID = nil; error = nil }
+
+    func loadActivity() async {
+        guard let app, let owner = app.session?.owner else { return }
+#if DEBUG
+        if app.backend == nil, app.session?.accessToken == "ui-test" { return }
+#endif
+        guard let backend = app.backend else { return }
+        do {
+            let rows = try await backend.householdRows(table: "activity_log", owner: owner, order: "created_at.desc", limit: 100, singlePage: true)
+            if app.session?.owner == owner { activity = rows.compactMap(HActivity.init) }
+        } catch { if app.session?.owner == owner { self.error = "לא הצלחנו לטעון את ההיסטוריה." } }
+    }
+
+    // MARK: Sections
+    func addSection(name: String, emoji: String, kind: String) async {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, clean.count <= 80, ["tasks", "shopping", "chores", "info"].contains(kind), let position = try? FractionalIndex.atEnd(sections.map(\.position).max()) else { return }
+        let id = UUID().uuidString.lowercased()
+        var fields: [String: JSONValue] = ["id": .string(id), "name": .string(clean), "kind": .string(kind), "position": .string(position)]
+        let icon = emoji.trimmingCharacters(in: .whitespaces); if !icon.isEmpty { fields["emoji"] = .string(String(icon.prefix(8))) }
+        if let me { fields["created_by"] = .string(me.id) }
+        guard let section = HSection(.object(fields)) else { return }
+        let backup = sections; sections.append(section); selectedSectionID = id
+        _ = await run("לא הצלחנו ליצור את המדור.", rollback: { [weak self] in self?.sections = backup; self?.selectedSectionID = backup.first?.id }) { backend, owner in
+            _ = try await backend.householdInsert(table: "sections", owner: owner, fields: fields)
+        }
+    }
+    func rename(_ section: HSection, name: String, emoji: String) async {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, clean.count <= 80, let index = sections.firstIndex(where: { $0.id == section.id }) else { return }
+        let backup = sections; sections[index].name = clean; sections[index].emoji = emoji.isEmpty ? nil : emoji
+        var fields: [String: JSONValue] = ["name": .string(clean), "emoji": emoji.isEmpty ? .null : .string(String(emoji.prefix(8)))]
+        if let me { fields["updated_by"] = .string(me.id) }
+        _ = await run("לא הצלחנו לשמור את שם המדור.", rollback: { [weak self] in self?.sections = backup }) { backend, owner in
+            _ = try await backend.householdUpdate(table: "sections", owner: owner, id: section.id, fields: fields)
+        }
+    }
+    func delete(_ section: HSection) async {
+        let backup = sections; let tasksBackup = tasks; let choresBackup = chores
+        sections.removeAll { $0.id == section.id }; tasks.removeAll { $0.sectionID == section.id }; chores.removeAll { $0.sectionID == section.id }
+        if selectedSectionID == section.id { selectedSectionID = sections.first?.id }
+        _ = await run("לא הצלחנו למחוק את המדור.", rollback: { [weak self] in self?.sections = backup; self?.tasks = tasksBackup; self?.chores = choresBackup }) { backend, owner in
+            _ = try await backend.householdUpdate(table: "sections", owner: owner, id: section.id, fields: ["deleted_at": .string(DateParsing.iso(Date()))])
+        }
+    }
 
     // MARK: Writes
     private func now() -> String { DateParsing.iso(Date()) }

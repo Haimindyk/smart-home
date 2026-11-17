@@ -94,3 +94,12 @@ struct HMember: Identifiable, Equatable {
         self.id = id; self.name = name; emoji = j.str("avatar_emoji"); color = j.str("color") ?? "#888888"
     }
 }
+
+struct HActivity: Identifiable, Equatable {
+    let id: String; var action: String; var entityType: String; var summary: String; var actorID: String?; var createdAt: Date?
+    init?(_ j: JSONValue) {
+        guard let id = j.str("id") else { return nil }
+        self.id = id; action = j.str("action") ?? ""; entityType = j.str("entity_type") ?? ""; summary = j.str("summary") ?? ""
+        actorID = j.str("actor_id"); createdAt = DateParsing.timestamp(j.str("created_at"))
+    }
+}

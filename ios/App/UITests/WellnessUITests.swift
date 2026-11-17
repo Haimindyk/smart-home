@@ -199,6 +199,27 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.buttons["event-d0000000-0000-4000-8000-000000000001"].waitForExistence(timeout: 5))
         capture(app, name: "native-calendar")
     }
+    func testHouseholdMenuCreatesSectionSearchesAndListsMembers() {
+        let app = launch("home")
+        XCTAssertTrue(app.buttons["home-menu"].waitForExistence(timeout: 15))
+        app.buttons["home-menu"].tap()
+        app.buttons["מדור חדש"].tap()
+        let name = app.textFields["section-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("מוצרי ניקיון")
+        app.buttons["section-save"].tap()
+        XCTAssertTrue(app.buttons["מוצרי ניקיון"].waitForExistence(timeout: 5), "A new section appears as a chip and is selected")
+        app.buttons["home-menu"].tap()
+        app.buttons["בני הבית"].tap()
+        XCTAssertTrue(app.staticTexts["נועה"].waitForExistence(timeout: 5))
+        capture(app, name: "native-home-members")
+        app.buttons["סגור"].tap()
+        app.buttons["home-menu"].tap()
+        app.buttons["חיפוש"].tap()
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("חלב")
+        XCTAssertTrue(app.buttons.containing(.staticText, identifier: "חלב").firstMatch.waitForExistence(timeout: 5))
+        capture(app, name: "native-home-search")
+    }
     func testLoginRequiresFourDigits() {
         let app = launch("login")
         let pin = app.secureTextFields.firstMatch
