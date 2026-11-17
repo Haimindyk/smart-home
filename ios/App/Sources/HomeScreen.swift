@@ -90,6 +90,10 @@ struct HomeScreen: View {
                 (Text("\(greeting)").foregroundStyle(Color.wellnessInk) + Text(home.me.map { ", " + $0.name } ?? "").foregroundStyle(Color.amberInk))
                     .font(.hb(.title, .bold)).tracking(-0.5).fixedSize(horizontal: false, vertical: true)
                 Text(Date(), format: .dateTime.weekday(.wide).day().month(.wide)).font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary)
+                Button { sheet = .newSection } label: {
+                    Label("קטגוריה חדשה", systemImage: "plus").font(.hb(.subheadline, .semibold)).padding(.horizontal, 16).frame(minHeight: 44)
+                        .foregroundStyle(Color.wellnessOnPrimary).background(Color.wellnessPrimary, in: Capsule())
+                }.buttonStyle(PressableStyle()).padding(.top, 8).accessibilityIdentifier("hero-new-section")
             }.frame(maxWidth: .infinity, alignment: .leading)
             MemberAvatar(member: home.me, size: 56)
         }
