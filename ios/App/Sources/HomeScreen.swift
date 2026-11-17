@@ -115,7 +115,6 @@ struct HomeScreen: View {
                         .foregroundStyle(Color.wellnessOnPrimary).background(Color.wellnessPrimary, in: Capsule())
                 }.buttonStyle(PressableStyle()).padding(.top, 8).accessibilityIdentifier("hero-new-section")
             }.frame(maxWidth: .infinity, alignment: .leading)
-            MemberAvatar(member: home.me, size: 56)
         }
         .padding(22)
         .background {
