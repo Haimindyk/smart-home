@@ -26,6 +26,13 @@ enum UITestFixtures {
             return row(id: id, data: "{\"date\":\"\(f.string(from: day))\",\"weight\":\(kg)}")
         }
     }
+    static func plans() -> [HealthRow] {
+        func ex(_ id: String, _ name: String, _ sets: Int, _ reps: Int, _ weight: Double, _ muscle: String) -> String {
+            "{\"id\":\"\(id)\",\"name\":\"\(name)\",\"muscle\":\"\(muscle)\",\"equipment\":\"\",\"kind\":\"strength\",\"sets\":\(sets),\"reps\":\(reps),\"weight\":\(weight),\"rest\":60,\"duration\":0,\"distance\":0,\"notes\":\"\"}"
+        }
+        let exercises = [ex("88888888-8888-4888-8888-888888888881", "לחיצת חזה", 3, 8, 40, "חזה"), ex("88888888-8888-4888-8888-888888888882", "סקוואט", 3, 10, 60, "רגליים")].joined(separator: ",")
+        return row(id: "99999999-9999-4999-8999-999999999999", data: "{\"name\":\"פלג גוף עליון\",\"exercises\":[\(exercises)],\"days\":[1,3],\"archived\":false}")
+    }
     static func workouts(date: String) -> [HealthRow] {
         row(id: "55555555-5555-8555-8555-555555555555", data: "{\"date\":\"\(date)\",\"name\":\"הליכה לבדיקה\",\"status\":\"completed\",\"quick\":true,\"startedAt\":\"\(date)T08:00:00Z\",\"exercises\":[],\"appleHealth\":{\"uuid\":\"66666666-6666-4666-8666-666666666666\",\"sourceName\":\"Test Watch\",\"durationSeconds\":1800,\"activityType\":52,\"energyKcal\":null,\"distanceMeters\":2500}}")
     }

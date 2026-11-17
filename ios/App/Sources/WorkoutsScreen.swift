@@ -23,7 +23,7 @@ struct WorkoutsScreen: View {
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                                 Image(systemName: "chevron.left").foregroundStyle(.secondary).font(.caption)
                             }.wellnessCard()
-                        }.buttonStyle(PressableStyle())
+                        }.buttonStyle(PressableStyle()).accessibilityIdentifier("plan-\(plan.id)")
                     }
                     Text("יומן האימונים").sectionTitle()
                     if history.isEmpty { ContentUnavailableView("עוד אין אימונים ביומן", systemImage: "calendar") }
@@ -46,9 +46,12 @@ struct WorkoutsScreen: View {
 }
 
 private struct PlanDetail: View {
+    @EnvironmentObject private var store: AppStore
     let plan: HealthRow
+    @State private var started: HealthRow?
     var body: some View {
         List {
+            Section { Button { Task { started = await store.startWorkout(from: plan) } } label: { Label("התחל אימון", systemImage: "play.fill").frame(maxWidth: .infinity) }.buttonStyle(PrimaryButton()).listRowBackground(Color.clear).listRowInsets(EdgeInsets()).disabled(store.busy).accessibilityIdentifier("start-workout") }
             ForEach(Array(plan.data["exercises"].arrayValue.enumerated()), id: \.offset) { _, exercise in
                 VStack(alignment: .leading, spacing: 8) {
                     Text(exercise["name"].stringValue ?? "תרגיל").font(.headline)
@@ -60,6 +63,7 @@ private struct PlanDetail: View {
                 }.padding(.vertical, 8)
             }
         }.listStyle(.insetGrouped).wellnessList().navigationTitle(plan.data["name"].stringValue ?? "תוכנית").navigationBarTitleDisplayMode(.inline)
+            .fullScreenCover(item: $started) { ActiveWorkoutView(row: $0).environmentObject(store) }
     }
 }
 

@@ -35,6 +35,9 @@ public struct HealthRow: Codable, Identifiable, Sendable {
     public let data: JSONValue
     public let version: Int
     public let deleted_at: String?
+    public init(id: String, owner_user_id: String, data: JSONValue, version: Int, deleted_at: String? = nil) {
+        self.id = id; self.owner_user_id = owner_user_id; self.data = data; self.version = version; self.deleted_at = deleted_at
+    }
 }
 
 public enum CoreError: Error { case invalidWorkout, invalidTimeZone, invalidOwner }

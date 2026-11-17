@@ -38,7 +38,7 @@ final class AppStore: ObservableObject {
                 session = Session(accessToken: "ui-test", refreshToken: "ui-test", owner: UITestFixtures.owner, member: "ui-test")
                 profile = .object(["timezone": .string("UTC"), "birthDate": .string("1990-01-01")])
                 goals = UITestFixtures.goals(date: dateKey)
-                if scenario == "--ui-test-meal" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey); weightLogs = UITestFixtures.weights(zone: timeZone) }
+                if scenario == "--ui-test-meal" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey); plans = UITestFixtures.plans(); weightLogs = UITestFixtures.weights(zone: timeZone) }
             }
             return
         }
@@ -243,6 +243,46 @@ final class AppStore: ObservableObject {
             if session?.owner == owner, let index = meals.firstIndex(where: { $0.id == row.id }) { meals[index] = saved }
         }
     }
+    // MARK: - Live workouts
+    private static func iso(_ date: Date) -> String { ISO8601DateFormatter().string(from: date) }
+    /// Creates an active session from a plan: one unchecked set per planned set, same shape as the web app.
+    func startWorkout(from plan: HealthRow) async -> HealthRow? {
+        let exercises = plan.data["exercises"].arrayValue.map { exercise -> JSONValue in
+            guard case .object(var fields) = exercise else { return exercise }
+            let sets = max(1, Int(fields["sets"]?.doubleValue ?? 3)), reps = fields["reps"]?.doubleValue ?? 10, weight = fields["weight"]?.doubleValue ?? 0
+            fields["performed"] = .array((0..<sets).map { _ in .object(["id": .string(UUID().uuidString.lowercased()), "reps": .number(reps), "weight": .number(weight), "done": .bool(false), "duration": .number(0), "distance": .number(0)]) })
+            fields["skipped"] = .bool(false)
+            return .object(fields)
+        }
+        guard !exercises.isEmpty else { return nil }
+        let payload: JSONValue = .object(["date": .string(dateKey), "planId": .string(plan.id), "name": plan.data["name"].stringValue.map { .string($0) } ?? .string("אימון"), "status": .string("active"), "quick": .bool(false), "startedAt": .string(Self.iso(Date())), "endedAt": .null, "exercises": .array(exercises), "notes": .string("")])
+        var result: HealthRow?
+#if DEBUG
+        if backend == nil, session?.accessToken == "ui-test" {
+            // Synthetic UI-test sessions never touch the network.
+            let row = HealthRow(id: UUID().uuidString.lowercased(), owner_user_id: session?.owner ?? "", data: payload, version: 1)
+            workouts.append(row); return row
+        }
+#endif
+        _ = await write("לא הצלחנו להתחיל את האימון.") { backend, owner in
+            let row = try await backend.save(table: "workout_sessions", owner: owner, payload: payload)
+            if session?.owner == owner { workouts.append(row); result = row }
+        }
+        return result
+    }
+    /// Persists a new payload for an existing session (autosave on every change) and returns the saved row.
+    func saveWorkout(_ row: HealthRow, payload: JSONValue) async -> HealthRow? {
+        var result: HealthRow?
+#if DEBUG
+        if backend == nil, session?.accessToken == "ui-test" { return HealthRow(id: row.id, owner_user_id: row.owner_user_id, data: payload, version: row.version + 1) }
+#endif
+        _ = await write("לא הצלחנו לשמור את האימון. הנתונים האחרונים לא נשמרו.") { backend, owner in
+            let saved = try await backend.save(table: "workout_sessions", owner: owner, payload: payload, existing: row)
+            if session?.owner == owner, let index = workouts.firstIndex(where: { $0.id == row.id }) { workouts[index] = saved; result = saved }
+        }
+        return result
+    }
+    func finishedTimestamp() -> String { Self.iso(Date()) }
     func deleteMeal(_ row: HealthRow) async -> Bool {
         await write("לא הצלחנו למחוק את הארוחה.") { backend, owner in
             try await backend.softDelete(table: "meals", row: row, owner: owner)
