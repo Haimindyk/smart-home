@@ -6,6 +6,9 @@ platform :ios do
   before_all do |lane|
     next unless lane == :beta
 
+    # gym's -showBuildSettings probe resolves SPM packages; the 3s default is too tight.
+    ENV["FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT"] ||= "120"
+
     api_key = app_store_connect_api_key(
       key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
       issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
@@ -15,7 +18,9 @@ platform :ios do
 
     # xcodebuild's -allowProvisioningUpdates does not reuse fastlane's api_key,
     # so write the same key to a .p8 and pass it via -authenticationKey* flags.
-    key_path = File.expand_path("../asc_api_key.p8", Dir.pwd)
+    # Lane code runs with Dir.pwd == ios/fastlane, so this lands at
+    # ios/fastlane/asc_api_key.p8, which ios/.gitignore covers.
+    key_path = File.expand_path("asc_api_key.p8", Dir.pwd)
     File.write(key_path, api_key[:key])
     File.chmod(0o600, key_path)
     ENV["ASC_API_KEY_PATH"] = key_path
