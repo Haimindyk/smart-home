@@ -88,10 +88,11 @@ struct HEvent: Identifiable, Equatable {
 }
 
 struct HMember: Identifiable, Equatable {
-    let id: String; var name: String; var emoji: String?; var color: String
+    let id: String; var name: String; var emoji: String?; var color: String; var photoURL: URL?
     init?(_ j: JSONValue) {
         guard let id = j.str("id"), let name = j.str("display_name") else { return nil }
         self.id = id; self.name = name; emoji = j.str("avatar_emoji"); color = j.str("color") ?? "#888888"
+        photoURL = j.str("avatar_photo_url").flatMap { URL(string: $0) }.flatMap { $0.scheme == "https" ? $0 : nil }
     }
 }
 

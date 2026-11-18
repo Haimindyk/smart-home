@@ -26,7 +26,7 @@ final class HomeStore: ObservableObject {
     var me: HMember? { members.first { $0.id == app?.session?.member } }
     var timeZone: TimeZone { app?.timeZone ?? .current }
     var currentSection: HSection? { sections.first { $0.id == selectedSectionID } ?? sections.first }
-    func member(_ id: String) -> HMember? { members.first { $0.id == id } }
+    func member(_ id: String?) -> HMember? { id.flatMap { id in members.first { $0.id == id } } }
     func tasks(in section: String) -> [HTask] { tasks.filter { $0.sectionID == section }.sorted { $0.position < $1.position } }
     func chores(in section: String) -> [HChore] { chores.filter { $0.sectionID == section }.sorted { ($0.nextDue ?? .distantFuture) < ($1.nextDue ?? .distantFuture) } }
 
@@ -44,7 +44,7 @@ final class HomeStore: ObservableObject {
             async let t = backend.householdRows(table: "tasks", owner: owner, order: "position.asc")
             async let c = backend.householdRows(table: "chores", owner: owner, order: "next_due_at.asc")
             async let e = backend.householdRows(table: "family_events", owner: owner, order: "event_date.asc")
-            async let m = backend.householdRows(table: "members", owner: owner, columns: "id,display_name,avatar_emoji,color", order: "display_name.asc")
+            async let m = backend.householdRows(table: "members", owner: owner, columns: "id,display_name,avatar_emoji,color,avatar_photo_url", order: "display_name.asc")
             async let sg = backend.householdRows(table: "ai_suggestions", owner: owner, filters: [.init(name: "status", value: "eq.open")], order: "created_at.desc", limit: 20, singlePage: true)
             async let pn = backend.householdRows(table: "ai_private_messages", owner: owner, filters: [.init(name: "member_id", value: "eq.\(app.session?.member ?? "")"), .init(name: "read_at", value: "is.null")], order: "created_at.desc", limit: 20, singlePage: true)
             let result = try await (s, t, c, e, m)
@@ -280,6 +280,24 @@ final class HomeStore: ObservableObject {
         if let me { fields["created_by"] = .string(me.id) }
         let ok = await run("לא הצלחנו להוסיף את המטלה.", rollback: {}) { backend, owner in _ = try await backend.householdInsert(table: "chores", owner: owner, fields: fields) }
         if ok { await refresh() }
+    }
+    /// Sets (or clears, with nil) the single responsible member of a chore.
+    func setAssignee(_ chore: HChore, to memberID: String?) async {
+        guard let index = chores.firstIndex(where: { $0.id == chore.id }), chores[index].assigneeIDs != (memberID.map { [$0] } ?? []) else { return }
+        let old = chores[index]
+        chores[index].assigneeIDs = memberID.map { [$0] } ?? []; chores[index].assigneeKind = memberID == nil ? "anyone" : "member"
+        var fields: [String: JSONValue] = ["assignee_kind": .string(memberID == nil ? "anyone" : "member"), "assignee_member_ids": .array(memberID.map { [.string($0)] } ?? []), "assignee_member_id": memberID.map { .string($0) } ?? .null]
+        if let me { fields["updated_by"] = .string(me.id) }
+        _ = await run("לא הצלחנו לשנות את האחראי.", rollback: { [weak self] in if let i = self?.chores.firstIndex(where: { $0.id == old.id }) { self?.chores[i] = old } }) { backend, owner in
+            _ = try await backend.householdUpdate(table: "chores", owner: owner, id: chore.id, fields: fields)
+        }
+    }
+    /// Sets (or clears, with nil) the single responsible member of a task.
+    func setAssignee(_ task: HTask, to memberID: String?) async {
+        guard task.assigneeIDs != (memberID.map { [$0] } ?? []) else { return }
+        await update(task, fields: ["assignee_kind": .string(memberID == nil ? "unassigned" : "member"), "assignee_member_ids": .array(memberID.map { [.string($0)] } ?? []), "assignee_member_id": memberID.map { .string($0) } ?? .null]) {
+            $0.assigneeIDs = memberID.map { [$0] } ?? []; $0.assigneeKind = memberID == nil ? "unassigned" : "member"
+        }
     }
     func delete(_ chore: HChore) async {
         let old = chores; chores.removeAll { $0.id == chore.id }

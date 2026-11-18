@@ -263,6 +263,26 @@ final class WellnessUITests: XCTestCase {
         confirm.tap()
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: confirm); waitForExpectations(timeout: 5)
     }
+    func testTappingAvatarOpensMemberDropdownAndChangesAssignee() {
+        let app = launch("home")
+        let assignee = app.buttons["task-assignee-b0000000-0000-4000-8000-000000000002"]
+        XCTAssertTrue(assignee.waitForExistence(timeout: 15))
+        var scrolls = 0
+        while (assignee.frame.minY > app.frame.height * 0.6 || assignee.frame.minY < app.frame.height * 0.28) && scrolls < 10 {
+            let down = assignee.frame.minY > app.frame.height * 0.6
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: down ? 0.7 : 0.4))
+            let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: down ? 0.5 : 0.6))
+            from.press(forDuration: 0.1, thenDragTo: to); scrolls += 1
+        }
+        dismissSystemAlerts(for: app)
+        assignee.tap()
+        let noa = app.descendants(matching: .any)["assignee-option-22222222-2222-4222-8222-222222222221"]
+        let found = noa.waitForExistence(timeout: 5)
+        capture(app, name: "native-assignee-dropdown")
+        XCTAssertTrue(found, "Dropdown should list household members")
+        noa.tap()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: noa); waitForExpectations(timeout: 5)
+    }
     func testHomeWellnessCardOpensHealth() {
         let app = launch("home")
         let card = app.buttons["wellness-entry"]

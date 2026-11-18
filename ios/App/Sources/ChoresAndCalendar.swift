@@ -42,6 +42,7 @@ struct ChorePanelBody: View {
                     }.frame(maxWidth: .infinity, alignment: .leading)
                     Button { Task { await home.complete(chore) } } label: { Label("בוצע", systemImage: "checkmark").font(.hb(.subheadline, .semibold)).padding(.horizontal, 14).frame(minHeight: 44).foregroundStyle(Color.wellnessOnPrimary).background(Color.wellnessPrimary, in: Capsule()) }
                         .buttonStyle(PressableStyle()).sensoryFeedback(.success, trigger: chore.nextDue).accessibilityLabel("סמן \(chore.title) כבוצע").accessibilityIdentifier("chore-complete-\(chore.id)")
+                    AssigneeButton(currentID: chore.assigneeIDs.first, size: 34) { id in Task { await home.setAssignee(chore, to: id) } }.accessibilityIdentifier("chore-assignee-\(chore.id)")
                 }.padding(10).swipeToDelete { confirmDelete = chore }
             }
         }
