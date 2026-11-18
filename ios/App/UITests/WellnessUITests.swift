@@ -295,6 +295,22 @@ final class WellnessUITests: XCTestCase {
         app.buttons["profile-save"].tap()
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: field); waitForExpectations(timeout: 8)
     }
+    func testChoreEditorOpensAndSaves() {
+        let app = launch("home")
+        let chip = app.buttons["section-a0000000-0000-4000-8000-000000000003"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 15)); chip.tap()
+        let open = app.buttons["chore-open-c0000000-0000-4000-8000-000000000001"]
+        XCTAssertTrue(open.waitForExistence(timeout: 8))
+        var scrolls = 0
+        while !open.isHittable && scrolls < 6 { app.swipeUp(); scrolls += 1 }
+        open.tap()
+        let field = app.textFields["chore-title"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8), "Chore editor opens")
+        capture(app, name: "native-chore-editor")
+        field.tap(); field.typeText("X")
+        app.buttons["chore-save"].tap()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: field); waitForExpectations(timeout: 8)
+    }
     func testHomeWellnessCardOpensHealth() {
         let app = launch("home")
         let card = app.buttons["wellness-entry"]

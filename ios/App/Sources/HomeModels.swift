@@ -53,13 +53,14 @@ struct HTask: Identifiable, Equatable {
 
 struct HChore: Identifiable, Equatable {
     let id: String; var sectionID: String; var title: String; var emoji: String?; var freq: String; var intervalN: Int
-    var nextDue: Date?; var assigneeKind: String; var assigneeIDs: [String]; var notes: String?; var position: String
+    var nextDue: Date?; var assigneeKind: String; var assigneeIDs: [String]; var notes: String?; var position: String; var weekdays: [Int]
     init?(_ j: JSONValue) {
         guard let id = j.str("id"), let section = j.str("section_id"), let title = j.str("title") else { return nil }
         self.id = id; sectionID = section; self.title = title; emoji = j.str("emoji"); freq = j.str("freq") ?? "weekly"; intervalN = Int(j.num("interval_n") ?? 1)
         nextDue = DateParsing.timestamp(j.str("next_due_at")); assigneeKind = j.str("assignee_kind") ?? "anyone"
         var ids = j.strings("assignee_member_ids"); if ids.isEmpty, let single = j.str("assignee_member_id") { ids = [single] }
         assigneeIDs = ids; notes = j.str("notes"); position = j.str("position") ?? ""
+        weekdays = j["weekdays"].arrayValue.compactMap { $0.doubleValue.map { Int($0) } }.filter { (0...6).contains($0) }
     }
 }
 

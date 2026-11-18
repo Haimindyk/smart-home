@@ -281,6 +281,14 @@ final class HomeStore: ObservableObject {
         let ok = await run("לא הצלחנו להוסיף את המטלה.", rollback: {}) { backend, owner in _ = try await backend.householdInsert(table: "chores", owner: owner, fields: fields) }
         if ok { await refresh() }
     }
+    func update(_ chore: HChore, fields: [String: JSONValue], apply: (inout HChore) -> Void) async {
+        guard let index = chores.firstIndex(where: { $0.id == chore.id }) else { return }
+        let old = chores[index]; apply(&chores[index])
+        var payload = fields; if let me { payload["updated_by"] = .string(me.id) }
+        _ = await run("לא הצלחנו לשמור את המטלה.", rollback: { [weak self] in if let i = self?.chores.firstIndex(where: { $0.id == old.id }) { self?.chores[i] = old } }) { backend, owner in
+            _ = try await backend.householdUpdate(table: "chores", owner: owner, id: chore.id, fields: payload)
+        }
+    }
     /// Sets (or clears, with nil) the single responsible member of a chore.
     func setAssignee(_ chore: HChore, to memberID: String?) async {
         guard let index = chores.firstIndex(where: { $0.id == chore.id }), chores[index].assigneeIDs != (memberID.map { [$0] } ?? []) else { return }
