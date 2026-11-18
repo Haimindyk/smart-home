@@ -25,6 +25,11 @@ public enum BackendError: Error, Equatable {
 
 public actor Backend {
     private let root: URL
+    /// Public ICS feed of family events (the Edge Function `calendar-feed`), subscribable from Calendar apps.
+    public nonisolated var calendarFeedURL: URL? {
+        guard let host = root.host, host.hasSuffix(".supabase.co") else { return nil }
+        return URL(string: "https://" + host.replacingOccurrences(of: ".supabase.co", with: ".functions.supabase.co") + "/calendar-feed")
+    }
     private let key: String
     private let vault: any SessionVault
     private let network: URLSession
@@ -127,9 +132,10 @@ public actor Backend {
         return result
     }
     // MARK: - Household tables (shared, not owner-scoped: sections, tasks, chores, events, members)
-    public static let householdReadable: Set<String> = ["sections", "tasks", "chores", "chore_completions", "family_events", "members", "activity_log", "barcode_products", "ai_suggestions", "ai_private_messages"]
-    public static let householdWritable: Set<String> = ["sections", "tasks", "chores", "family_events", "ai_suggestions", "ai_private_messages"]
+    public static let householdReadable: Set<String> = ["sections", "tasks", "chores", "chore_completions", "family_events", "members", "activity_log", "barcode_products", "ai_suggestions", "ai_private_messages", "attachments"]
+    public static let householdWritable: Set<String> = ["sections", "tasks", "chores", "family_events", "ai_suggestions", "ai_private_messages", "attachments"]
     private static let householdRPCs: Set<String> = ["complete_chore"]
+    private static let readRPCs: Set<String> = ["search_barcode_products"]
 
     /// Reads a household table, paging up to 10,000 rows. `deleted_at is null` is applied for tables that soft-delete.
     public func householdRows(table: String, owner: String, columns: String = "*", filters: [URLQueryItem] = [], order: String? = nil, limit: Int = 1000, singlePage: Bool = false) async throws -> [JSONValue] {
@@ -162,6 +168,78 @@ public actor Backend {
         guard (200..<300).contains(status) else { throw BackendError.server(status) }
         guard let row = try json(data).arrayValue.first else { throw BackendError.conflict }
         return row
+    }
+    // MARK: Attachments (private `attachments` bucket; paths are `<parentId>/<uuid>-<name>`)
+    private static func safeAttachmentPath(_ path: String) -> Bool {
+        path.count <= 300 && !path.contains("..") && !path.hasPrefix("/") && path.split(separator: "/").count == 2 &&
+            path.unicodeScalars.allSatisfy { $0.value > 31 && $0.value != 127 && !"\\?#%".unicodeScalars.contains($0) }
+    }
+    public func uploadAttachment(_ data: Data, path: String, mimeType: String, owner: String) async throws {
+        guard !data.isEmpty, data.count <= 25 * 1024 * 1024, Self.safeAttachmentPath(path), mimeType.count <= 100, !mimeType.contains("\n") else { throw BackendError.invalidResponse }
+        let encoded = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
+        let (_, status) = try await authorized("/storage/v1/object/attachments/\(encoded)", method: "POST", expectedOwner: owner, binary: (data, mimeType))
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+    }
+    /// A short-lived signed https URL for viewing an attachment.
+    public func signedAttachmentURL(path: String, owner: String) async throws -> URL {
+        guard Self.safeAttachmentPath(path) else { throw BackendError.invalidResponse }
+        let encoded = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
+        let (data, status) = try await authorized("/storage/v1/object/sign/attachments/\(encoded)", method: "POST", expectedOwner: owner, body: .object(["expiresIn": .number(3600)]))
+        guard status == 200, let signed = try json(data)["signedURL"].stringValue, signed.hasPrefix("/object/sign/attachments/"),
+              let url = URL(string: "/storage/v1" + signed, relativeTo: root)?.absoluteURL, url.scheme == "https", url.host == root.host else { throw BackendError.invalidResponse }
+        return url
+    }
+    /// Removes the stored file and then the attachment row.
+    public func deleteAttachment(id: String, path: String, owner: String) async throws {
+        guard UUID(uuidString: id) != nil, Self.safeAttachmentPath(path) else { throw BackendError.invalidResponse }
+        let encoded = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
+        _ = try await authorized("/storage/v1/object/attachments/\(encoded)", method: "DELETE", expectedOwner: owner)
+        let (_, status) = try await authorized("/rest/v1/attachments", method: "DELETE", expectedOwner: owner, query: [.init(name: "id", value: "eq.\(id)")])
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+    }
+    /// Updates the member's own profile fields (name, emoji, color, photo). Nothing else on `members` is writable.
+    public func updateMemberProfile(id: String, owner: String, fields: [String: JSONValue]) async throws {
+        let allowed: Set<String> = ["display_name", "avatar_emoji", "color", "avatar_photo_url"]
+        guard UUID(uuidString: id) != nil, !fields.isEmpty, Set(fields.keys).isSubset(of: allowed) else { throw BackendError.invalidResponse }
+        let (data, status) = try await authorized("/rest/v1/members", method: "PATCH", expectedOwner: owner, body: .object(fields), query: [.init(name: "id", value: "eq.\(id)")])
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        _ = data
+    }
+    /// Uploads a prepared JPEG profile photo to the public avatars bucket and returns its public https URL.
+    public func uploadAvatar(_ jpeg: Data, memberID: String, owner: String) async throws -> String {
+        guard UUID(uuidString: memberID) != nil, !jpeg.isEmpty, jpeg.count <= 2_097_152, jpeg.starts(with: [0xFF, 0xD8, 0xFF]) else { throw BackendError.invalidResponse }
+        let path = "\(memberID.lowercased())/\(Int(Date().timeIntervalSince1970 * 1000)).jpg"
+        let (_, status) = try await authorized("/storage/v1/object/avatars/\(path)", method: "POST", expectedOwner: owner, binary: (jpeg, "image/jpeg"))
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        guard let url = URL(string: "/storage/v1/object/public/avatars/\(path)", relativeTo: root)?.absoluteURL, url.scheme == "https", url.host == root.host else { throw BackendError.invalidResponse }
+        return url.absoluteString
+    }
+    /// Registers a new household member with a 4-digit PIN (edge function `health-account`, action `register`). A PIN that is already used throws `.conflict`.
+    public func registerMember(name: String, pin: String, emoji: String, color: String, owner: String) async throws -> JSONValue {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, clean.count <= 60, pin.count == 4, pin.allSatisfy({ $0.isASCII && $0.isNumber }), emoji.count <= 8, color.range(of: "^#[0-9a-fA-F]{6}$", options: .regularExpression) != nil else { throw BackendError.invalidResponse }
+        let (data, status) = try await authorized("/functions/v1/health-account", method: "POST", expectedOwner: owner,
+                                                  body: .object(["action": .string("register"), "name": .string(clean), "pin": .string(pin), "emoji": .string(emoji), "color": .string(color)]))
+        if status == 400, (try? json(data))?["error"].stringValue == "pin_taken" { throw BackendError.conflict }
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        let member = try json(data)["member"]
+        guard member["id"].stringValue != nil else { throw BackendError.invalidResponse }
+        return member
+    }
+    /// Posts a household broadcast message (an `activity_log` row, which also triggers the web app's push notifications).
+    public func sendBroadcast(_ message: String, actorID: String?, owner: String) async throws {
+        let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, text.count <= 500, actorID.map({ UUID(uuidString: $0) != nil }) ?? true else { throw BackendError.invalidResponse }
+        let body: JSONValue = .object(["entity_type": .string("broadcast"), "entity_id": .string(UUID().uuidString.lowercased()), "action": .string("message"), "actor_id": actorID.map { .string($0) } ?? .null, "summary": .string(text)])
+        let (_, status) = try await authorized("/rest/v1/activity_log", method: "POST", expectedOwner: owner, body: body)
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+    }
+    /// Read-only RPCs that return rows (allow-listed).
+    public func rpcRows(_ name: String, owner: String, args: [String: JSONValue]) async throws -> [JSONValue] {
+        guard Self.readRPCs.contains(name) else { throw BackendError.invalidResponse }
+        let (data, status) = try await authorized("/rest/v1/rpc/\(name)", method: "POST", expectedOwner: owner, body: .object(args))
+        guard status == 200 else { throw BackendError.server(status) }
+        return try json(data).arrayValue
     }
     public func householdRPC(_ name: String, owner: String, args: [String: JSONValue]) async throws {
         guard Self.householdRPCs.contains(name) else { throw BackendError.invalidResponse }

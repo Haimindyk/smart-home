@@ -53,13 +53,14 @@ struct HTask: Identifiable, Equatable {
 
 struct HChore: Identifiable, Equatable {
     let id: String; var sectionID: String; var title: String; var emoji: String?; var freq: String; var intervalN: Int
-    var nextDue: Date?; var assigneeKind: String; var assigneeIDs: [String]; var notes: String?; var position: String
+    var nextDue: Date?; var assigneeKind: String; var assigneeIDs: [String]; var notes: String?; var position: String; var weekdays: [Int]
     init?(_ j: JSONValue) {
         guard let id = j.str("id"), let section = j.str("section_id"), let title = j.str("title") else { return nil }
         self.id = id; sectionID = section; self.title = title; emoji = j.str("emoji"); freq = j.str("freq") ?? "weekly"; intervalN = Int(j.num("interval_n") ?? 1)
         nextDue = DateParsing.timestamp(j.str("next_due_at")); assigneeKind = j.str("assignee_kind") ?? "anyone"
         var ids = j.strings("assignee_member_ids"); if ids.isEmpty, let single = j.str("assignee_member_id") { ids = [single] }
         assigneeIDs = ids; notes = j.str("notes"); position = j.str("position") ?? ""
+        weekdays = j["weekdays"].arrayValue.compactMap { $0.doubleValue.map { Int($0) } }.filter { (0...6).contains($0) }
     }
 }
 
@@ -88,10 +89,11 @@ struct HEvent: Identifiable, Equatable {
 }
 
 struct HMember: Identifiable, Equatable {
-    let id: String; var name: String; var emoji: String?; var color: String
+    let id: String; var name: String; var emoji: String?; var color: String; var photoURL: URL?
     init?(_ j: JSONValue) {
         guard let id = j.str("id"), let name = j.str("display_name") else { return nil }
         self.id = id; self.name = name; emoji = j.str("avatar_emoji"); color = j.str("color") ?? "#888888"
+        photoURL = j.str("avatar_photo_url").flatMap { URL(string: $0) }.flatMap { $0.scheme == "https" ? $0 : nil }
     }
 }
 
@@ -119,5 +121,21 @@ struct HPrivateNote: Identifiable, Equatable {
     init?(_ j: JSONValue) {
         guard let id = j.str("id"), let member = j.str("member_id"), let summary = j.str("summary") else { return nil }
         self.id = id; memberID = member; self.summary = summary
+    }
+}
+
+struct HAttachment: Identifiable, Equatable {
+    let id: String; var taskID: String?; var choreID: String?; var path: String; var fileName: String; var mimeType: String?; var size: Int; var kind: String
+    init?(_ j: JSONValue) {
+        guard let id = j.str("id"), let path = j.str("storage_path"), let name = j.str("file_name") else { return nil }
+        self.id = id; taskID = j.str("task_id"); choreID = j.str("chore_id"); self.path = path; fileName = name; mimeType = j.str("mime_type"); size = Int(j.num("size_bytes") ?? 0); kind = j.str("kind") ?? "file"
+    }
+    static func kind(forMime mime: String) -> String {
+        if mime.hasPrefix("image/") { return "image" }; if mime == "application/pdf" { return "pdf" }
+        if mime.hasPrefix("audio/") { return "audio" }; if mime.hasPrefix("video/") { return "video" }; return "file"
+    }
+    static func safeName(_ name: String) -> String {
+        let cleaned = String(name.unicodeScalars.map { $0.value < 32 || "/\\?#%".unicodeScalars.contains($0) ? "_" : Character($0) }).trimmingCharacters(in: .whitespaces)
+        return String((cleaned.isEmpty ? "file" : cleaned).suffix(80))
     }
 }

@@ -20,6 +20,7 @@ struct RootShell: View {
     @Namespace private var pill
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.scenePhase) private var scenePhase
     var body: some View {
         Group {
             switch tab {
@@ -30,6 +31,9 @@ struct RootShell: View {
         }
         .transition(.opacity)
         .sensoryFeedback(.selection, trigger: tab)
+        .onChange(of: scenePhase) { _, phase in if phase == .active, started { Task { await home.refreshIfLive() } } }
+        // Other household members' changes show up without pulling to refresh (the web app uses realtime; this polls while the home or calendar is open).
+        .task(id: tab) { guard tab != .health else { return }; while !Task.isCancelled { try? await Task.sleep(for: .seconds(25)); if !Task.isCancelled, scenePhase == .active { await home.refreshIfLive() } } }
         .onChange(of: home.openHealthRequested) { _, requested in if requested { home.openHealthRequested = false; withAnimation(.snappy) { tab = .health } } }
         .task { home.bind(store); if !started { started = true; tab = store.startsOnHealth ? .health : .home; await home.refresh() } }
         .safeAreaInset(edge: .bottom, spacing: 0) { bar }

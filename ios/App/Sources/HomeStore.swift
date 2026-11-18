@@ -8,6 +8,7 @@ import WellnessCore
 final class HomeStore: ObservableObject {
     /// Set by the home screen's wellness card; the root shell switches to the health tab and clears it.
     @Published var openHealthRequested = false
+    @Published var attachments: [HAttachment] = []
     @Published var sections: [HSection] = []
     @Published var tasks: [HTask] = []
     @Published var chores: [HChore] = []
@@ -26,11 +27,13 @@ final class HomeStore: ObservableObject {
     var me: HMember? { members.first { $0.id == app?.session?.member } }
     var timeZone: TimeZone { app?.timeZone ?? .current }
     var currentSection: HSection? { sections.first { $0.id == selectedSectionID } ?? sections.first }
-    func member(_ id: String) -> HMember? { members.first { $0.id == id } }
+    func member(_ id: String?) -> HMember? { id.flatMap { id in members.first { $0.id == id } } }
     func tasks(in section: String) -> [HTask] { tasks.filter { $0.sectionID == section }.sorted { $0.position < $1.position } }
     func chores(in section: String) -> [HChore] { chores.filter { $0.sectionID == section }.sorted { ($0.nextDue ?? .distantFuture) < ($1.nextDue ?? .distantFuture) } }
 
     // MARK: Loading
+    /// Background refresh: only against the real backend, and never while a write is in flight (it would flicker optimistic rows).
+    func refreshIfLive() async { guard app?.backend != nil, !loading else { return }; await refresh() }
     func refresh() async {
         guard let app, let owner = app.session?.owner else { return }
 #if DEBUG
@@ -44,16 +47,17 @@ final class HomeStore: ObservableObject {
             async let t = backend.householdRows(table: "tasks", owner: owner, order: "position.asc")
             async let c = backend.householdRows(table: "chores", owner: owner, order: "next_due_at.asc")
             async let e = backend.householdRows(table: "family_events", owner: owner, order: "event_date.asc")
-            async let m = backend.householdRows(table: "members", owner: owner, columns: "id,display_name,avatar_emoji,color", order: "display_name.asc")
+            async let m = backend.householdRows(table: "members", owner: owner, columns: "id,display_name,avatar_emoji,color,avatar_photo_url", order: "display_name.asc")
             async let sg = backend.householdRows(table: "ai_suggestions", owner: owner, filters: [.init(name: "status", value: "eq.open")], order: "created_at.desc", limit: 20, singlePage: true)
             async let pn = backend.householdRows(table: "ai_private_messages", owner: owner, filters: [.init(name: "member_id", value: "eq.\(app.session?.member ?? "")"), .init(name: "read_at", value: "is.null")], order: "created_at.desc", limit: 20, singlePage: true)
             let result = try await (s, t, c, e, m)
             let assistant = (try? await (sg, pn)) ?? ([], [])
+            let files = (try? await backend.householdRows(table: "attachments", owner: owner, order: "created_at.asc")) ?? []
             guard request == revision, app.session?.owner == owner else { return }
             sections = result.0.compactMap(HSection.init).sorted { $0.position < $1.position }
             tasks = result.1.compactMap(HTask.init); chores = result.2.compactMap(HChore.init)
             events = result.3.compactMap(HEvent.init); members = result.4.compactMap(HMember.init)
-            suggestions = assistant.0.compactMap(HSuggestion.init); notes = assistant.1.compactMap(HPrivateNote.init)
+            suggestions = assistant.0.compactMap(HSuggestion.init); notes = assistant.1.compactMap(HPrivateNote.init); attachments = files.compactMap(HAttachment.init)
             if selectedSectionID == nil || !sections.contains(where: { $0.id == selectedSectionID }) { selectedSectionID = sections.first?.id }
         } catch { if request == revision, app.session?.owner == owner { self.error = "לא הצלחנו לטעון את נתוני הבית. אפשר למשוך לרענון." } }
     }
@@ -113,6 +117,17 @@ final class HomeStore: ObservableObject {
         else { before = siblings[target].position; after = target + 1 < siblings.count ? siblings[target + 1].position : nil }
         guard let position = try? FractionalIndex.between(before, after) else { return }
         await update(task, fields: ["position": .string(position)]) { $0.position = position }
+    }
+
+    /// Drag and drop: puts `taskID` where `targetID` is (below it when dragging downward, above it when dragging upward).
+    func reorder(_ taskID: String, onto targetID: String) async {
+        guard taskID != targetID, let moving = tasks.first(where: { $0.id == taskID }), let target = tasks.first(where: { $0.id == targetID }),
+              moving.sectionID == target.sectionID, moving.parentID == nil, target.parentID == nil, !moving.isCompleted, !target.isCompleted else { return }
+        let siblings = tasks.filter { $0.sectionID == moving.sectionID && $0.parentID == nil && !$0.isCompleted }.sorted { $0.position < $1.position }
+        guard let from = siblings.firstIndex(where: { $0.id == taskID }), let to = siblings.firstIndex(where: { $0.id == targetID }) else { return }
+        _ = (from, to)
+        guard let position = Reorder.position(siblings.map { ($0.id, $0.position) }, moving: taskID, onto: targetID) else { return }
+        await update(moving, fields: ["position": .string(position)]) { $0.position = position }
     }
 
     // MARK: Assistant suggestions and notes
@@ -221,14 +236,18 @@ final class HomeStore: ObservableObject {
         catch { rollback(); if app.session?.owner == owner { self.error = failure }; return false }
     }
 
-    func addTask(title: String, section: HSection, parent: HTask? = nil, isNote: Bool = false, quantity: Double? = nil) async {
-        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Adds a task. With `parseDates`, phrases like "מחר" or "25/1" set the due date and are removed from the title.
+    func addTask(title: String, section: HSection, parent: HTask? = nil, isNote: Bool = false, quantity: Double? = nil, parseDates: Bool = false) async {
+        var due: Date?
+        var clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if parseDates, !isNote, section.kind != "info" { let parsed = QuickAdd.parse(clean, calendar: { var c = Calendar(identifier: .gregorian); c.timeZone = timeZone; return c }()); clean = parsed.title; due = parsed.due }
         guard !clean.isEmpty, clean.count <= 500, let position = try? FractionalIndex.atEnd(tasks.filter { $0.sectionID == section.id && $0.parentID == parent?.id }.map(\.position).max()) else { return }
         let id = UUID().uuidString.lowercased()
         var fields: [String: JSONValue] = ["id": .string(id), "section_id": .string(section.id), "parent_task_id": parent.map { .string($0.id) } ?? .null, "position": .string(position), "title": .string(clean)]
         if let me = me { fields["created_by"] = .string(me.id) }
         if isNote { fields["is_note"] = .bool(true) }
         if let quantity { fields["quantity"] = .number(quantity) }
+        if let due { fields["due_at"] = .string(DateParsing.iso(due)) }
         let local = HTask(.object(fields).withDefaults)
         if let local { tasks.append(local) }
         _ = await run("לא הצלחנו להוסיף את המשימה.", rollback: { [weak self] in self?.tasks.removeAll { $0.id == id } }) { backend, owner in
@@ -281,6 +300,109 @@ final class HomeStore: ObservableObject {
         let ok = await run("לא הצלחנו להוסיף את המטלה.", rollback: {}) { backend, owner in _ = try await backend.householdInsert(table: "chores", owner: owner, fields: fields) }
         if ok { await refresh() }
     }
+    func update(_ chore: HChore, fields: [String: JSONValue], apply: (inout HChore) -> Void) async {
+        guard let index = chores.firstIndex(where: { $0.id == chore.id }) else { return }
+        let old = chores[index]; apply(&chores[index])
+        var payload = fields; if let me { payload["updated_by"] = .string(me.id) }
+        _ = await run("לא הצלחנו לשמור את המטלה.", rollback: { [weak self] in if let i = self?.chores.firstIndex(where: { $0.id == old.id }) { self?.chores[i] = old } }) { backend, owner in
+            _ = try await backend.householdUpdate(table: "chores", owner: owner, id: chore.id, fields: payload)
+        }
+    }
+    /// Sets (or clears, with nil) the single responsible member of a chore.
+    func setAssignee(_ chore: HChore, to memberID: String?) async {
+        guard let index = chores.firstIndex(where: { $0.id == chore.id }), chores[index].assigneeIDs != (memberID.map { [$0] } ?? []) else { return }
+        let old = chores[index]
+        chores[index].assigneeIDs = memberID.map { [$0] } ?? []; chores[index].assigneeKind = memberID == nil ? "anyone" : "member"
+        var fields: [String: JSONValue] = ["assignee_kind": .string(memberID == nil ? "anyone" : "member"), "assignee_member_ids": .array(memberID.map { [.string($0)] } ?? []), "assignee_member_id": memberID.map { .string($0) } ?? .null]
+        if let me { fields["updated_by"] = .string(me.id) }
+        _ = await run("לא הצלחנו לשנות את האחראי.", rollback: { [weak self] in if let i = self?.chores.firstIndex(where: { $0.id == old.id }) { self?.chores[i] = old } }) { backend, owner in
+            _ = try await backend.householdUpdate(table: "chores", owner: owner, id: chore.id, fields: fields)
+        }
+    }
+    /// Sets (or clears, with nil) the single responsible member of a task.
+    func setAssignee(_ task: HTask, to memberID: String?) async {
+        guard task.assigneeIDs != (memberID.map { [$0] } ?? []) else { return }
+        await update(task, fields: ["assignee_kind": .string(memberID == nil ? "unassigned" : "member"), "assignee_member_ids": .array(memberID.map { [.string($0)] } ?? []), "assignee_member_id": memberID.map { .string($0) } ?? .null]) {
+            $0.assigneeIDs = memberID.map { [$0] } ?? []; $0.assigneeKind = memberID == nil ? "unassigned" : "member"
+        }
+    }
+    func attachments(task: String? = nil, chore: String? = nil) -> [HAttachment] { attachments.filter { ($0.taskID != nil && $0.taskID == task) || ($0.choreID != nil && $0.choreID == chore) } }
+    /// Uploads a file and records it on a task or chore. Files over 25 MB are refused.
+    func addAttachment(data: Data, fileName: String, mimeType: String, taskID: String? = nil, choreID: String? = nil) async {
+        guard let parent = taskID ?? choreID, !data.isEmpty, data.count <= 25 * 1024 * 1024 else { error = "הקובץ גדול מדי (עד 25MB)."; return }
+        let id = UUID().uuidString.lowercased(), name = HAttachment.safeName(fileName), path = "\(parent.lowercased())/\(id)-\(name)"
+        var fields: [String: JSONValue] = ["id": .string(id), "storage_path": .string(path), "file_name": .string(name), "mime_type": .string(mimeType), "size_bytes": .number(Double(data.count)), "kind": .string(HAttachment.kind(forMime: mimeType))]
+        fields["task_id"] = taskID.map { .string($0) } ?? .null; fields["chore_id"] = choreID.map { .string($0) } ?? .null
+        if let me { fields["created_by"] = .string(me.id) }
+        var uploaded = false
+        let ok = await run("לא הצלחנו להעלות את הקובץ.", rollback: {}) { backend, owner in
+            try await backend.uploadAttachment(data, path: path, mimeType: mimeType, owner: owner); uploaded = true
+            do { _ = try await backend.householdInsert(table: "attachments", owner: owner, fields: fields) }
+            catch { try? await backend.deleteAttachment(id: id, path: path, owner: owner); throw error }
+        }
+        _ = uploaded
+        if ok, let row = HAttachment(.object(fields)) { attachments.append(row) }
+    }
+    func delete(_ attachment: HAttachment) async {
+        let old = attachments; attachments.removeAll { $0.id == attachment.id }
+        _ = await run("לא הצלחנו למחוק את הקובץ.", rollback: { [weak self] in self?.attachments = old }) { backend, owner in
+            try await backend.deleteAttachment(id: attachment.id, path: attachment.path, owner: owner)
+        }
+    }
+    func url(for attachment: HAttachment) async -> URL? {
+        guard let app, let owner = app.session?.owner, let backend = app.backend else { return nil }
+        return try? await backend.signedAttachmentURL(path: attachment.path, owner: owner)
+    }
+    /// Compares the open items of a shopping section across supermarket chains.
+    func comparePrices(for section: HSection) async -> PriceComparison.Result? {
+        let items = tasks(in: section.id).filter { $0.parentID == nil && !$0.isCompleted && !$0.isNote }.map { PriceComparison.Item(id: $0.id, title: $0.title, notes: $0.notes) }
+        guard !items.isEmpty else { return nil }
+        let excluded = PriceComparison.excludedChains(forSection: section.name)
+#if DEBUG
+        if app?.backend == nil, app?.session?.accessToken == "ui-test" { return try? await PriceComparison.compare(items, excluding: excluded, source: UITestFixtures.priceSource) }
+#endif
+        guard let app, let owner = app.session?.owner, let backend = app.backend else { return nil }
+        return try? await PriceComparison.compare(items, excluding: excluded, source: BackendPriceSource(backend: backend, owner: owner))
+    }
+    enum AddMemberResult { case added(HMember), pinTaken, failed }
+    /// Registers a new household member with a 4-digit PIN.
+    func addMember(name: String, pin: String, emoji: String, color: String) async -> AddMemberResult {
+#if DEBUG
+        if app?.backend == nil, app?.session?.accessToken == "ui-test" {
+            guard let m = HMember(.object(["id": .string(UUID().uuidString.lowercased()), "display_name": .string(name), "avatar_emoji": .string(emoji), "color": .string(color)])) else { return .failed }
+            members.append(m); return .added(m)
+        }
+#endif
+        guard let app, let owner = app.session?.owner, let backend = app.backend else { return .failed }
+        do {
+            let row = try await backend.registerMember(name: name, pin: pin, emoji: emoji, color: color, owner: owner)
+            guard app.session?.owner == owner, let m = HMember(row) else { return .failed }
+            members.append(m); members.sort { $0.name < $1.name }; return .added(m)
+        } catch BackendError.conflict { return .pinTaken } catch { return .failed }
+    }
+    /// Sends a message to the whole household (shows up in history and in the web app's notifications).
+    func sendBroadcast(_ text: String) async -> Bool {
+        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, clean.count <= 500 else { return false }
+        return await run("לא הצלחנו לשלוח את ההודעה.", rollback: {}) { backend, owner in try await backend.sendBroadcast(clean, actorID: me?.id, owner: owner) }
+    }
+    /// Saves the signed-in member's profile; an optional JPEG becomes the new profile photo.
+    @discardableResult
+    func saveProfile(name: String, emoji: String, color: String, photoJPEG: Data?, removePhoto: Bool) async -> Bool {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let me, !clean.isEmpty, clean.count <= 60, color.range(of: "^#[0-9a-fA-F]{6}$", options: .regularExpression) != nil, emoji.count <= 8 else { return false }
+        let old = members
+        var fields: [String: JSONValue] = ["display_name": .string(clean), "avatar_emoji": .string(emoji), "color": .string(color)]
+        if removePhoto && photoJPEG == nil { fields["avatar_photo_url"] = .null }
+        if let i = members.firstIndex(where: { $0.id == me.id }) { members[i].name = clean; members[i].emoji = emoji; members[i].color = color; if removePhoto && photoJPEG == nil { members[i].photoURL = nil } }
+        var uploaded: String?
+        let ok = await run("לא הצלחנו לשמור את הפרופיל.", rollback: { [weak self] in self?.members = old }) { backend, owner in
+            if let photoJPEG { uploaded = try await backend.uploadAvatar(photoJPEG, memberID: me.id, owner: owner); fields["avatar_photo_url"] = .string(uploaded!) }
+            try await backend.updateMemberProfile(id: me.id, owner: owner, fields: fields)
+        }
+        if ok, let uploaded, let i = members.firstIndex(where: { $0.id == me.id }) { members[i].photoURL = URL(string: uploaded) }
+        return ok
+    }
     func delete(_ chore: HChore) async {
         let old = chores; chores.removeAll { $0.id == chore.id }
         _ = await run("לא הצלחנו למחוק את המטלה.", rollback: { [weak self] in self?.chores = old }) { backend, owner in
@@ -319,4 +441,13 @@ private extension JSONValue {
         f["is_completed"] = f["is_completed"] ?? .bool(false); f["assignee_kind"] = f["assignee_kind"] ?? .string("unassigned")
         return .object(f)
     }
+}
+
+/// Price data for the comparison: exact barcode lookups and trigram title search on `barcode_products`.
+struct BackendPriceSource: PriceComparison.Source {
+    let backend: Backend, owner: String
+    func product(barcode: String) async throws -> PriceComparison.Product? {
+        try await backend.householdRows(table: "barcode_products", owner: owner, filters: [.init(name: "barcode", value: "eq.\(barcode)")], limit: 1, singlePage: true).first.flatMap(PriceComparison.Product.init)
+    }
+    func search(_ query: String) async throws -> [PriceComparison.Product] { try await backend.searchBarcodeProducts(query, owner: owner) }
 }

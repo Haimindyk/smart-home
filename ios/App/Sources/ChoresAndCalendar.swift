@@ -7,6 +7,7 @@ struct ChorePanelBody: View {
     @EnvironmentObject private var home: HomeStore
     let section: HSection
     @State private var confirmDelete: HChore?
+    @State private var editing: HChore?
     @State private var draft = ""
     private func status(_ chore: HChore) -> (text: String, color: Color) {
         guard let due = chore.nextDue else { return ("", Color.wellnessSecondary) }
@@ -36,15 +37,19 @@ struct ChorePanelBody: View {
                 let s = status(chore)
                 HStack(spacing: 12) {
                     Text(chore.emoji ?? "🧹").font(.system(size: 22)).frame(width: 46, height: 46).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(chore.title).font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessInk).multilineTextAlignment(.leading)
-                        HStack(spacing: 8) { Text(s.text).font(.hb(.caption, .semibold)).foregroundStyle(s.color); Text(repeatText(chore)).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }
-                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    Button { editing = chore } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(chore.title).font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessInk).multilineTextAlignment(.leading)
+                            HStack(spacing: 8) { Text(s.text).font(.hb(.caption, .semibold)).foregroundStyle(s.color); Text(repeatText(chore)).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }
+                        }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                    }.buttonStyle(.plain).accessibilityIdentifier("chore-open-\(chore.id)")
                     Button { Task { await home.complete(chore) } } label: { Label("בוצע", systemImage: "checkmark").font(.hb(.subheadline, .semibold)).padding(.horizontal, 14).frame(minHeight: 44).foregroundStyle(Color.wellnessOnPrimary).background(Color.wellnessPrimary, in: Capsule()) }
                         .buttonStyle(PressableStyle()).sensoryFeedback(.success, trigger: chore.nextDue).accessibilityLabel("סמן \(chore.title) כבוצע").accessibilityIdentifier("chore-complete-\(chore.id)")
+                    AssigneeButton(currentID: chore.assigneeIDs.first, size: 34) { id in Task { await home.setAssignee(chore, to: id) } }.accessibilityIdentifier("chore-assignee-\(chore.id)")
                 }.padding(10).swipeToDelete { confirmDelete = chore }
             }
         }
+        .sheet(item: $editing) { ChoreEditorSheet(chore: $0).environmentObject(home) }
         .confirmationDialog("למחוק את המטלה?", isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }), titleVisibility: .visible) {
             Button("מחיקה", role: .destructive) { if let c = confirmDelete { Task { await home.delete(c) } }; confirmDelete = nil }
         }
@@ -100,9 +105,11 @@ struct QuickAddSheet: View {
 
 struct CalendarScreen: View {
     @EnvironmentObject private var home: HomeStore
+    @EnvironmentObject private var store: AppStore
     @State private var month = Date()
     @State private var selected: Date?
     @State private var editing: HEvent?
+    @State private var subscribing = false
     private var cal: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = home.timeZone; c.firstWeekday = 1; c.locale = Locale(identifier: "he_IL"); return c }
     private struct Occurrence: Identifiable { let event: HEvent; let date: Date; var id: String { event.id + "\(date.timeIntervalSince1970)" } }
     private var monthStart: Date { cal.date(from: cal.dateComponents([.year, .month], from: month)) ?? month }
@@ -121,6 +128,7 @@ struct CalendarScreen: View {
                     HStack {
                         Text(monthStart, format: .dateTime.month(.wide).year()).font(.hb(.title, .bold))
                         Spacer()
+                        Button { subscribing = true } label: { Image(systemName: "calendar.badge.plus").frame(width: 44, height: 44).background(Color.wellnessCard, in: Circle()) }.accessibilityLabel("הוספה ליומן שלי").accessibilityIdentifier("calendar-subscribe")
                         Button { step(-1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44).background(Color.wellnessCard, in: Circle()) }.accessibilityLabel("חודש קודם")
                         Button { step(1) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44).background(Color.wellnessCard, in: Circle()) }.accessibilityLabel("חודש הבא")
                     }.foregroundStyle(Color.wellnessInk)
@@ -132,6 +140,7 @@ struct CalendarScreen: View {
                     }
                 }.padding(20).padding(.bottom, 90)
             }.wellnessScreen().toolbar(.hidden, for: .navigationBar).refreshable { await home.refresh() }
+            .sheet(isPresented: $subscribing) { SubscribeCalendarSheet().environmentObject(store) }
             .sheet(item: $editing) { EventEditorSheet(event: $0).environmentObject(home).presentationDragIndicator(.visible) }
         }
     }
@@ -204,6 +213,117 @@ struct EventEditorSheet: View {
                 guard let event else { return }
                 title = event.title; kind = event.kind; yearly = event.recurrence == "yearly"; notes = event.notes ?? ""; date = DateParsing.day(event.eventDate, zone: home.timeZone) ?? Date()
             }
+        }
+    }
+}
+
+/// Full chore editor (the web app's chore sheet): title, emoji, notes, frequency, weekdays, assignees.
+struct ChoreEditorSheet: View {
+    @EnvironmentObject private var home: HomeStore
+    @Environment(\.dismiss) private var dismiss
+    let chore: HChore
+    @State private var title = ""
+    @State private var emoji = ""
+    @State private var notes = ""
+    @State private var freq = "weekly"
+    @State private var interval = 1
+    @State private var weekdays: Set<Int> = []
+    @State private var anyone = true
+    @State private var assignees: Set<String> = []
+    @State private var confirmDelete = false
+    private static let dayNames = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"]
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    HStack(spacing: 10) {
+                        TextField("🧹", text: $emoji).multilineTextAlignment(.center).frame(width: 54).onChange(of: emoji) { _, v in if v.count > 4 { emoji = String(v.prefix(4)) } }
+                        TextField("שם המטלה", text: $title).font(.hb(.headline, .semibold)).accessibilityIdentifier("chore-title")
+                    }
+                    TextField("הערות", text: $notes, axis: .vertical).lineLimit(1...5)
+                }
+                Section("תדירות") {
+                    Picker("תדירות", selection: $freq) { Text("יומי").tag("daily"); Text("שבועי").tag("weekly"); Text("חודשי").tag("monthly"); Text("לפי הצורך").tag("as_needed") }.pickerStyle(.segmented)
+                    if freq != "as_needed" { Stepper(value: $interval, in: 1...60) { Text("כל \(interval) \(unit)").font(.hb(.body)) } }
+                    if freq == "weekly" {
+                        HStack(spacing: 6) {
+                            ForEach(0..<7, id: \.self) { d in
+                                Button { if weekdays.contains(d) { weekdays.remove(d) } else { weekdays.insert(d) } } label: {
+                                    Text(Self.dayNames[d]).font(.hb(.subheadline, .semibold)).frame(maxWidth: .infinity, minHeight: 40)
+                                        .foregroundStyle(weekdays.contains(d) ? Color.wellnessOnPrimary : Color.wellnessInk)
+                                        .background(weekdays.contains(d) ? Color.wellnessPrimary : Color.wellnessChip, in: Capsule())
+                                }.buttonStyle(.plain).accessibilityAddTraits(weekdays.contains(d) ? [.isSelected] : [])
+                            }
+                        }.padding(.vertical, 4)
+                    }
+                }
+                Section("מי אחראי") {
+                    Picker("אחראי", selection: $anyone) { Text("כל אחד").tag(true); Text("אנשים מסוימים").tag(false) }.pickerStyle(.segmented)
+                    if !anyone {
+                        ForEach(home.members) { m in
+                            Button { if assignees.contains(m.id) { assignees.remove(m.id) } else { assignees.insert(m.id) } } label: {
+                                HStack(spacing: 12) { MemberAvatar(member: m, size: 32); Text(m.name).foregroundStyle(Color.wellnessInk); Spacer(); if assignees.contains(m.id) { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.wellnessInk) } }.frame(minHeight: 44)
+                            }.accessibilityAddTraits(assignees.contains(m.id) ? [.isSelected] : [])
+                        }
+                    }
+                }
+                AttachmentsSection(choreID: chore.id)
+                Section { Button("מחיקה", role: .destructive) { confirmDelete = true }.frame(maxWidth: .infinity) }
+            }
+            .wellnessList().navigationTitle("עריכת מטלה").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("ביטול") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("שמירה") { Task { await save(); dismiss() } }.disabled(title.trimmingCharacters(in: .whitespaces).isEmpty).accessibilityIdentifier("chore-save") }
+            }
+            .onAppear { title = chore.title; emoji = chore.emoji ?? ""; notes = chore.notes ?? ""; freq = chore.freq; interval = max(1, chore.intervalN); weekdays = Set(chore.weekdays)
+                anyone = chore.assigneeIDs.isEmpty; assignees = Set(chore.assigneeIDs) }
+            .confirmationDialog("למחוק את המטלה?", isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button("מחיקה", role: .destructive) { Task { await home.delete(chore); dismiss() } }
+            }
+        }
+    }
+    private var unit: String { freq == "daily" ? "ימים" : freq == "weekly" ? "שבועות" : "חודשים" }
+    private func save() async {
+        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, clean.count <= 300 else { return }
+        let ids = home.members.map(\.id).filter { assignees.contains($0) && !anyone }
+        let days = freq == "weekly" ? weekdays.sorted() : []
+        let fields: [String: JSONValue] = [
+            "title": .string(clean), "emoji": emoji.isEmpty ? .null : .string(emoji), "notes": notes.isEmpty ? .null : .string(String(notes.prefix(2000))),
+            "freq": .string(freq), "interval_n": .number(Double(interval)), "weekdays": days.isEmpty ? .null : .array(days.map { .number(Double($0)) }),
+            "assignee_kind": .string(ids.isEmpty ? "anyone" : "member"), "assignee_member_ids": .array(ids.map { .string($0) }), "assignee_member_id": ids.first.map { .string($0) } ?? .null]
+        await home.update(chore, fields: fields) { c in
+            c.title = clean; c.emoji = emoji.isEmpty ? nil : emoji; c.notes = notes.isEmpty ? nil : notes; c.freq = freq; c.intervalN = interval; c.weekdays = days
+            c.assigneeIDs = ids; c.assigneeKind = ids.isEmpty ? "anyone" : "member"
+        }
+    }
+}
+
+/// How to subscribe to the family calendar from Apple/Google Calendar (the web app's subscribe dialog).
+struct SubscribeCalendarSheet: View {
+    @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+    @State private var copied = false
+    private var feed: URL? { store.backend?.calendarFeedURL }
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    if let feed {
+                        Button { if var c = URLComponents(url: feed, resolvingAgainstBaseURL: false) { c.scheme = "webcal"; if let url = c.url { openURL(url) } } } label: { Label("פתיחה ביומן", systemImage: "calendar.badge.plus").font(.hb(.headline, .semibold)) }.accessibilityIdentifier("calendar-open")
+                        HStack {
+                            Text(feed.absoluteString).font(.footnote.monospaced()).foregroundStyle(Color.wellnessSecondary).lineLimit(2).environment(\.layoutDirection, .leftToRight).textSelection(.enabled)
+                            Spacer(minLength: 8)
+                            Button { UIPasteboard.general.string = feed.absoluteString; copied = true } label: { Image(systemName: copied ? "checkmark" : "doc.on.doc").frame(width: 44, height: 44) }.buttonStyle(.plain).accessibilityLabel("העתקת קישור היומן")
+                        }
+                    } else { Text("הקישור ליומן אינו זמין כרגע.").foregroundStyle(Color.wellnessSecondary) }
+                } footer: { Text("בטלפון זה פותח את אפליקציית היומן ומציע להוסיף את הלוח כמנוי. אם לא קרה כלום, השתמשו בקישור.") }
+                Section("יומן Apple (iPhone / Mac)") { Text("הגדרות ← יומן ← חשבונות ← הוספת חשבון ← אחר ← \"הוספת יומן מנוי\" ← הדביקו את הקישור.").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary) }
+                Section("Google Calendar (במחשב)") { Text("היכנסו ל-calendar.google.com ← ליד \"יומנים אחרים\" לחצו על + ← \"לפי כתובת URL\" ← הדביקו את הקישור שהעתקתם.").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary) }
+            }
+            .wellnessList().navigationTitle("הוספה ליומן שלי").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("סגור") { dismiss() } } }
         }
     }
 }

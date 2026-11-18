@@ -263,6 +263,126 @@ final class WellnessUITests: XCTestCase {
         confirm.tap()
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: confirm); waitForExpectations(timeout: 5)
     }
+    func testTappingAvatarOpensMemberDropdownAndChangesAssignee() {
+        let app = launch("home")
+        let assignee = app.buttons["task-assignee-b0000000-0000-4000-8000-000000000002"]
+        XCTAssertTrue(assignee.waitForExistence(timeout: 15))
+        var scrolls = 0
+        while (assignee.frame.minY > app.frame.height * 0.6 || assignee.frame.minY < app.frame.height * 0.28) && scrolls < 10 {
+            let down = assignee.frame.minY > app.frame.height * 0.6
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: down ? 0.7 : 0.4))
+            let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: down ? 0.5 : 0.6))
+            from.press(forDuration: 0.1, thenDragTo: to); scrolls += 1
+        }
+        dismissSystemAlerts(for: app)
+        assignee.tap()
+        let noa = app.descendants(matching: .any)["assignee-option-22222222-2222-4222-8222-222222222221"]
+        let found = noa.waitForExistence(timeout: 5)
+        capture(app, name: "native-assignee-dropdown")
+        XCTAssertTrue(found, "Dropdown should list household members")
+        noa.tap()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: noa); waitForExpectations(timeout: 5)
+    }
+    func testProfileEditorEditsNameAndSaves() {
+        let app = launch("home")
+        XCTAssertTrue(app.buttons["home-account"].waitForExistence(timeout: 15)); app.buttons["home-account"].tap()
+        let item = app.buttons["הפרופיל שלי"]
+        XCTAssertTrue(item.waitForExistence(timeout: 5)); item.tap()
+        let field = app.textFields["profile-name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        capture(app, name: "native-profile-editor")
+        field.tap(); field.typeText("X")
+        app.buttons["profile-save"].tap()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: field); waitForExpectations(timeout: 8)
+    }
+    func testChoreEditorOpensAndSaves() {
+        let app = launch("home")
+        let chip = app.buttons["section-a0000000-0000-4000-8000-000000000003"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 15)); chip.tap()
+        let open = app.buttons["chore-open-c0000000-0000-4000-8000-000000000001"]
+        XCTAssertTrue(open.waitForExistence(timeout: 8))
+        var scrolls = 0
+        while !open.isHittable && scrolls < 6 { app.swipeUp(); scrolls += 1 }
+        open.tap()
+        let field = app.textFields["chore-title"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8), "Chore editor opens")
+        capture(app, name: "native-chore-editor")
+        field.tap(); field.typeText("X")
+        app.buttons["chore-save"].tap()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: field); waitForExpectations(timeout: 8)
+    }
+    func testPriceComparisonShowsCheapestChain() {
+        let app = launch("home")
+        app.buttons["section-a0000000-0000-4000-8000-000000000002"].tap()
+        let compare = app.buttons["compare-prices"]
+        XCTAssertTrue(compare.waitForExistence(timeout: 10))
+        var scrolls = 0
+        while !compare.isHittable && scrolls < 6 { app.swipeUp(); scrolls += 1 }
+        compare.tap()
+        let rami = app.buttons["price-chain-rami_levy"]
+        XCTAssertTrue(rami.waitForExistence(timeout: 10), "Chains are listed with totals")
+        capture(app, name: "native-price-comparison")
+    }
+    func testAddingMemberShowsInvitationWithPin() {
+        let app = launch("home")
+        XCTAssertTrue(app.buttons["home-menu"].waitForExistence(timeout: 15)); app.buttons["home-menu"].tap()
+        app.buttons["בני הבית"].tap()
+        let add = app.buttons["add-member"]
+        XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let name = app.textFields["member-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("Dana")
+        let pin = app.secureTextFields["member-pin"]
+        XCTAssertTrue(pin.waitForExistence(timeout: 5)); pin.tap(); pin.typeText("4821")
+        let save = app.buttons["member-save"]
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: save); waitForExpectations(timeout: 8)
+        save.tap()
+        let shown = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "4821")).firstMatch.waitForExistence(timeout: 12)
+        capture(app, name: "native-member-added")
+        XCTAssertTrue(shown, "The new member's PIN is shown for sharing")
+        capture(app, name: "native-member-added")
+    }
+    func testFoodLibraryListsRecipesAndOpensEditor() {
+        let app = launch("meal")
+        XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 15)); app.buttons["settings-button"].tap()
+        let library = app.buttons["food-library"]
+        var tries = 0
+        while !library.exists && tries < 4 { app.swipeUp(); tries += 1 }
+        XCTAssertTrue(library.waitForExistence(timeout: 5)); library.tap()
+        let recipe = app.buttons["recipe-55555555-5555-4555-8555-555555555555"]
+        XCTAssertTrue(recipe.waitForExistence(timeout: 8), "Saved recipes are listed")
+        capture(app, name: "native-food-library")
+        recipe.tap()
+        XCTAssertTrue(app.textFields["recipe-name"].waitForExistence(timeout: 5), "Recipe editor opens")
+    }
+    func testProfileAndTargetsJourneyCalculatesAGoal() {
+        let app = launch("meal")
+        XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 15)); app.buttons["settings-button"].tap()
+        let entry = app.buttons["profile-goals"]
+        var tries = 0
+        while !entry.exists && tries < 4 { app.swipeUp(); tries += 1 }
+        XCTAssertTrue(entry.waitForExistence(timeout: 5)); entry.tap()
+        XCTAssertTrue(app.buttons["choice-lose"].waitForExistence(timeout: 8)); app.buttons["choice-lose"].tap()
+        app.buttons["profile-goals-next"].tap()
+        let height = app.textFields["profile-height"]
+        XCTAssertTrue(height.waitForExistence(timeout: 5)); height.tap(); height.typeText("180")
+        let weight = app.textFields["profile-weight"]; weight.tap(); weight.typeText("80")
+        app.buttons["choice-male"].tap()
+        capture(app, name: "native-profile-journey")
+    }
+    func testManualFoodEntryLeadsToPortionPicker() {
+        let app = launch("meal")
+        XCTAssertTrue(app.buttons["add-meal"].waitForExistence(timeout: 15)); app.buttons["add-meal"].tap()
+        let manual = app.buttons["manual-food"]
+        XCTAssertTrue(manual.waitForExistence(timeout: 8)); manual.tap()
+        let name = app.textFields["manual-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("Bread")
+        let fields = app.textFields.matching(NSPredicate(format: "placeholderValue == %@", "0"))
+        XCTAssertGreaterThanOrEqual(fields.count, 4)
+        for (i, value) in ["250", "9", "45", "3"].enumerated() { let f = fields.element(boundBy: i); f.tap(); f.typeText(value) }
+        app.buttons["manual-continue"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Bread")).firstMatch.waitForExistence(timeout: 10), "The portion picker opens for the manual food")
+        capture(app, name: "native-manual-food-portion")
+    }
     func testHomeWellnessCardOpensHealth() {
         let app = launch("home")
         let card = app.buttons["wellness-entry"]

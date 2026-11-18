@@ -243,6 +243,77 @@ final class BackendTests: XCTestCase {
         do { _ = try await api.uploadImage(Data([1, 2, 3]), owner: owner); XCTFail("must reject non-JPEG") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
         do { _ = try await api.uploadImage(Data(), owner: owner); XCTFail("must reject empty") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
     }
+    func testRegisterMemberValidatesPinAndMapsDuplicatePin() async throws {
+        let owner = owner
+        var pinTaken = false
+        let api = try await signedInBackend { request in
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            if request.url!.path == "/functions/v1/health-account" { return pinTaken ? (400, "{\"error\":\"pin_taken\"}") : (200, "{\"member\":{\"id\":\"m1\",\"display_name\":\"נועה\"}}") }
+            return (200, "{}")
+        }
+        let member = try await api.registerMember(name: " נועה ", pin: "1234", emoji: "🙂", color: "#6366f1", owner: owner)
+        XCTAssertEqual(member["id"].stringValue, "m1")
+        for bad in ["123", "12a4", "12345", ""] { do { _ = try await api.registerMember(name: "x", pin: bad, emoji: "🙂", color: "#6366f1", owner: owner); XCTFail("pin \(bad) must be rejected") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) } }
+        pinTaken = true
+        do { _ = try await api.registerMember(name: "x", pin: "1234", emoji: "🙂", color: "#6366f1", owner: owner); XCTFail("duplicate pin") } catch { XCTAssertEqual(error as? BackendError, .conflict) }
+    }
+    func testBroadcastPostsAnActivityRowAndRejectsEmptyText() async throws {
+        let owner = owner
+        var seen: [String] = []
+        let lock = NSLock()
+        let api = try await signedInBackend { request in
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            lock.lock(); seen.append("\(request.httpMethod ?? "") \(request.url!.path)"); lock.unlock()
+            return (201, "")
+        }
+        try await api.sendBroadcast("  שלום לכולם  ", actorID: "22222222-2222-4222-8222-222222222222", owner: owner)
+        XCTAssertTrue(seen.contains("POST /rest/v1/activity_log"))
+        do { try await api.sendBroadcast("   ", actorID: nil, owner: owner); XCTFail("empty") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+        do { try await api.sendBroadcast("x", actorID: "not-a-uuid", owner: owner); XCTFail("bad actor") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+    }
+    func testCalendarFeedURLUsesFunctionsHost() async throws {
+        let owner = owner
+        let api = try await signedInBackend { request in request.url!.path == "/auth/v1/user" ? (200, "{\"id\":\"\(owner)\"}") : (200, "{}") }
+        if let url = api.calendarFeedURL { XCTAssertTrue(url.absoluteString.hasSuffix(".functions.supabase.co/calendar-feed") && url.scheme == "https") }
+    }
+    func testMemberProfileUpdateAndAvatarUploadAreGuarded() async throws {
+        let owner = owner
+        var seen: [String] = []
+        let lock = NSLock()
+        let api = try await signedInBackend { request in
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            lock.lock(); seen.append("\(request.httpMethod ?? "") \(request.url!.path)?\(request.url!.query ?? "")"); lock.unlock()
+            return (200, "{}")
+        }
+        let id = "22222222-2222-4222-8222-222222222222"
+        try await api.updateMemberProfile(id: id, owner: owner, fields: ["display_name": .string("חיים"), "color": .string("#E8A02E")])
+        XCTAssertTrue(seen.contains { $0.hasPrefix("PATCH /rest/v1/members?id=eq.\(id)") })
+        do { try await api.updateMemberProfile(id: id, owner: owner, fields: ["pin": .string("1234")]); XCTFail("pin must not be writable") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+        let url = try await api.uploadAvatar(Data([0xFF, 0xD8, 0xFF, 0x00]), memberID: id, owner: owner)
+        XCTAssertTrue(url.contains("/storage/v1/object/public/avatars/\(id)/") && url.hasPrefix("https://"))
+        do { _ = try await api.uploadAvatar(Data([1, 2, 3]), memberID: id, owner: owner); XCTFail("non-JPEG must be rejected") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+    }
+    func testAttachmentsAreUploadedSignedAndDeletedWithGuards() async throws {
+        let owner = owner
+        var seen: [String] = []
+        let lock = NSLock()
+        let api = try await signedInBackend { request in
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            lock.lock(); seen.append("\(request.httpMethod ?? "") \(request.url!.path)?\(request.url!.query ?? "")"); lock.unlock()
+            if request.url!.path.contains("/object/sign/") { return (200, "{\"signedURL\":\"/object/sign/attachments/p/x.pdf?token=t\"}") }
+            return (200, "{}")
+        }
+        let parent = "22222222-2222-4222-8222-222222222222"
+        try await api.uploadAttachment(Data([1, 2]), path: "\(parent)/abc-חשבון.pdf", mimeType: "application/pdf", owner: owner)
+        XCTAssertTrue(seen.contains { $0.hasPrefix("POST /storage/v1/object/attachments/\(parent)/") })
+        for bad in ["../x/y.pdf", "a/b/c.pdf", "/abs/x.pdf", "\(parent)/x?.pdf", "noslash.pdf"] {
+            do { try await api.uploadAttachment(Data([1]), path: bad, mimeType: "image/png", owner: owner); XCTFail("\(bad) must be rejected") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+        }
+        let url = try await api.signedAttachmentURL(path: "\(parent)/x.pdf", owner: owner)
+        XCTAssertEqual(url.scheme, "https"); XCTAssertTrue(url.path.contains("/storage/v1/object/sign/attachments/"))
+        try await api.deleteAttachment(id: parent, path: "\(parent)/x.pdf", owner: owner)
+        XCTAssertTrue(seen.contains { $0.hasPrefix("DELETE /storage/v1/object/attachments/") } && seen.contains { $0.hasPrefix("DELETE /rest/v1/attachments?id=eq.") })
+    }
     func testHouseholdAccessIsAllowListedPagedAndGuarded() async throws {
         let owner = owner
         var seen: [String] = []

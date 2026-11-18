@@ -6,9 +6,52 @@ struct MemberAvatar: View {
     var size: CGFloat = 36
     var body: some View {
         let tint = Color(hex: member?.color ?? "#888888")
-        Text(member?.emoji ?? String(member?.name.prefix(1) ?? "?")).font(.system(size: size * 0.5))
-            .frame(width: size, height: size).background(tint.opacity(0.22), in: Circle()).overlay(Circle().strokeBorder(tint.opacity(0.5), lineWidth: 1.5))
-            .accessibilityLabel(member?.name ?? "")
+        ZStack {
+            Text(member?.emoji ?? String(member?.name.prefix(1) ?? "?")).font(.system(size: size * 0.5))
+            if let url = member?.photoURL {
+                AsyncImage(url: url) { phase in
+                    if case .success(let image) = phase { image.resizable().scaledToFill() } else { Color.clear }
+                }
+            }
+        }
+        .frame(width: size, height: size).background(tint.opacity(0.22), in: Circle()).clipShape(Circle())
+        .overlay(Circle().strokeBorder(tint.opacity(0.5), lineWidth: 1.5))
+        .accessibilityLabel(member?.name ?? "")
+    }
+}
+
+/// Avatar button that opens a dropdown list of household members (photo + name) to choose who is responsible.
+struct AssigneeButton: View {
+    @EnvironmentObject private var home: HomeStore
+    let currentID: String?
+    var size: CGFloat = 36
+    let onPick: (String?) -> Void
+    @State private var open = false
+    var body: some View {
+        Button { open = true } label: {
+            Group {
+                if let m = home.member(currentID) { MemberAvatar(member: m, size: size) }
+                else { Image(systemName: "person.badge.plus").font(.system(size: size * 0.42, weight: .semibold)).foregroundStyle(Color.wellnessSecondary).frame(width: size, height: size).background(Color.wellnessChip, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))) }
+            }.frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle()).accessibilityLabel(home.member(currentID).map { "אחראי: \($0.name). לחיצה לשינוי" } ?? "הגדרת אחראי")
+        .popover(isPresented: $open) {
+            VStack(spacing: 0) {
+                ForEach(home.members) { m in row(m.id, name: m.name, member: m) }
+                Divider()
+                row(nil, name: "ללא אחראי", member: nil)
+            }.padding(.vertical, 6).frame(minWidth: 240).presentationCompactAdaptation(.popover)
+        }
+    }
+    private func row(_ id: String?, name: String, member: HMember?) -> some View {
+        Button { open = false; onPick(id) } label: {
+            HStack(spacing: 12) {
+                if let member { MemberAvatar(member: member, size: 34) } else { Image(systemName: "person.slash").frame(width: 34, height: 34).foregroundStyle(Color.wellnessSecondary) }
+                Text(name).font(.hb(.body)).foregroundStyle(Color.wellnessInk)
+                Spacer(minLength: 16)
+                if id == currentID { Image(systemName: "checkmark").font(.footnote.weight(.bold)).foregroundStyle(Color.wellnessInk) }
+            }.padding(.horizontal, 16).frame(minHeight: 48).contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityIdentifier("assignee-option-\(id ?? "none")")
     }
 }
 extension Color {
@@ -40,6 +83,9 @@ struct HomeScreen: View {
     @EnvironmentObject private var home: HomeStore
     @State private var showSettings = false
     @State private var showAssistant = false
+    @State private var showProfile = false
+    @State private var broadcasting = false
+    @State private var broadcastText = ""
     @State private var sheet: HomeSheet?
     @State private var jumping = false
     private var greeting: String {
@@ -69,6 +115,12 @@ struct HomeScreen: View {
             }
             .wellnessScreen().toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
+            .alert("הודעה לכל הבית", isPresented: $broadcasting) {
+                TextField("מה לכתוב?", text: $broadcastText)
+                Button("שליחה") { let text = broadcastText; broadcastText = ""; Task { _ = await home.sendBroadcast(text) } }
+                Button("ביטול", role: .cancel) { broadcastText = "" }
+            } message: { Text("ההודעה תופיע בהיסטוריה ותישלח כהתראה לבני הבית.") }
+            .sheet(isPresented: $showProfile) { ProfileEditorSheet().environmentObject(home) }
             .sheet(isPresented: $showAssistant) { AssistantSheet().environmentObject(store).environmentObject(home) }
             .sheet(item: $sheet) { which in
                 switch which {
@@ -134,7 +186,9 @@ struct HomeScreen: View {
                 Text("הבית").font(.hb(.title3, .bold)).padding(.leading, 6)
                 Spacer()
                 Menu {
+                    Button { showProfile = true } label: { Label("הפרופיל שלי", systemImage: "person.crop.circle") }
                     Button { sheet = .members } label: { Label("בני הבית", systemImage: "person.2") }
+                    Button { broadcasting = true } label: { Label("הודעה לכל הבית", systemImage: "megaphone") }
                     Button { showSettings = true } label: { Label("הגדרות", systemImage: "gearshape") }
                 } label: {
                     HStack(spacing: 4) { MemberAvatar(member: home.me, size: 32); Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Color.wellnessSecondary) }
@@ -197,6 +251,7 @@ struct SectionPanel: View {
     @EnvironmentObject private var home: HomeStore
     let section: HSection
     @State private var scanning = false
+    @State private var comparing = false
     @State private var scanned: String?
     @State private var lookingUp = false
     @State private var unknownCode: String?
@@ -239,6 +294,7 @@ struct SectionPanel: View {
         .overlay(alignment: .top) { UnevenRoundedRectangle(topLeadingRadius: 30, topTrailingRadius: 30, style: .continuous).fill(section.kindColor).frame(height: 6) }
         .background(GeometryReader { geo in Color.clear.preference(key: PanelOffsetKey.self, value: [section.id: geo.frame(in: .named("home-scroll")).minY]) })
         .accessibilityElement(children: .contain).accessibilityLabel(section.name)
+        .sheet(isPresented: $comparing) { PriceComparisonSheet(section: section).environmentObject(home) }
         .fullScreenCover(isPresented: $scanning) {
             ZStack(alignment: .topLeading) {
                 BarcodeScanner { code in scanning = false; Task { await handle(code) } }.ignoresSafeArea()
@@ -274,6 +330,8 @@ struct SectionPanel: View {
                 .buttonStyle(PressableStyle()).accessibilityIdentifier("scan-barcode")
             ShareLink(item: home.shareText(for: section)) { Label("שיתוף הרשימה", systemImage: "square.and.arrow.up").font(.hb(.footnote, .semibold)).padding(.horizontal, 14).frame(minHeight: 40).foregroundStyle(Color.wellnessInk).background(Color.wellnessChip, in: Capsule()) }
                 .accessibilityIdentifier("share-list")
+            Button { comparing = true } label: { Label("השוואת מחירים", systemImage: "chart.line.downtrend.xyaxis").font(.hb(.footnote, .semibold)).padding(.horizontal, 14).frame(minHeight: 40).foregroundStyle(Color.wellnessInk).background(Color.wellnessChip, in: Capsule()) }
+                .buttonStyle(PressableStyle()).accessibilityIdentifier("compare-prices")
             Spacer(minLength: 0)
         }
     }
@@ -332,7 +390,7 @@ struct TaskPanelBody: View {
             HStack(spacing: 10) {
                 Image(systemName: "plus").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.wellnessSecondary)
                 TextField(section.kind == "shopping" ? "מה צריך לקנות?" : notesStyle ? "הערה חדשה…" : "משימה חדשה…", text: $draft).submitLabel(.done)
-                    .onSubmit { let text = draft; draft = ""; Task { await home.addTask(title: text, section: section, isNote: notesStyle) } }
+                    .onSubmit { let text = draft; draft = ""; Task { await home.addTask(title: text, section: section, isNote: notesStyle, parseDates: true) } }
                     .accessibilityIdentifier("quick-add-field-\(section.id)")
             }.padding(.horizontal, 14).frame(minHeight: 46).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             if open.isEmpty && done.isEmpty {
@@ -357,6 +415,7 @@ struct TaskPanelBody: View {
         TaskRow(task: task, depth: depth, notesStyle: notesStyle) { editing = task }
             .padding(.leading, CGFloat(depth) * 22)
             .swipeToDelete { Task { await home.delete(task) } }
+            .modifier(ReorderDrag(task: task, enabled: depth == 0 && !notesStyle && !task.isCompleted))
             .contextMenu {
                 if !notesStyle { Button { Task { await home.toggle(task) } } label: { Label(task.isCompleted ? "בטל סימון" : "סמן כבוצע", systemImage: "checkmark.circle") } }
                 Button { editing = task } label: { Label("עריכה", systemImage: "pencil") }
@@ -366,6 +425,22 @@ struct TaskPanelBody: View {
                 }
                 Button(role: .destructive) { Task { await home.delete(task) } } label: { Label("מחיקה", systemImage: "trash") }
             }
+    }
+}
+
+/// Long-press and drag a task onto another to reorder the list (the web app's drag handles).
+private struct ReorderDrag: ViewModifier {
+    @EnvironmentObject private var home: HomeStore
+    let task: HTask
+    let enabled: Bool
+    func body(content: Content) -> some View {
+        if enabled {
+            content.draggable(task.id) { Text(task.title).font(.hb(.body)).padding(10).background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 12, style: .continuous)) }
+                .dropDestination(for: String.self) { ids, _ in
+                    guard let id = ids.first else { return false }
+                    Task { await home.reorder(id, onto: task.id) }; return true
+                }
+        } else { content }
     }
 }
 
@@ -393,16 +468,18 @@ struct TaskRow: View {
                     meta
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, notesStyle ? 10 : 8).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityIdentifier("task-open-\(task.id)")
+            if !notesStyle || !task.assigneeIDs.isEmpty {
+                AssigneeButton(currentID: task.assigneeIDs.first, size: 34) { id in Task { await home.setAssignee(task, to: id) } }.accessibilityIdentifier("task-assignee-\(task.id)")
+            }
         }
         .padding(.horizontal, notesStyle ? 14 : 4).background(notesStyle ? Color.wellnessCard : Color.clear, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(notesStyle ? Color.wellnessHairline : .clear))
     }
     @ViewBuilder private var meta: some View {
         let parts = chips
-        if !parts.isEmpty || !task.assigneeIDs.isEmpty {
+        if !parts.isEmpty {
             HStack(spacing: 6) {
                 ForEach(parts, id: \.text) { chip in Label(chip.text, systemImage: chip.icon).font(.hb(.caption, .medium)).padding(.horizontal, 8).padding(.vertical, 4).foregroundStyle(chip.color).background(chip.color.opacity(0.13), in: Capsule()) }
-                ForEach(task.assigneeIDs.prefix(3), id: \.self) { MemberAvatar(member: home.member($0), size: 22) }
             }
         }
     }
@@ -467,6 +544,7 @@ struct TaskEditorSheet: View {
                 if section.kind == "shopping" {
                     Section("כמות") { HStack { TextField("כמות", text: $quantity).keyboardType(.decimalPad); TextField("יחידה (ק״ג, יח׳…)", text: $unit) } }
                 }
+                AttachmentsSection(taskID: task.id)
                 Section { Button("מחיקה", role: .destructive) { confirmDelete = true }.frame(maxWidth: .infinity) }
             }
             .wellnessList().navigationTitle("עריכה").navigationBarTitleDisplayMode(.inline)

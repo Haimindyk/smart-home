@@ -108,3 +108,13 @@ public enum FractionalIndex {
         return String(head) + String(chars)
     }
 }
+
+/// Drag-and-drop ordering: the new position for the dragged item so it lands where the target is.
+public enum Reorder {
+    /// `siblings` are `(id, position)` pairs sorted by position. Dropping downward puts the item after the target, upward before it.
+    public static func position(_ siblings: [(id: String, position: String)], moving: String, onto target: String) -> String? {
+        guard moving != target, let from = siblings.firstIndex(where: { $0.id == moving }), let to = siblings.firstIndex(where: { $0.id == target }) else { return nil }
+        var rest = siblings; rest.remove(at: from)
+        return try? FractionalIndex.between(to > 0 ? rest[to - 1].position : nil, to < rest.count ? rest[to].position : nil)
+    }
+}
