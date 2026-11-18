@@ -311,6 +311,18 @@ final class WellnessUITests: XCTestCase {
         app.buttons["chore-save"].tap()
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: field); waitForExpectations(timeout: 8)
     }
+    func testPriceComparisonShowsCheapestChain() {
+        let app = launch("home")
+        app.buttons["section-a0000000-0000-4000-8000-000000000002"].tap()
+        let compare = app.buttons["compare-prices"]
+        XCTAssertTrue(compare.waitForExistence(timeout: 10))
+        var scrolls = 0
+        while !compare.isHittable && scrolls < 6 { app.swipeUp(); scrolls += 1 }
+        compare.tap()
+        let rami = app.buttons["price-chain-rami_levy"]
+        XCTAssertTrue(rami.waitForExistence(timeout: 10), "Chains are listed with totals")
+        capture(app, name: "native-price-comparison")
+    }
     func testHomeWellnessCardOpensHealth() {
         let app = launch("home")
         let card = app.buttons["wellness-entry"]

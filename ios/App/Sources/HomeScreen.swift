@@ -243,6 +243,7 @@ struct SectionPanel: View {
     @EnvironmentObject private var home: HomeStore
     let section: HSection
     @State private var scanning = false
+    @State private var comparing = false
     @State private var scanned: String?
     @State private var lookingUp = false
     @State private var unknownCode: String?
@@ -285,6 +286,7 @@ struct SectionPanel: View {
         .overlay(alignment: .top) { UnevenRoundedRectangle(topLeadingRadius: 30, topTrailingRadius: 30, style: .continuous).fill(section.kindColor).frame(height: 6) }
         .background(GeometryReader { geo in Color.clear.preference(key: PanelOffsetKey.self, value: [section.id: geo.frame(in: .named("home-scroll")).minY]) })
         .accessibilityElement(children: .contain).accessibilityLabel(section.name)
+        .sheet(isPresented: $comparing) { PriceComparisonSheet(section: section).environmentObject(home) }
         .fullScreenCover(isPresented: $scanning) {
             ZStack(alignment: .topLeading) {
                 BarcodeScanner { code in scanning = false; Task { await handle(code) } }.ignoresSafeArea()
@@ -320,6 +322,8 @@ struct SectionPanel: View {
                 .buttonStyle(PressableStyle()).accessibilityIdentifier("scan-barcode")
             ShareLink(item: home.shareText(for: section)) { Label("שיתוף הרשימה", systemImage: "square.and.arrow.up").font(.hb(.footnote, .semibold)).padding(.horizontal, 14).frame(minHeight: 40).foregroundStyle(Color.wellnessInk).background(Color.wellnessChip, in: Capsule()) }
                 .accessibilityIdentifier("share-list")
+            Button { comparing = true } label: { Label("השוואת מחירים", systemImage: "chart.line.downtrend.xyaxis").font(.hb(.footnote, .semibold)).padding(.horizontal, 14).frame(minHeight: 40).foregroundStyle(Color.wellnessInk).background(Color.wellnessChip, in: Capsule()) }
+                .buttonStyle(PressableStyle()).accessibilityIdentifier("compare-prices")
             Spacer(minLength: 0)
         }
     }

@@ -342,6 +342,17 @@ final class HomeStore: ObservableObject {
         guard let app, let owner = app.session?.owner, let backend = app.backend else { return nil }
         return try? await backend.signedAttachmentURL(path: attachment.path, owner: owner)
     }
+    /// Compares the open items of a shopping section across supermarket chains.
+    func comparePrices(for section: HSection) async -> PriceComparison.Result? {
+        let items = tasks(in: section.id).filter { $0.parentID == nil && !$0.isCompleted && !$0.isNote }.map { PriceComparison.Item(id: $0.id, title: $0.title, notes: $0.notes) }
+        guard !items.isEmpty else { return nil }
+        let excluded = PriceComparison.excludedChains(forSection: section.name)
+#if DEBUG
+        if app?.backend == nil, app?.session?.accessToken == "ui-test" { return try? await PriceComparison.compare(items, excluding: excluded, source: UITestFixtures.priceSource) }
+#endif
+        guard let app, let owner = app.session?.owner, let backend = app.backend else { return nil }
+        return try? await PriceComparison.compare(items, excluding: excluded, source: BackendPriceSource(backend: backend, owner: owner))
+    }
     /// Saves the signed-in member's profile; an optional JPEG becomes the new profile photo.
     @discardableResult
     func saveProfile(name: String, emoji: String, color: String, photoJPEG: Data?, removePhoto: Bool) async -> Bool {
@@ -397,4 +408,13 @@ private extension JSONValue {
         f["is_completed"] = f["is_completed"] ?? .bool(false); f["assignee_kind"] = f["assignee_kind"] ?? .string("unassigned")
         return .object(f)
     }
+}
+
+/// Price data for the comparison: exact barcode lookups and trigram title search on `barcode_products`.
+struct BackendPriceSource: PriceComparison.Source {
+    let backend: Backend, owner: String
+    func product(barcode: String) async throws -> PriceComparison.Product? {
+        try await backend.householdRows(table: "barcode_products", owner: owner, filters: [.init(name: "barcode", value: "eq.\(barcode)")], limit: 1, singlePage: true).first.flatMap(PriceComparison.Product.init)
+    }
+    func search(_ query: String) async throws -> [PriceComparison.Product] { try await backend.searchBarcodeProducts(query, owner: owner) }
 }

@@ -34,6 +34,14 @@ enum UITestFixtures {
         """
         return (try? JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))) ?? .null
     }
+    static var priceSource: PriceComparison.Source { FixturePrices() }
+    private struct FixturePrices: PriceComparison.Source {
+        func product(barcode: String) async throws -> PriceComparison.Product? { nil }
+        func search(_ query: String) async throws -> [PriceComparison.Product] {
+            [.init(barcode: "1", name: "חלב 3% 1 ליטר", prices: ["shufersal": 7.9, "rami_levy": 6.5, "carrefour": 7.2, "osher_ad": 6.9]),
+             .init(barcode: "2", name: "ביצים L 12", prices: ["shufersal": 13.9, "rami_levy": 11.9, "carrefour": 12.5, "osher_ad": 12.0])]
+        }
+    }
     static var assistantReply: JSONValue {
         let json = """
         {"reply":"בטח! הכנתי הצעה: להוסיף סבון כלים לרשימת הקניות.","proposedActions":[{"type":"create_task","sectionId":"a0000000-0000-4000-8000-000000000002","title":"סבון כלים"}]}

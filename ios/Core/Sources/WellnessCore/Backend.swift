@@ -135,6 +135,7 @@ public actor Backend {
     public static let householdReadable: Set<String> = ["sections", "tasks", "chores", "chore_completions", "family_events", "members", "activity_log", "barcode_products", "ai_suggestions", "ai_private_messages", "attachments"]
     public static let householdWritable: Set<String> = ["sections", "tasks", "chores", "family_events", "ai_suggestions", "ai_private_messages", "attachments"]
     private static let householdRPCs: Set<String> = ["complete_chore"]
+    private static let readRPCs: Set<String> = ["search_barcode_products"]
 
     /// Reads a household table, paging up to 10,000 rows. `deleted_at is null` is applied for tables that soft-delete.
     public func householdRows(table: String, owner: String, columns: String = "*", filters: [URLQueryItem] = [], order: String? = nil, limit: Int = 1000, singlePage: Bool = false) async throws -> [JSONValue] {
@@ -212,6 +213,13 @@ public actor Backend {
         guard (200..<300).contains(status) else { throw BackendError.server(status) }
         guard let url = URL(string: "/storage/v1/object/public/avatars/\(path)", relativeTo: root)?.absoluteURL, url.scheme == "https", url.host == root.host else { throw BackendError.invalidResponse }
         return url.absoluteString
+    }
+    /// Read-only RPCs that return rows (allow-listed).
+    public func rpcRows(_ name: String, owner: String, args: [String: JSONValue]) async throws -> [JSONValue] {
+        guard Self.readRPCs.contains(name) else { throw BackendError.invalidResponse }
+        let (data, status) = try await authorized("/rest/v1/rpc/\(name)", method: "POST", expectedOwner: owner, body: .object(args))
+        guard status == 200 else { throw BackendError.server(status) }
+        return try json(data).arrayValue
     }
     public func householdRPC(_ name: String, owner: String, args: [String: JSONValue]) async throws {
         guard Self.householdRPCs.contains(name) else { throw BackendError.invalidResponse }
