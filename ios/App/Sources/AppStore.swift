@@ -25,7 +25,7 @@ final class AppStore: ObservableObject {
     @Published var selection: Set<UUID> = []
     @Published var importMessage: String?
     let health = HealthReader()
-    private let backend: Backend?
+    let backend: Backend?
     private var revision = 0
     private var healthRevision = 0
     init() {
@@ -35,7 +35,7 @@ final class AppStore: ObservableObject {
             backend = nil
             phase = scenario == "--ui-test-login" ? .signedOut : .signedIn
             if phase == .signedIn {
-                session = Session(accessToken: "ui-test", refreshToken: "ui-test", owner: UITestFixtures.owner, member: "ui-test")
+                session = Session(accessToken: "ui-test", refreshToken: "ui-test", owner: UITestFixtures.owner, member: "11111111-1111-4111-8111-111111111111")
                 profile = .object(["timezone": .string("UTC"), "birthDate": .string("1990-01-01"), "aiProviderConsent": .bool(scenario == "--ui-test-coach")])
                 goals = UITestFixtures.goals(date: dateKey)
                 if scenario == "--ui-test-meal" || scenario == "--ui-test-coach" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey); plans = UITestFixtures.plans(); weightLogs = UITestFixtures.weights(zone: timeZone) }
@@ -48,6 +48,13 @@ final class AppStore: ObservableObject {
            let root = URL(string: "https://\(host)"), let key = info["SUPABASE_PUBLIC_KEY"] as? String {
             backend = try? Backend(root: root, publicKey: key, vault: KeychainVault())
         } else { backend = nil }
+    }
+    /// Real sessions open on the household home screen (like the web app); synthetic test sessions keep the health screens unless asked otherwise.
+    var startsOnHealth: Bool {
+#if DEBUG
+        if let scenario = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--ui-test-") }) { return scenario != "--ui-test-home" }
+#endif
+        return false
     }
     var timeZone: TimeZone { TimeZone(identifier: profile["timezone"].stringValue ?? "") ?? .current }
     var dateKey: String { Self.dateKey(selectedDate, zone: timeZone) }
@@ -103,6 +110,7 @@ final class AppStore: ObservableObject {
             waterLogs = extras.0; weightLogs = extras.1
             candidates = pendingAppleWorkouts(candidates, existing: importedIDs)
             selection.formIntersection(Set(candidates.map(\.id)))
+            publishToWatch()
         } catch { if request == revision, session?.owner == owner { self.error = Self.message(error) } }
     }
     func readHealth() async {
@@ -161,6 +169,23 @@ final class AppStore: ObservableObject {
             return true
         } catch { if session?.owner == owner { self.error = "לא הצלחנו למחוק את האימון. רענן את הנתונים ונסה שוב." }; return false }
     }
+    // MARK: - Apple Watch
+    func watchSummary() -> WatchSummary {
+        WatchSummary(date: dateKey, kcalConsumed: nutrientTotal(meals: dayMeals, nutrient: "kcal"), kcalTarget: goal["kcal"].doubleValue,
+                     waterML: dayWater, waterTarget: waterTarget, steps: steps, updatedAt: Date())
+    }
+    /// Sends today's numbers to the watch. Always today (not the browsed date), so the watch is never confusing.
+    func publishToWatch() {
+        guard session != nil, phase == .signedIn else { return }
+        let saved = selectedDate
+        let today = Self.dateKey(Date(), zone: timeZone)
+        let meals = meals.filter { $0.data["date"].stringValue == today }
+        let water = waterLogs.filter { $0.data["date"].stringValue == today }.reduce(0.0) { $0 + ($1.data["amount"].doubleValue ?? 0) }
+        _ = saved
+        PhoneConnectivity.shared.push(WatchSummary(date: today, kcalConsumed: nutrientTotal(meals: meals, nutrient: "kcal"), kcalTarget: goals.filter { ($0.data["date"].stringValue ?? "9999") <= today }.max { ($0.data["date"].stringValue ?? "") < ($1.data["date"].stringValue ?? "") }?.data["kcal"].doubleValue,
+                                                      waterML: water, waterTarget: waterTarget, steps: steps, updatedAt: Date()))
+    }
+
     // MARK: - Writes (same rows and edge functions as the web app)
     var waterTarget: Double { profile["waterTarget"].doubleValue ?? 2000 }
     var dayWaterLogs: [HealthRow] { waterLogs.filter { $0.data["date"].stringValue == dateKey } }
@@ -169,7 +194,7 @@ final class AppStore: ObservableObject {
 
     private func write(_ failure: String, _ work: (Backend, String) async throws -> Void) async -> Bool {
         guard let owner = session?.owner, let backend else { return false }
-        do { try await work(backend, owner); return session?.owner == owner }
+        do { try await work(backend, owner); let ok = session?.owner == owner; if ok { publishToWatch() }; return ok }
         catch { if session?.owner == owner { self.error = error as? BackendError == .conflict ? "הנתון השתנה במקום אחר. רענן ונסה שוב." : failure }; return false }
     }
     func addWater(_ ml: Int) async {
@@ -243,16 +268,54 @@ final class AppStore: ObservableObject {
             if session?.owner == owner, let index = meals.firstIndex(where: { $0.id == row.id }) { meals[index] = saved }
         }
     }
+    // MARK: - AI trainer (wellness-ai: program / adjust / apply)
+    struct TrainingPreferences: Equatable {
+        var goal = "muscle", experience = "beginner", split = "auto", notes = ""
+        var days: Set<Int> = [0, 2, 4]
+        var minutes = 45
+        var focus: [String] = []
+        var equipment: Set<String> = ["bodyweight", "dumbbell", "machine", "cable"]
+        var json: JSONValue {
+            .object(["goal": .string(goal), "experience": .string(experience), "days": .array(days.sorted().map { .number(Double($0)) }), "minutes": .number(Double(minutes)),
+                     "split": .string(split), "focus": .array(focus.map { .string($0) }), "equipment": .array(equipment.sorted().map { .string($0) }), "avoid": .array([]), "notes": .string(String(notes.prefix(1000)))])
+        }
+    }
+    /// Stores the preferences in the profile first, exactly like the web app, so the server reads the same values.
+    func saveTrainingPreferences(_ prefs: TrainingPreferences) async -> Bool {
+#if DEBUG
+        if backend == nil, session?.accessToken == "ui-test" { return true }
+#endif
+        guard let row = profileRow, case .object(var fields) = row.data else { self.error = "צריך להשלים פרופיל באפליקציה הרגילה לפני שימוש במאמן."; return false }
+        fields["trainingPreferences"] = prefs.json
+        return await write("לא הצלחנו לשמור את ההעדפות.") { backend, owner in
+            let saved = try await backend.save(table: "health_profiles", owner: owner, payload: .object(fields), existing: row)
+            if session?.owner == owner { profileRow = saved; profile = saved.data }
+        }
+    }
+
     // MARK: - Workout plans
-    struct PlanExercise: Identifiable, Equatable { var id = UUID(); var name = ""; var sets = 3; var reps = 10; var weight = 0.0; var rest = 90 }
+    struct PlanExercise: Identifiable, Equatable { var id = UUID(); var name = ""; var catalogId: String?; var muscle = ""; var equipment = ""; var sets = 3; var reps = 10; var weight = 0.0; var rest = 90 }
     func savePlan(name: String, days: Set<Int>, exercises: [PlanExercise]) async -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let valid = exercises.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         guard !trimmed.isEmpty, trimmed.count <= 150, !valid.isEmpty, valid.count <= 100 else { return false }
-        let list: [JSONValue] = valid.map { e in
-            .object(["id": .string(e.id.uuidString.lowercased()), "name": .string(String(e.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(150))), "muscle": .string(""), "equipment": .string(""), "kind": .string("strength"),
-                     "sets": .number(Double(min(30, max(1, e.sets)))), "reps": .number(Double(min(500, max(1, e.reps)))), "weight": .number(min(1000, max(0, e.weight))), "rest": .number(Double(min(1800, max(0, e.rest)))),
-                     "duration": .number(0), "distance": .number(0), "notes": .string("")])
+        var list: [JSONValue] = []
+        for e in valid {
+            var fields: [String: JSONValue] = [:]
+            fields["id"] = .string(e.id.uuidString.lowercased())
+            fields["name"] = .string(String(e.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(150)))
+            fields["muscle"] = .string(String(e.muscle.prefix(80)))
+            fields["equipment"] = .string(String(e.equipment.prefix(80)))
+            fields["kind"] = .string("strength")
+            fields["sets"] = .number(Double(min(30, max(1, e.sets))))
+            fields["reps"] = .number(Double(min(500, max(1, e.reps))))
+            fields["weight"] = .number(min(1000, max(0, e.weight)))
+            fields["rest"] = .number(Double(min(1800, max(0, e.rest))))
+            fields["duration"] = .number(0)
+            fields["distance"] = .number(0)
+            fields["notes"] = .string("")
+            if let catalogId = e.catalogId { fields["catalogId"] = .string(catalogId) }
+            list.append(.object(fields))
         }
         let payload: JSONValue = .object(["name": .string(trimmed), "exercises": .array(list), "days": .array(days.sorted().map { .number(Double($0)) }), "archived": .bool(false)])
         return await write("לא הצלחנו לשמור את התוכנית.") { backend, owner in
@@ -337,7 +400,11 @@ final class AppStore: ObservableObject {
     /// Calls an allow-listed edge function as the signed-in owner. Returns the server's error code on failure.
     func call(_ function: String, _ body: JSONValue) async -> Result<JSONValue, BackendError> {
 #if DEBUG
-        if backend == nil, session?.accessToken == "ui-test", function == "wellness-chat" { return .success(UITestFixtures.chatState) }
+        if backend == nil, session?.accessToken == "ui-test" {
+            if function == "wellness-chat" { return .success(UITestFixtures.chatState) }
+            if function == "assistant" { return .success(UITestFixtures.assistantReply) }
+            if function == "wellness-ai" { return .success(body["action"].stringValue == "apply" ? .object(["ok": .bool(true)]) : UITestFixtures.trainerProposal) }
+        }
 #endif
         guard let owner = session?.owner, let backend else { return .failure(.sessionRequired) }
         do {

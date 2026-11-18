@@ -4,17 +4,20 @@ import WellnessCore
 struct WorkoutsScreen: View {
     @EnvironmentObject private var store: AppStore
     @State private var creating = false
+    @State private var trainer = false
     @State private var planToArchive: HealthRow?
     private var history: [HealthRow] { store.workouts.sorted { ($0.data["startedAt"].stringValue ?? "") > ($1.data["startedAt"].stringValue ?? "") } }
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    Text("האימונים שלך").font(.system(.largeTitle, design: .rounded).bold())
+                    Text("האימונים שלך").font(.hb(.largeTitle, .bold))
                     HStack {
                         Text("התוכניות שלי").sectionTitle()
                         Spacer()
-                        Button { creating = true } label: { Label("תוכנית חדשה", systemImage: "plus").font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(height: 40).background(Color.wellnessInk, in: Capsule()).foregroundStyle(Color.wellnessOnInk) }
+                        Button { trainer = true } label: { Image(systemName: "sparkles").font(.hb(.subheadline, .bold)).foregroundStyle(.flame).frame(width: 40, height: 40).background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline)) }
+                            .buttonStyle(PressableStyle()).accessibilityLabel("מאמן AI").accessibilityIdentifier("trainer-button")
+                        Button { creating = true } label: { Label("תוכנית חדשה", systemImage: "plus").font(.hb(.subheadline, .semibold)).padding(.horizontal, 14).frame(height: 40).background(Color.wellnessPrimary, in: Capsule()).foregroundStyle(Color.wellnessOnPrimary) }
                             .buttonStyle(PressableStyle()).accessibilityIdentifier("new-plan")
                     }
                     if store.activePlans.isEmpty {
@@ -23,12 +26,12 @@ struct WorkoutsScreen: View {
                     ForEach(store.activePlans) { plan in
                         NavigationLink { PlanDetail(plan: plan) } label: {
                             HStack(spacing: 16) {
-                                Image(systemName: "dumbbell.fill").font(.title2).padding(14).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                Image(systemName: "dumbbell.fill").font(.hb(.title2)).padding(14).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text(plan.data["name"].stringValue ?? "תוכנית אימון").font(.headline)
-                                    Text("\(plan.data["exercises"].arrayValue.count) תרגילים").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
+                                    Text(plan.data["name"].stringValue ?? "תוכנית אימון").font(.hb(.headline, .semibold))
+                                    Text("\(plan.data["exercises"].arrayValue.count) תרגילים").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
-                                Image(systemName: "chevron.left").foregroundStyle(Color.wellnessSecondary).font(.caption)
+                                Image(systemName: "chevron.left").foregroundStyle(Color.wellnessSecondary).font(.hb(.caption))
                             }.wellnessCard()
                         }.buttonStyle(PressableStyle()).accessibilityIdentifier("plan-\(plan.id)")
                         .contextMenu { Button(role: .destructive) { planToArchive = plan } label: { Label("העבר לארכיון", systemImage: "archivebox") } }
@@ -39,16 +42,17 @@ struct WorkoutsScreen: View {
                         NavigationLink { WorkoutDetail(workout: workout) } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text(workout.data["name"].stringValue ?? "אימון").font(.headline)
-                                    Text(workout.data["date"].stringValue ?? "").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
+                                    Text(workout.data["name"].stringValue ?? "אימון").font(.hb(.headline, .semibold))
+                                    Text(workout.data["date"].stringValue ?? "").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                                 if workout.data["appleHealth"] != .null { Image(systemName: "heart.fill").foregroundStyle(.pink).accessibilityLabel("Apple Health") }
-                                Text(statusName(workout.data["status"].stringValue)).font(.caption).foregroundStyle(Color.wellnessSecondary)
+                                Text(statusName(workout.data["status"].stringValue)).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
                             }.wellnessCard()
                         }.buttonStyle(PressableStyle()).accessibilityIdentifier("workout-\(workout.id)")
                     }
                 }.padding(22)
-            }.wellnessScreen().toolbar(.hidden, for: .navigationBar)
+            }.wellnessScreen().safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }.toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $trainer) { TrainerSheet().environmentObject(store) }
             .sheet(isPresented: $creating) { PlanEditorSheet().environmentObject(store) }
             .confirmationDialog("להעביר את התוכנית לארכיון?", isPresented: Binding(get: { planToArchive != nil }, set: { if !$0 { planToArchive = nil } }), titleVisibility: .visible) {
                 Button("העבר לארכיון", role: .destructive) { if let plan = planToArchive { Task { _ = await store.archivePlan(plan) } }; planToArchive = nil }
@@ -62,21 +66,30 @@ private struct PlanDetail: View {
     @EnvironmentObject private var store: AppStore
     let plan: HealthRow
     @State private var started: HealthRow?
+    @State private var demo: (name: String, demo: ExerciseDemo)?
     var body: some View {
         List {
             Section { Button { Task { started = await store.startWorkout(from: plan) } } label: { Label("התחל אימון", systemImage: "play.fill").frame(maxWidth: .infinity) }.buttonStyle(PrimaryButton()).listRowBackground(Color.clear).listRowInsets(EdgeInsets()).disabled(store.busy).accessibilityIdentifier("start-workout") }
             ForEach(Array(plan.data["exercises"].arrayValue.enumerated()), id: \.offset) { _, exercise in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(exercise["name"].stringValue ?? "תרגיל").font(.headline)
-                    Text("\(Int(exercise["sets"].doubleValue ?? 0)) סטים · \(Int(exercise["reps"].doubleValue ?? 0)) חזרות").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
-                    if exercise["loadUnknown"].boolValue != true, let weight = exercise["weight"].doubleValue, weight > 0 {
-                        Text("\(weight, specifier: "%g") ק״ג").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
-                    }
-                    if let notes = exercise["notes"].stringValue, !notes.isEmpty { Text(notes).font(.footnote).foregroundStyle(Color.wellnessSecondary) }
-                }.padding(.vertical, 8)
+                let found = ExerciseDemos.resolve(name: exercise["name"].stringValue ?? "", catalogId: exercise["catalogId"].stringValue)
+                Button { if let found { demo = (exercise["name"].stringValue ?? "תרגיל", found) } } label: {
+                    HStack(spacing: 12) {
+                        if let found { ExerciseThumb(demo: found) }
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(exercise["name"].stringValue ?? "תרגיל").font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessInk)
+                            Text("\(Int(exercise["sets"].doubleValue ?? 0)) סטים · \(Int(exercise["reps"].doubleValue ?? 0)) חזרות").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
+                            if exercise["loadUnknown"].boolValue != true, let weight = exercise["weight"].doubleValue, weight > 0 {
+                                Text("\(weight, specifier: "%g") ק״ג").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
+                            }
+                            if let notes = exercise["notes"].stringValue, !notes.isEmpty { Text(notes).font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary) }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                        if found != nil { Image(systemName: "play.rectangle").foregroundStyle(Color.wellnessSecondary) }
+                    }.padding(.vertical, 6)
+                }.buttonStyle(.plain).accessibilityHint(found == nil ? "" : "מציג הדגמה").accessibilityIdentifier(found == nil ? "" : "demo-\(found!.id)")
             }
         }.listStyle(.insetGrouped).wellnessList().navigationTitle(plan.data["name"].stringValue ?? "תוכנית").navigationBarTitleDisplayMode(.inline)
             .fullScreenCover(item: $started) { ActiveWorkoutView(row: $0).environmentObject(store) }
+            .sheet(item: Binding(get: { demo.map { DemoItem(name: $0.name, demo: $0.demo) } }, set: { if $0 == nil { demo = nil } })) { ExerciseDemoSheet(name: $0.name, demo: $0.demo) }
     }
 }
 
@@ -126,3 +139,5 @@ private struct WorkoutDetail: View {
 private func statusName(_ status: String?) -> String {
     switch status { case "completed": "הושלם"; case "partial": "חלקי"; case "active": "פעיל"; case "cancelled": "בוטל"; default: "" }
 }
+
+private struct DemoItem: Identifiable { let name: String; let demo: ExerciseDemo; var id: String { demo.id } }

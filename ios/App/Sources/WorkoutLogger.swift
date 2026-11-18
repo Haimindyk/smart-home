@@ -10,6 +10,7 @@ struct ActiveWorkoutView: View {
     @State private var restEnd: Date?
     @State private var saving = false
     @State private var confirmFinish = false
+    @State private var demoItem: DemoRef?
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private var exercises: [JSONValue] { row.data["exercises"].arrayValue }
     private var doneSets: Int { exercises.flatMap { $0["performed"].arrayValue }.filter { $0["done"].boolValue == true }.count }
@@ -20,18 +21,26 @@ struct ActiveWorkoutView: View {
             List {
                 Section {
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack { Text("\(doneSets) מתוך \(totalSets) סטים").font(.headline); Spacer(); if let rest { Label("\(rest) ש׳", systemImage: "timer").font(.headline.monospacedDigit()).foregroundStyle(Color.kcalAmber).contentTransition(.numericText(value: Double(rest))) } }
-                        ProgressView(value: Double(doneSets), total: Double(max(1, totalSets))).tint(Color.wellnessInk)
+                        HStack { Text("\(doneSets) מתוך \(totalSets) סטים").font(.hb(.headline, .semibold)); Spacer(); if let rest { Label("\(rest) ש׳", systemImage: "timer").font(.hb(.headline, .semibold)).monospacedDigit().foregroundStyle(Color.kcalAmber).contentTransition(.numericText(value: Double(rest))) } }
+                        ProgressView(value: Double(doneSets), total: Double(max(1, totalSets))).tint(Color.wellnessPrimary)
                     }.accessibilityElement(children: .combine)
                 }
                 ForEach(Array(exercises.enumerated()), id: \.offset) { exIndex, exercise in
-                    Section(exercise["name"].stringValue ?? "תרגיל") {
+                    Section {
                         ForEach(Array(exercise["performed"].arrayValue.enumerated()), id: \.offset) { setIndex, set in
                             SetRow(index: setIndex, set: set, enabled: isActive) { reps, weight, done in
                                 update(exIndex, setIndex, reps: reps, weight: weight, done: done, rest: Int(exercise["rest"].doubleValue ?? 90))
                             }
                         }
-                        if let notes = exercise["notes"].stringValue, !notes.isEmpty { Text(notes).font(.footnote).foregroundStyle(Color.wellnessSecondary) }
+                        if let notes = exercise["notes"].stringValue, !notes.isEmpty { Text(notes).font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary) }
+                    } header: {
+                        HStack {
+                            Text(exercise["name"].stringValue ?? "תרגיל")
+                            Spacer()
+                            if let found = ExerciseDemos.resolve(name: exercise["name"].stringValue ?? "", catalogId: exercise["catalogId"].stringValue) {
+                                Button { demoItem = DemoRef(name: exercise["name"].stringValue ?? "תרגיל", demo: found) } label: { Label("הדגמה", systemImage: "play.rectangle").font(.hb(.footnote, .semibold)).frame(minHeight: 44) }.accessibilityIdentifier("workout-demo-\(found.id)")
+                            }
+                        }
                     }
                 }
                 if isActive {
@@ -49,6 +58,7 @@ struct ActiveWorkoutView: View {
                 if left <= 0 { self.restEnd = nil; rest = nil; UINotificationFeedbackGenerator().notificationOccurred(.success) } else { rest = left }
             }
             .sensoryFeedback(.success, trigger: doneSets) { old, new in new > old }
+            .sheet(item: $demoItem) { ExerciseDemoSheet(name: $0.name, demo: $0.demo) }
         }
         .interactiveDismissDisabled(saving)
     }
@@ -84,11 +94,11 @@ private struct SetRow: View {
     var body: some View {
         let reps = set["reps"].doubleValue ?? 0, weight = set["weight"].doubleValue ?? 0, done = set["done"].boolValue == true
         HStack(spacing: 8) {
-            Text("\(index + 1)").font(.headline.monospacedDigit()).foregroundStyle(Color.wellnessSecondary).frame(width: 22)
+            Text("\(index + 1)").font(.hb(.headline, .semibold)).monospacedDigit().foregroundStyle(Color.wellnessSecondary).frame(width: 22)
             control(value: weight, unit: "ק״ג", label: "משקל", step: 2.5) { onChange(reps, max(0, $0), done) }
             control(value: reps, unit: "חזרות", label: "חזרות", step: 1) { onChange(max(0, $0), weight, done) }
             Button { onChange(reps, weight, !done) } label: {
-                Image(systemName: done ? "checkmark.circle.fill" : "circle").font(.title).foregroundStyle(done ? Color.wellnessInk : Color.wellnessSecondary)
+                Image(systemName: done ? "checkmark.circle.fill" : "circle").font(.hb(.title)).foregroundStyle(done ? Color.wellnessInk : Color.wellnessSecondary)
                     .symbolEffect(.bounce, value: done).frame(width: 44, height: 44)
             }.buttonStyle(.plain).disabled(!enabled).accessibilityLabel(done ? "סט \(index + 1) הושלם" : "סמן סט \(index + 1) כהושלם")
         }.padding(.vertical, 4)
@@ -97,8 +107,8 @@ private struct SetRow: View {
     private func control(value: Double, unit: String, label: String, step: Double, set: @escaping (Double) -> Void) -> some View {
         VStack(spacing: 6) {
             VStack(spacing: 0) {
-                Text(value, format: .number.precision(.fractionLength(0...1))).font(.title3.weight(.bold).monospacedDigit()).contentTransition(.numericText(value: value))
-                Text(unit).font(.caption2).foregroundStyle(Color.wellnessSecondary)
+                Text(value, format: .number.precision(.fractionLength(0...1))).font(.hb(.title3, .bold)).monospacedDigit().contentTransition(.numericText(value: value))
+                Text(unit).font(.hb(.caption2)).foregroundStyle(Color.wellnessSecondary)
             }.accessibilityElement(children: .combine)
             HStack(spacing: 8) {
                 stepButton("minus") { set(value - step) }.accessibilityLabel("הפחת \(label)")
@@ -108,7 +118,9 @@ private struct SetRow: View {
     }
     private func stepButton(_ icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon).font(.footnote.weight(.bold)).foregroundStyle(Color.wellnessInk).frame(width: 40, height: 36).background(Color.wellnessChip, in: Capsule())
+            Image(systemName: icon).font(.hb(.footnote, .bold)).foregroundStyle(Color.wellnessInk).frame(width: 40, height: 36).background(Color.wellnessChip, in: Capsule())
         }.buttonStyle(.plain).disabled(!enabled)
     }
 }
+
+private struct DemoRef: Identifiable { let name: String; let demo: ExerciseDemo; var id: String { demo.id } }

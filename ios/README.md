@@ -60,7 +60,7 @@ Unsigned simulator build (requires no production credentials/signing):
 ```sh
 xcodebuild -project SmartHomeWellness.xcodeproj \
   -scheme SmartHomeWellness -configuration Debug \
-  -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+  -destination 'generic/platform=iOS Simulator' \
   CODE_SIGNING_ALLOWED=NO build
 ```
 

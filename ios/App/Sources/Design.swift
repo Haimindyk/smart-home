@@ -10,17 +10,27 @@ private func adaptive(_ light: (Double, Double, Double), _ dark: (Double, Double
 
 extension Color {
     /// Screen background: warm off-white in light mode, near-black in dark mode.
-    static let wellnessCanvas = adaptive((0.961, 0.957, 0.945), (0.039, 0.039, 0.043))
+    static let wellnessCanvas = adaptive((0.980, 0.980, 0.980), (0.039, 0.039, 0.043))
     /// Card surface.
     static let wellnessCard = adaptive((1, 1, 1), (0.105, 0.105, 0.115))
     /// Inner chips and placeholders that sit on top of a card.
-    static let wellnessChip = adaptive((0.945, 0.941, 0.929), (0.18, 0.18, 0.195))
+    static let wellnessChip = adaptive((0.945, 0.949, 0.957), (0.18, 0.18, 0.195))
     /// Primary ink (text and filled buttons) and the color that sits on top of it.
     static let wellnessInk = adaptive((0.07, 0.07, 0.08), (0.96, 0.96, 0.97))
     static let wellnessOnInk = adaptive((1, 1, 1), (0.07, 0.07, 0.08))
     /// Secondary text with at least 4.5:1 contrast on cards and canvas in both appearances.
     static let wellnessSecondary = adaptive((0.30, 0.30, 0.33), (0.70, 0.70, 0.74))
-    static let wellnessHairline = adaptive((0, 0, 0), (1, 1, 1), lightAlpha: 0.07, darkAlpha: 0.10)
+    static let wellnessHairline = adaptive((0.914, 0.918, 0.929), (1, 1, 1), lightAlpha: 1, darkAlpha: 0.10)
+    /// Filled primary controls: near-black in light mode, warm amber in dark mode (as on the web).
+    static let wellnessPrimary = adaptive((0.09, 0.09, 0.09), (0.96, 0.73, 0.22))
+    static let wellnessOnPrimary = adaptive((1, 1, 1), (0.09, 0.09, 0.09))
+    // Section kind colors (web: indigo, emerald, rose, sky).
+    static let kindTasks = Color(red: 0.388, green: 0.400, blue: 0.945)
+    static let kindShopping = Color(red: 0.063, green: 0.725, blue: 0.506)
+    static let kindChores = Color(red: 0.957, green: 0.247, blue: 0.369)
+    static let kindInfo = Color(red: 0.055, green: 0.647, blue: 0.914)
+    static let amberTint = adaptive((1, 0.957, 0.843), (0.30, 0.22, 0.08))
+    static let amberInk = adaptive((0.47, 0.333, 0), (0.96, 0.73, 0.22))
     // Macro palette shared with the web app.
     // Text-safe variants (>= 4.5:1 on cards); the base colors stay for rings, bars and icons.
     static let kcalAmberText = adaptive((0.64, 0.36, 0.0), (0.96, 0.72, 0.30))
@@ -41,7 +51,8 @@ extension View {
         self.padding(padding)
             .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Color.wellnessHairline))
-            .shadow(color: .black.opacity(0.04), radius: 14, y: 5)
+            .shadow(color: .black.opacity(0.05), radius: 1, y: 1)
+            .shadow(color: .black.opacity(0.10), radius: 12, y: 6)
     }
 
     /// Full-screen warm background that also fills the safe areas.
@@ -66,9 +77,9 @@ struct PrimaryButton: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.font(.headline).frame(maxWidth: .infinity).frame(minHeight: 56)
-            .foregroundStyle(Color.wellnessOnInk)
-            .background(Color.wellnessInk.opacity(enabled ? 1 : 0.3), in: Capsule())
+        configuration.label.font(.hb(.headline, .semibold)).frame(maxWidth: .infinity).frame(minHeight: 56)
+            .foregroundStyle(Color.wellnessOnPrimary)
+            .background(Color.wellnessPrimary.opacity(enabled ? 1 : 0.3), in: Capsule())
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
             .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.72), value: configuration.isPressed)
             .sensoryFeedback(.impact(weight: .medium), trigger: configuration.isPressed) { _, pressed in pressed && enabled }
@@ -126,5 +137,5 @@ struct Shimmer: ViewModifier {
 extension View {
     func shimmer(_ active: Bool) -> some View { modifier(Shimmer(active: active)) }
     /// Grouped list that follows the app canvas and card colors (light and dark).
-    func wellnessList() -> some View { scrollContentBackground(.hidden).background(Color.wellnessCanvas.ignoresSafeArea()) }
+    func wellnessList() -> some View { scrollContentBackground(.hidden).background(Color.wellnessCanvas.ignoresSafeArea()).font(.hb(.body)).tint(Color.wellnessPrimary).listSectionSpacing(16) }
 }

@@ -52,13 +52,13 @@ struct CoachChatView: View {
                                 if turn["id"].stringValue == turns.last?["id"].stringValue {
                                     ScrollView(.horizontal, showsIndicators: false) {
                                         HStack { ForEach(answer["followUps"].arrayValue.compactMap(\.stringValue), id: \.self) { f in
-                                            Button(f) { text = f }.font(.footnote).padding(.horizontal, 12).padding(.vertical, 8).background(Color.wellnessCard, in: Capsule()).overlay(Capsule().strokeBorder(Color.wellnessHairline)).buttonStyle(PressableStyle())
+                                            Button(f) { text = f }.font(.hb(.footnote)).padding(.horizontal, 12).padding(.vertical, 8).background(Color.wellnessCard, in: Capsule()).overlay(Capsule().strokeBorder(Color.wellnessHairline)).buttonStyle(PressableStyle())
                                         } }
                                     }
                                 }
                             }
                         }
-                        if sending { HStack(spacing: 8) { ProgressView(); Text("המאמן חושב…").font(.footnote).foregroundStyle(Color.wellnessSecondary) }.id("typing") }
+                        if sending { HStack(spacing: 8) { ProgressView(); Text("המאמן חושב…").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary) }.id("typing") }
                         Color.clear.frame(height: 1).id("end")
                     }.padding(16)
                 }
@@ -66,21 +66,21 @@ struct CoachChatView: View {
                 .onChange(of: turns.count) { _, _ in withAnimation { proxy.scrollTo("end") } }
                 .onChange(of: sending) { _, _ in withAnimation { proxy.scrollTo("end") } }
             }
-            if let error { Text(error).font(.footnote).foregroundStyle(Color.fatCoral).padding(.horizontal, 16).padding(.bottom, 6).frame(maxWidth: .infinity, alignment: .leading) }
+            if let error { Text(error).font(.hb(.footnote)).foregroundStyle(Color.fatCoral).padding(.horizontal, 16).padding(.bottom, 6).frame(maxWidth: .infinity, alignment: .leading) }
             composer
         }
     }
     private var intro: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("שאל על תזונה, אימונים וטכניקה", systemImage: "sparkles").font(.headline)
+            Label("שאל על תזונה, אימונים וטכניקה", systemImage: "sparkles").font(.hb(.headline, .semibold))
             Text("מידע כללי ב־AI, לא תחליף לתזונאי או לאיש מקצוע רפואי. השיחה פרטית ונשמרת עד 30 יום; רק ההודעות האחרונות נשלחות. סיכום יומן נשלח רק בסימון שלך, ללא תמונות, שם או הערות אישיות. הצ׳אט לא משנה יומן או תוכנית.")
-                .font(.footnote).foregroundStyle(Color.wellnessSecondary)
+                .font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary)
         }.wellnessCard()
     }
     private func bubble(_ message: String, mine: Bool) -> some View {
         HStack { if !mine { Spacer(minLength: 40) }
             Text(message).padding(.horizontal, 16).padding(.vertical, 12)
-                .foregroundStyle(mine ? Color.wellnessOnInk : Color.wellnessInk)
+                .foregroundStyle(mine ? Color.wellnessOnPrimary : Color.wellnessInk)
                 .background(mine ? Color.wellnessInk : Color.wellnessCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(mine ? .clear : Color.wellnessHairline))
                 .textSelection(.enabled)
@@ -88,16 +88,16 @@ struct CoachChatView: View {
     }
     private var composer: some View {
         VStack(spacing: 8) {
-            Toggle("שתף סיכום יומן עם המאמן", isOn: $includeDiary).font(.footnote).tint(Color.wellnessInk)
+            Toggle("שתף סיכום יומן עם המאמן", isOn: $includeDiary).font(.hb(.footnote)).tint(Color.wellnessPrimary)
             HStack(alignment: .bottom, spacing: 10) {
                 TextField("שאל שאלה על תזונה…", text: $text, axis: .vertical).lineLimit(1...5).padding(.horizontal, 14).padding(.vertical, 12)
                     .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.wellnessHairline))
                     .onChange(of: text) { _, value in if value.count > 2000 { text = String(value.prefix(2000)) } }
                 Button { Task { await send() } } label: {
-                    Image(systemName: "arrow.up").font(.headline.weight(.bold)).foregroundStyle(Color.wellnessOnInk).frame(width: 46, height: 46).background(Color.wellnessInk.opacity(canSend ? 1 : 0.3), in: Circle())
+                    Image(systemName: "arrow.up").font(.hb(.headline, .bold)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 46, height: 46).background(Color.wellnessPrimary.opacity(canSend ? 1 : 0.3), in: Circle())
                 }.buttonStyle(PressableStyle()).disabled(!canSend).accessibilityLabel("שליחה")
             }
-            if limit > 0 { Text("\(used)/\(limit) הודעות היום").font(.caption2).foregroundStyle(Color.wellnessSecondary) }
+            if limit > 0 { Text("\(used)/\(limit) הודעות היום").font(.hb(.caption2)).foregroundStyle(Color.wellnessSecondary) }
         }.padding(.horizontal, 16).padding(.vertical, 10).background(Color.wellnessCanvas)
     }
     private var canSend: Bool { !sending && available && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (limit == 0 || used < limit) }

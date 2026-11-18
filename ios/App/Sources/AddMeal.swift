@@ -19,9 +19,9 @@ struct AddMealSheet: View {
         NavigationStack {
             VStack(spacing: 16) {
                 HStack(spacing: 10) {
-                    Button { aiMeal = true } label: { Image(systemName: "sparkles").font(.title2).foregroundStyle(Color.wellnessOnInk).frame(width: 52, height: 52).background(Color.wellnessInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous)) }
+                    Button { aiMeal = true } label: { Image(systemName: "sparkles").font(.hb(.title2)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 52, height: 52).background(Color.wellnessPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous)) }
                         .buttonStyle(PressableStyle()).accessibilityLabel("ארוחה מתמונה עם AI").accessibilityIdentifier("ai-meal")
-                    Button { scanning = true } label: { Image(systemName: "barcode.viewfinder").font(.title2).foregroundStyle(Color.wellnessOnInk).frame(width: 52, height: 52).background(Color.wellnessInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous)) }
+                    Button { scanning = true } label: { Image(systemName: "barcode.viewfinder").font(.hb(.title2)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 52, height: 52).background(Color.wellnessPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous)) }
                         .buttonStyle(PressableStyle()).accessibilityLabel("סריקת ברקוד")
                     HStack {
                         Image(systemName: "magnifyingglass").foregroundStyle(Color.wellnessSecondary)
@@ -67,8 +67,8 @@ struct AddMealSheet: View {
             .fullScreenCover(isPresented: $scanning) {
                 ZStack(alignment: .topLeading) {
                     BarcodeScanner { code in scanning = false; Task { await run(code, barcode: code) } }.ignoresSafeArea()
-                    Button { scanning = false } label: { Image(systemName: "xmark").font(.headline).padding(14).background(.ultraThinMaterial, in: Circle()) }.padding(20).accessibilityLabel("סגור")
-                    VStack { Spacer(); Text("כוון את הברקוד למרכז המסגרת").font(.headline).padding(14).background(.ultraThinMaterial, in: Capsule()).padding(.bottom, 60) }.frame(maxWidth: .infinity)
+                    Button { scanning = false } label: { Image(systemName: "xmark").font(.hb(.headline, .semibold)).padding(14).background(.ultraThinMaterial, in: Circle()) }.padding(20).accessibilityLabel("סגור")
+                    VStack { Spacer(); Text("כוון את הברקוד למרכז המסגרת").font(.hb(.headline, .semibold)).padding(14).background(.ultraThinMaterial, in: Capsule()).padding(.bottom, 60) }.frame(maxWidth: .infinity)
                 }
             }
         }
@@ -90,12 +90,12 @@ private struct RecentRow: View {
     var body: some View {
         let name = meal.data["name"].stringValue.flatMap { $0.isEmpty ? nil : $0 } ?? (meal.data["items"].arrayValue.first?["food"]["name"].stringValue ?? "ארוחה")
         HStack(spacing: 14) {
-            Image(systemName: "arrow.counterclockwise").font(.headline).foregroundStyle(Color.wellnessOnInk).frame(width: 40, height: 40).background(Color.wellnessInk, in: Circle())
+            Image(systemName: "arrow.counterclockwise").font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 40, height: 40).background(Color.wellnessPrimary, in: Circle())
             VStack(alignment: .leading, spacing: 4) {
-                Text(name).font(.headline).foregroundStyle(Color.wellnessInk).lineLimit(2).multilineTextAlignment(.leading)
-                Text(meal.data["items"].arrayValue.compactMap { $0["food"]["name"].stringValue }.joined(separator: " · ")).font(.caption).foregroundStyle(Color.wellnessSecondary).lineLimit(1)
+                Text(name).font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessInk).lineLimit(2).multilineTextAlignment(.leading)
+                Text(meal.data["items"].arrayValue.compactMap { $0["food"]["name"].stringValue }.joined(separator: " · ")).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).lineLimit(1)
             }.frame(maxWidth: .infinity, alignment: .leading)
-            VStack(spacing: 1) { Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded()))").font(.headline).foregroundStyle(Color.wellnessInk); Text("קק״ל").font(.caption2).foregroundStyle(Color.wellnessSecondary) }
+            VStack(spacing: 1) { Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded()))").font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessInk); Text("קק״ל").font(.hb(.caption2)).foregroundStyle(Color.wellnessSecondary) }
         }.wellnessCard(padding: 14).accessibilityElement(children: .combine).accessibilityHint("מוסיף את הארוחה שוב להיום")
     }
 }
@@ -105,12 +105,12 @@ private struct FoodRow: View {
     var body: some View {
         let per = food["per100"]
         HStack(spacing: 14) {
-            Image(systemName: "plus").font(.headline).foregroundStyle(Color.wellnessOnInk).frame(width: 40, height: 40).background(Color.wellnessInk, in: Circle())
+            Image(systemName: "plus").font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 40, height: 40).background(Color.wellnessPrimary, in: Circle())
             VStack(alignment: .leading, spacing: 5) {
-                Text(food["name"].stringValue ?? "מוצר").font(.headline).foregroundStyle(Color.wellnessInk).lineLimit(2).multilineTextAlignment(.leading)
-                Text("חלבון \(fmt(per["protein"])) ג׳ · פחמימות \(fmt(per["carbs"])) ג׳ · שומן \(fmt(per["fat"])) ג׳").font(.caption).foregroundStyle(Color.wellnessSecondary)
+                Text(food["name"].stringValue ?? "מוצר").font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessInk).lineLimit(2).multilineTextAlignment(.leading)
+                Text("חלבון \(fmt(per["protein"])) ג׳ · פחמימות \(fmt(per["carbs"])) ג׳ · שומן \(fmt(per["fat"])) ג׳").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
             }.frame(maxWidth: .infinity, alignment: .leading)
-            VStack(spacing: 1) { Text(fmt(per["kcal"])).font(.headline).foregroundStyle(Color.wellnessInk); Text("קק״ל ל־100").font(.caption2).foregroundStyle(Color.wellnessSecondary) }
+            VStack(spacing: 1) { Text(fmt(per["kcal"])).font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessInk); Text("קק״ל ל־100").font(.hb(.caption2)).foregroundStyle(Color.wellnessSecondary) }
         }.wellnessCard(padding: 14)
     }
     private func fmt(_ v: JSONValue) -> String { String(Int((v.doubleValue ?? 0).rounded())) }
@@ -129,26 +129,26 @@ private struct PortionSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView { VStack(spacing: 20) {
-                Text(food["name"].stringValue ?? "מוצר").font(.title2.bold()).multilineTextAlignment(.center)
+                Text(food["name"].stringValue ?? "מוצר").font(.hb(.title2, .bold)).multilineTextAlignment(.center)
                 HStack(spacing: 10) {
                     macro("קק״ל", total("kcal"), Color.wellnessInk); macro("חלבון", total("protein"), .proteinBlue)
                     macro("פחמימות", total("carbs"), .carbsGold); macro("שומן", total("fat"), .fatCoral)
                 }
                 VStack(spacing: 14) {
-                    Text("כמות").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
+                    Text("כמות").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
                     HStack(spacing: 22) {
-                        stepper("plus", 10); VStack { Text(quantity, format: .number.precision(.fractionLength(0))).font(.system(size: bigNumber, weight: .heavy).monospacedDigit()).contentTransition(.numericText(value: quantity)); Text(unit).foregroundStyle(Color.wellnessSecondary) }.frame(minWidth: 96)
+                        stepper("plus", 10); VStack { Text(quantity, format: .number.precision(.fractionLength(0))).font(.hbFixed(bigNumber, .heavy)).monospacedDigit().contentTransition(.numericText(value: quantity)); Text(unit).foregroundStyle(Color.wellnessSecondary) }.frame(minWidth: 96)
                         stepper("minus", -10)
                     }
                     if let serving = food["servingSize"].doubleValue, serving > 0 {
-                        Button("מנה (\(Int(serving)) \(unit))") { withAnimation(.snappy) { quantity = serving } }.buttonStyle(.bordered).tint(Color.wellnessInk)
+                        Button("מנה (\(Int(serving)) \(unit))") { withAnimation(.snappy) { quantity = serving } }.buttonStyle(.bordered).tint(Color.wellnessPrimary)
                     }
                 }.frame(maxWidth: .infinity).wellnessCard()
                 Picker("ארוחה", selection: $kind) {
                     Text("בוקר").tag("breakfast"); Text("צהריים").tag("lunch"); Text("ערב").tag("dinner"); Text("נשנוש").tag("snack")
                 }.pickerStyle(.segmented)
                 Button { Task { if await store.saveMeal(kind: kind, name: food["name"].stringValue ?? "", food: food, quantity: quantity) { dismiss(); onSaved() } } } label: {
-                    if store.busy { ProgressView().tint(Color.wellnessOnInk) } else { Label("הוסף לארוחה", systemImage: "plus.circle") }
+                    if store.busy { ProgressView().tint(Color.wellnessOnPrimary) } else { Label("הוסף לארוחה", systemImage: "plus.circle") }
                 }.buttonStyle(PrimaryButton())
             }.padding(20) }
             .wellnessScreen().navigationTitle("פרטי מוצר").navigationBarTitleDisplayMode(.inline)
@@ -162,12 +162,12 @@ private struct PortionSheet: View {
         }
     }
     private func macro(_ title: String, _ value: Double, _ color: Color) -> some View {
-        VStack(spacing: 4) { Text(Int(value.rounded()), format: .number).font(.title3.bold()).foregroundStyle(color).contentTransition(.numericText(value: value)); Text(title).font(.caption2).foregroundStyle(Color.wellnessSecondary) }
+        VStack(spacing: 4) { Text(Int(value.rounded()), format: .number).font(.hb(.title3, .bold)).foregroundStyle(color).contentTransition(.numericText(value: value)); Text(title).font(.hb(.caption2)).foregroundStyle(Color.wellnessSecondary) }
             .frame(maxWidth: .infinity).padding(.vertical, 12).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     private func stepper(_ icon: String, _ delta: Double) -> some View {
         Button { withAnimation(.snappy) { quantity = min(10_000, max(1, quantity + delta)) } } label: {
-            Image(systemName: icon).font(.title3.bold()).frame(width: 54, height: 54).background(Color.wellnessChip, in: Circle()).foregroundStyle(Color.wellnessInk)
+            Image(systemName: icon).font(.hb(.title3, .bold)).frame(width: 54, height: 54).background(Color.wellnessChip, in: Circle()).foregroundStyle(Color.wellnessInk)
         }.buttonStyle(PressableStyle()).accessibilityLabel(delta > 0 ? "הוסף כמות" : "הפחת כמות")
     }
 }

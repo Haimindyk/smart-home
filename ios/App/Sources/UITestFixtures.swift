@@ -34,15 +34,60 @@ enum UITestFixtures {
         """
         return (try? JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))) ?? .null
     }
+    static var assistantReply: JSONValue {
+        let json = """
+        {"reply":"בטח! הכנתי הצעה: להוסיף סבון כלים לרשימת הקניות.","proposedActions":[{"type":"create_task","sectionId":"a0000000-0000-4000-8000-000000000002","title":"סבון כלים"}]}
+        """
+        return (try? JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))) ?? .null
+    }
+    static var trainerProposal: JSONValue {
+        let json = """
+        {"requestId":"req-1","kind":"program","message":"תוכנית ABC לשלושה ימים בשבוע, 45 דקות לאימון, עם דגש על חזה וגב.","reasons":["שלושה ימי אימון מאפשרים התאוששות בין האימונים","בחרתי תרגילים מהציוד שסימנת"],
+         "changes":[{"id":"c1","expectedVersion":null,"data":{"name":"אימון A – חזה וכתפיים","days":[0],"archived":false,"notes":"","exercises":[
+            {"id":"a1","name":"שכיבות סמיכה","sets":3,"reps":12,"weight":0,"rest":60,"muscle":"חזה","equipment":"משקל גוף"},
+            {"id":"a2","name":"לחיצת חזה עם דאמבלים","sets":3,"reps":10,"weight":14,"rest":90,"muscle":"חזה","equipment":"דאמבלים"}]}}]}
+        """
+        return (try? JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))) ?? .null
+    }
     static func plans() -> [HealthRow] {
         func ex(_ id: String, _ name: String, _ sets: Int, _ reps: Int, _ weight: Double, _ muscle: String) -> String {
             "{\"id\":\"\(id)\",\"name\":\"\(name)\",\"muscle\":\"\(muscle)\",\"equipment\":\"\",\"kind\":\"strength\",\"sets\":\(sets),\"reps\":\(reps),\"weight\":\(weight),\"rest\":60,\"duration\":0,\"distance\":0,\"notes\":\"\"}"
         }
-        let exercises = [ex("88888888-8888-4888-8888-888888888881", "לחיצת חזה", 3, 8, 40, "חזה"), ex("88888888-8888-4888-8888-888888888882", "סקוואט", 3, 10, 60, "רגליים")].joined(separator: ",")
+        let exercises = [ex("88888888-8888-4888-8888-888888888881", "פרפר בכבלים", 3, 8, 40, "חזה"), ex("88888888-8888-4888-8888-888888888882", "פולי עליון לגב", 3, 10, 60, "גב")].joined(separator: ",")
         return row(id: "99999999-9999-4999-8999-999999999999", data: "{\"name\":\"פלג גוף עליון\",\"exercises\":[\(exercises)],\"days\":[1,3],\"archived\":false}")
     }
     static func workouts(date: String) -> [HealthRow] {
         row(id: "55555555-5555-8555-8555-555555555555", data: "{\"date\":\"\(date)\",\"name\":\"הליכה לבדיקה\",\"status\":\"completed\",\"quick\":true,\"startedAt\":\"\(date)T08:00:00Z\",\"exercises\":[],\"appleHealth\":{\"uuid\":\"66666666-6666-4666-8666-666666666666\",\"sourceName\":\"Test Watch\",\"durationSeconds\":1800,\"activityType\":52,\"energyKcal\":null,\"distanceMeters\":2500}}")
+    }
+}
+
+@MainActor
+extension HomeStore {
+    func loadFixtures() {
+        func j(_ text: String) -> JSONValue { (try? JSONDecoder().decode(JSONValue.self, from: Data(text.utf8))) ?? .null }
+        let day = Date(); let f = ISO8601DateFormatter()
+        let tomorrow = f.string(from: day.addingTimeInterval(86_400 + 3_600)), yesterday = f.string(from: day.addingTimeInterval(-90_000))
+        let mid = "11111111-1111-4111-8111-111111111111"
+        sections = [j("{\"id\":\"a0000000-0000-4000-8000-000000000001\",\"name\":\"משימות\",\"emoji\":\"✅\",\"kind\":\"tasks\",\"position\":\"a0\"}"),
+                    j("{\"id\":\"a0000000-0000-4000-8000-000000000002\",\"name\":\"קניות\",\"emoji\":\"🛒\",\"kind\":\"shopping\",\"position\":\"a1\"}"),
+                    j("{\"id\":\"a0000000-0000-4000-8000-000000000003\",\"name\":\"מטלות\",\"emoji\":\"🧹\",\"kind\":\"chores\",\"position\":\"a2\"}"),
+                    j("{\"id\":\"a0000000-0000-4000-8000-000000000004\",\"name\":\"מידע\",\"emoji\":\"📋\",\"kind\":\"info\",\"position\":\"a3\"}")].compactMap(HSection.init)
+        members = [j("{\"id\":\"\(mid)\",\"display_name\":\"חיים\",\"avatar_emoji\":\"😎\",\"color\":\"#E8A02E\"}"), j("{\"id\":\"22222222-2222-4222-8222-222222222221\",\"display_name\":\"נועה\",\"avatar_emoji\":\"🦊\",\"color\":\"#5B8DEF\"}")].compactMap(HMember.init)
+        tasks = [j("{\"id\":\"b0000000-0000-4000-8000-000000000001\",\"section_id\":\"a0000000-0000-4000-8000-000000000001\",\"title\":\"לתאם טכנאי למזגן\",\"position\":\"a0\",\"priority\":3,\"due_at\":\"\(tomorrow)\",\"assignee_member_ids\":[\"\(mid)\"],\"is_completed\":false}"),
+                 j("{\"id\":\"b0000000-0000-4000-8000-000000000002\",\"section_id\":\"a0000000-0000-4000-8000-000000000001\",\"title\":\"לשלם ארנונה\",\"position\":\"a1\",\"due_at\":\"\(yesterday)\",\"is_completed\":false}"),
+                 j("{\"id\":\"b0000000-0000-4000-8000-000000000003\",\"section_id\":\"a0000000-0000-4000-8000-000000000001\",\"title\":\"להזמין מתנה ליום הולדת\",\"position\":\"a2\",\"is_completed\":true}"),
+                 j("{\"id\":\"b0000000-0000-4000-8000-000000000004\",\"section_id\":\"a0000000-0000-4000-8000-000000000002\",\"title\":\"חלב\",\"position\":\"a0\",\"quantity\":2,\"unit\":\"ליטר\",\"is_completed\":false}"),
+                 j("{\"id\":\"b0000000-0000-4000-8000-000000000005\",\"section_id\":\"a0000000-0000-4000-8000-000000000002\",\"title\":\"לחם\",\"position\":\"a1\",\"is_completed\":false}"),
+                 j("{\"id\":\"b0000000-0000-4000-8000-000000000006\",\"section_id\":\"a0000000-0000-4000-8000-000000000004\",\"title\":\"קוד ל-WiFi של האורחים\",\"notes\":\"הרשת: SmartHome-Guest\\nהסיסמה בארון הכניסה\",\"position\":\"a0\",\"is_note\":true}")].compactMap(HTask.init)
+        chores = [j("{\"id\":\"c0000000-0000-4000-8000-000000000001\",\"section_id\":\"a0000000-0000-4000-8000-000000000003\",\"title\":\"להוציא את הזבל\",\"emoji\":\"🗑️\",\"freq\":\"daily\",\"interval_n\":1,\"next_due_at\":\"\(f.string(from: day))\",\"position\":\"a0\"}"),
+                  j("{\"id\":\"c0000000-0000-4000-8000-000000000002\",\"section_id\":\"a0000000-0000-4000-8000-000000000003\",\"title\":\"לשטוף את הרצפה\",\"emoji\":\"🧽\",\"freq\":\"weekly\",\"interval_n\":1,\"next_due_at\":\"\(yesterday)\",\"position\":\"a1\"}")].compactMap(HChore.init)
+        let ymd = DateFormatter(); ymd.dateFormat = "yyyy-MM-dd"; ymd.locale = Locale(identifier: "en_US_POSIX")
+        let soon = ymd.string(from: day.addingTimeInterval(5 * 86_400)), later = ymd.string(from: day.addingTimeInterval(11 * 86_400))
+        events = [j("{\"id\":\"d0000000-0000-4000-8000-000000000001\",\"title\":\"יום הולדת לנועה\",\"emoji\":\"🎂\",\"kind\":\"birthday\",\"event_date\":\"\(soon)\",\"recurrence\":\"yearly\"}"),
+                  j("{\"id\":\"d0000000-0000-4000-8000-000000000002\",\"title\":\"בדיקת דם\",\"emoji\":\"🩺\",\"kind\":\"medical\",\"event_date\":\"\(later)\",\"recurrence\":\"none\"}")].compactMap(HEvent.init)
+        suggestions = [j("{\"id\":\"e0000000-0000-4000-8000-000000000001\",\"emoji\":\"🥛\",\"summary\":\"נגמר החלב מהקנייה האחרונה. להוסיף לרשימה?\",\"status\":\"open\",\"action\":{\"type\":\"create_task\",\"sectionId\":\"a0000000-0000-4000-8000-000000000002\",\"title\":\"חלב\"}}")].compactMap(HSuggestion.init)
+        notes = [j("{\"id\":\"e1000000-0000-4000-8000-000000000001\",\"member_id\":\"\(mid)\",\"summary\":\"שמתי לב שלא סימנת את המטלות מהיום. הכול בסדר?\"}")].compactMap(HPrivateNote.init)
+        selectedSectionID = sections.first?.id
     }
 }
 #endif

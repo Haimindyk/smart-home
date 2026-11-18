@@ -10,24 +10,24 @@ struct TodayScreen: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 24) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("היום שלך").font(.largeTitle.bold())
+                        Text("היום שלך").font(.hb(.largeTitle, .bold))
                         Button { showCalendar = true } label: {
                             HStack(spacing: 6) {
                                 Text(store.selectedDate, format: .dateTime.month(.wide).year())
-                                Image(systemName: "chevron.down").font(.caption)
+                                Image(systemName: "chevron.down").font(.hb(.caption))
                             }.foregroundStyle(Color.wellnessSecondary)
                         }.frame(minHeight: 44).accessibilityLabel("בחירת תאריך").accessibilityIdentifier("date-picker")
                     }
                         Spacer()
                         Button { showCoach = true } label: {
-                            Image(systemName: "sparkles").font(.title3).foregroundStyle(.flame).frame(width: 48, height: 48)
+                            Image(systemName: "sparkles").font(.hb(.title3)).foregroundStyle(.flame).frame(width: 48, height: 48)
                                 .background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline))
                         }.buttonStyle(PressableStyle()).accessibilityLabel("המאמן שלי").accessibilityIdentifier("coach-button")
                         Button { showSettings = true } label: {
-                            Image(systemName: "gearshape.fill").font(.title3).foregroundStyle(Color.wellnessInk).frame(width: 48, height: 48)
+                            Image(systemName: "gearshape.fill").font(.hb(.title3)).foregroundStyle(Color.wellnessInk).frame(width: 48, height: 48)
                                 .background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline))
                         }.buttonStyle(PressableStyle()).accessibilityLabel("הגדרות").accessibilityIdentifier("settings-button")
                     }
@@ -50,6 +50,7 @@ struct TodayScreen: View {
                 }.padding(22).shimmer(store.loading && store.meals.isEmpty && store.goals.isEmpty)
             }
             .wellnessScreen()
+            .safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }
             .toolbar(.hidden, for: .navigationBar)
             .refreshable { await store.refresh() }
             .sensoryFeedback(.selection, trigger: store.selectedDate)
@@ -79,13 +80,13 @@ private struct DayRail: View {
         return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0 - weekday + 1, to: start) }
     }
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 2) {
             HStack {
-                Button { withAnimation(.snappy) { shift(-7) } } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }.accessibilityLabel("שבוע קודם")
+                Button { withAnimation(.snappy) { shift(-7) } } label: { Image(systemName: "chevron.right").frame(width: 44, height: 32) }.accessibilityLabel("שבוע קודם")
                 Spacer()
-                if !calendar.isDateInToday(store.selectedDate) { Button("היום") { withAnimation(.snappy) { store.selectedDate = Date() } }.font(.caption.bold()).padding(.horizontal, 14).frame(minHeight: 44).background(Color.wellnessCard, in: Capsule()).foregroundStyle(Color.wellnessInk) }
+                if !calendar.isDateInToday(store.selectedDate) { Button("היום") { withAnimation(.snappy) { store.selectedDate = Date() } }.font(.hb(.caption, .bold)).padding(.horizontal, 14).frame(minHeight: 44).background(Color.wellnessCard, in: Capsule()).foregroundStyle(Color.wellnessInk) }
                 Spacer()
-                Button { withAnimation(.snappy) { shift(7) } } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }.accessibilityLabel("שבוע הבא")
+                Button { withAnimation(.snappy) { shift(7) } } label: { Image(systemName: "chevron.left").frame(width: 44, height: 32) }.accessibilityLabel("שבוע הבא")
             }.foregroundStyle(Color.wellnessSecondary)
             ViewThatFits(in: .horizontal) {
                 dayCells(scrolling: false)
@@ -100,8 +101,8 @@ private struct DayRail: View {
                     let future = day > Date() && !calendar.isDateInToday(day)
                     Button { withAnimation(.snappy) { store.selectedDate = day } } label: {
                         VStack(spacing: 8) {
-                            Text(day, format: .dateTime.weekday(.narrow)).font(.caption).foregroundStyle(future ? Color.primary.opacity(0.5) : Color.wellnessSecondary)
-                            Text(day, format: .dateTime.day()).font(.title3.weight(.semibold).monospacedDigit())
+                            Text(day, format: .dateTime.weekday(.narrow)).font(.hb(.caption)).foregroundStyle(future ? Color.primary.opacity(0.5) : Color.wellnessSecondary)
+                            Text(day, format: .dateTime.day()).font(.hb(.title3, .semibold)).monospacedDigit()
                                 .foregroundStyle(future ? Color.primary.opacity(0.5) : Color.wellnessInk).lineLimit(1)
                             Circle().fill(calendar.isDateInToday(day) ? Color.kcalAmber : .clear).frame(width: 4, height: 4)
                         }.frame(maxWidth: scrolling ? nil : .infinity).frame(minWidth: scrolling ? 56 : 0).padding(.vertical, 10)
@@ -127,17 +128,17 @@ private struct CalorieCard: View {
         HStack(spacing: 20) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(remaining.map { max(0, $0) } ?? consumed, format: .number.precision(.fractionLength(0)))
-                    .font(.system(size: bigNumber, weight: .heavy)).minimumScaleFactor(0.6)
+                    .font(.hbFixed(bigNumber, .heavy)).minimumScaleFactor(0.6)
                     .contentTransition(.numericText(value: remaining ?? consumed))
                     .animation(.snappy, value: consumed)
-                Text(remaining == nil ? "קלוריות נאכלו" : "קלוריות נותרו").font(.title3).foregroundStyle(Color.wellnessSecondary).lineLimit(2).minimumScaleFactor(0.7)
+                Text(remaining == nil ? "קלוריות נאכלו" : "קלוריות נותרו").font(.hb(.title3)).foregroundStyle(Color.wellnessSecondary).lineLimit(2).minimumScaleFactor(0.7)
                 if let target {
                     if let remaining, remaining < 0 {
-                        Text("חרגת ב־\(Int((-remaining).rounded())) קק״ל").font(.caption.weight(.semibold)).foregroundStyle(Color.kcalAmberText)
+                        Text("חרגת ב־\(Int((-remaining).rounded())) קק״ל").font(.hb(.caption, .semibold)).foregroundStyle(Color.kcalAmberText)
                     } else {
-                        Text("נאכלו \(Int(consumed.rounded())) מתוך \(Int(target))").font(.caption).foregroundStyle(Color.wellnessSecondary)
+                        Text("נאכלו \(Int(consumed.rounded())) מתוך \(Int(target))").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
                     }
-                } else { Text("יעד יומי עדיין לא הוגדר").font(.caption).foregroundStyle(Color.wellnessSecondary) }
+                } else { Text("יעד יומי עדיין לא הוגדר").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }
             }.frame(maxWidth: .infinity, alignment: .leading)
             ProgressRing(value: consumed, target: target, color: .kcalAmber, symbol: "flame.fill", lineWidth: 9).frame(width: 96, height: 96)
         }.wellnessCard(padding: 24).accessibilityElement(children: .ignore)
@@ -187,13 +188,13 @@ private struct WaterCard: View {
         let total = store.dayWater, target = store.waterTarget
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("מים").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
+                Text("מים").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(Int(total), format: .number).font(.system(size: waterNumber, weight: .heavy).monospacedDigit()).contentTransition(.numericText(value: total))
-                    Text("/ \(Int(target)) מ״ל").font(.caption).foregroundStyle(Color.wellnessSecondary)
+                    Text(Int(total), format: .number).font(.hbFixed(waterNumber, .heavy)).monospacedDigit().contentTransition(.numericText(value: total))
+                    Text("/ \(Int(target)) מ״ל").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
                 }.animation(.snappy, value: total)
                 HStack(spacing: 10) {
-                    Button { Task { await store.addWater(250) } } label: { Label("250", systemImage: "plus").font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(height: 40).background(Color.proteinBlue.opacity(0.14), in: Capsule()).foregroundStyle(Color.proteinBlueText) }
+                    Button { Task { await store.addWater(250) } } label: { Label("250", systemImage: "plus").font(.hb(.subheadline, .semibold)).padding(.horizontal, 14).frame(height: 40).background(Color.proteinBlue.opacity(0.14), in: Capsule()).foregroundStyle(Color.proteinBlueText) }
                         .buttonStyle(PressableStyle()).accessibilityLabel("הוסף 250 מיליליטר מים")
                     Button { Task { await store.undoWater() } } label: { Image(systemName: "arrow.uturn.backward").frame(width: 40, height: 40).background(Color.wellnessChip, in: Circle()).foregroundStyle(Color.wellnessInk) }
                         .buttonStyle(PressableStyle()).disabled(store.dayWaterLogs.isEmpty).accessibilityLabel("ביטול הכוס האחרונה")
@@ -212,9 +213,9 @@ private struct StepsCard: View {
         let steps = store.steps ?? 0
         HStack(spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("צעדים").font(.subheadline).foregroundStyle(Color.wellnessSecondary)
-                Text(steps, format: .number.precision(.fractionLength(0))).font(.system(size: stepsNumber, weight: .heavy).monospacedDigit())
-                Text("היום · Apple Health").font(.caption).foregroundStyle(Color.wellnessSecondary)
+                Text("צעדים").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
+                Text(steps, format: .number.precision(.fractionLength(0))).font(.hbFixed(stepsNumber, .heavy)).monospacedDigit()
+                Text("היום · Apple Health").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
             }.frame(maxWidth: .infinity, alignment: .leading)
             ProgressRing(value: steps, target: 10_000, color: .wellnessInk, symbol: "figure.walk", lineWidth: 8).frame(width: 84, height: 84)
         }.wellnessCard().accessibilityElement(children: .combine)
@@ -231,12 +232,12 @@ private struct NutrientCard: View {
         VStack(spacing: 10) {
             ProgressRing(value: value, target: target, color: color, symbol: symbol, lineWidth: 5).frame(width: 46, height: 46)
             VStack(spacing: 3) {
-                Text("\(Int(value.rounded())) ג׳").font(.headline.weight(.bold))
+                Text("\(Int(value.rounded())) ג׳").font(.hb(.headline, .bold))
                     .contentTransition(.numericText(value: value)).animation(.snappy, value: value)
-                Text(title).font(.caption).foregroundStyle(Color.wellnessSecondary)
+                Text(title).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
                 if let left {
                     Text(left >= 0 ? "נותרו \(Int(left.rounded())) ג׳" : "חרגת ב־\(Int((-left).rounded())) ג׳")
-                        .font(.caption2.weight(.medium)).foregroundStyle(left >= 0 ? Color.wellnessSecondary : Color.kcalAmberText)
+                        .font(.hb(.caption2, .medium)).foregroundStyle(left >= 0 ? Color.wellnessSecondary : Color.kcalAmberText)
                 }
             }
         }.frame(maxWidth: .infinity).padding(.vertical, 18).padding(.horizontal, 5)
@@ -254,19 +255,19 @@ private struct MealCard: View {
             HStack {
                 PrivateMealPhoto(meal: meal, thumbnail: true).frame(width: 60, height: 64).clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(mealName(meal)).font(.headline).lineLimit(2)
-                    Text(meal.data["items"].arrayValue.compactMap { $0["food"]["name"].stringValue }.joined(separator: " · ")).font(.subheadline).foregroundStyle(Color.wellnessSecondary).lineLimit(2)
+                    Text(mealName(meal)).font(.hb(.headline, .semibold)).lineLimit(2)
+                    Text(meal.data["items"].arrayValue.compactMap { $0["food"]["name"].stringValue }.joined(separator: " · ")).font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary).lineLimit(2)
                 }
                 Spacer(minLength: 2)
-                Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded()))").font(.title3.bold())
-                Text("קק״ל").font(.caption).foregroundStyle(Color.wellnessSecondary)
+                Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded()))").font(.hb(.title3, .bold))
+                Text("קק״ל").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
             }
             HStack {
                 ForEach([("חלבון", "protein", "fish.fill", Color.proteinBlue), ("פחמימות", "carbs", "carrot.fill", Color.carbsGold), ("שומן", "fat", "drop.fill", Color.fatCoral)], id: \.0) { item in
                     HStack(spacing: 5) {
                         Text("\(Int(nutrientTotal(meals: [meal], nutrient: item.1).rounded())) ג׳")
                         Image(systemName: item.2).foregroundStyle(item.3)
-                    }.font(.caption.weight(.medium)).frame(maxWidth: .infinity).padding(.vertical, 8).background(Color.wellnessChip, in: Capsule())
+                    }.font(.hb(.caption, .medium)).frame(maxWidth: .infinity).padding(.vertical, 8).background(Color.wellnessChip, in: Capsule())
                         .accessibilityLabel("\(item.0) \(Int(nutrientTotal(meals: [meal], nutrient: item.1).rounded())) גרם")
                 }
             }
@@ -283,16 +284,16 @@ private struct MealDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 if mealPhotoPath(meal) != nil { PrivateMealPhoto(meal: meal, thumbnail: false).clipShape(RoundedRectangle(cornerRadius: 24)) }
-                Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded())) קק״ל").font(.largeTitle.bold())
+                Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded())) קק״ל").font(.hb(.largeTitle, .bold))
                 VStack(spacing: 0) {
                     ForEach(Array(meal.data["items"].arrayValue.enumerated()), id: \.offset) { _, item in
                         HStack {
                             VStack(alignment: .leading, spacing: 5) {
-                                Text(item["food"]["name"].stringValue ?? "רכיב").font(.headline)
+                                Text(item["food"]["name"].stringValue ?? "רכיב").font(.hb(.headline, .semibold))
                                 Text("\(Int((item["quantity"].doubleValue ?? 0).rounded())) \(item["food"]["basis"].stringValue == "ml" ? "מ״ל" : "גרם")").foregroundStyle(Color.wellnessSecondary)
                             }
                             Spacer()
-                            if item["food"]["source"].stringValue == "ai" { Text("הערכה").font(.caption).foregroundStyle(Color.wellnessSecondary) }
+                            if item["food"]["source"].stringValue == "ai" { Text("הערכה").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }
                         }.padding(.vertical, 16)
                         Divider()
                     }

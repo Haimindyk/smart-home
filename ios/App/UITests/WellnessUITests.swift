@@ -4,7 +4,23 @@ final class WellnessUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
     private func launch(_ scenario: String) -> XCUIApplication {
         let app = XCUIApplication(); app.launchArguments = ["--ui-test-\(scenario)"]
-        app.launch(); return app
+        // Unrelated simulator system dialogs (Apple ID verification) can appear at any moment; dismiss them on the next interaction.
+        addUIInterruptionMonitor(withDescription: "system alerts") { alert in
+            for label in ["לא כעת", "Not Now", "אל תאפשר", "Don’t Allow", "אישור", "OK"] where alert.buttons[label].exists { alert.buttons[label].tap(); return true }
+            return false
+        }
+        app.launch()
+        dismissSystemAlerts(for: app)
+        return app
+    }
+    /// The simulator can raise unrelated system dialogs (e.g. Apple ID verification) over the app; dismiss them.
+    func dismissSystemAlerts(for app: XCUIApplication) {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        for label in ["לא כעת", "Not Now", "אל תאפשר", "Don’t Allow", "אישור", "OK"] {
+            let button = springboard.alerts.buttons[label]
+            if button.waitForExistence(timeout: 1.5) { button.tap(); break }
+        }
+        if app.state != .runningForeground { app.activate() }
     }
     private func capture(_ app: XCUIApplication, name: String) {
         let image = XCTAttachment(screenshot: app.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image)
@@ -46,6 +62,7 @@ final class WellnessUITests: XCTestCase {
         app.buttons["ביטול"].tap()
         XCTAssertFalse(app.buttons["Back"].exists, "System navigation should also use the app's Hebrew localization")
         capture(app, name: "native-meal-details")
+        app.navigationBars.buttons["BackButton"].tap()  // back from meal details to the health tabs
         app.buttons["tab-workouts"].tap()
         XCTAssertTrue(app.buttons["workout-55555555-5555-8555-8555-555555555555"].waitForExistence(timeout: 5))
         capture(app, name: "native-workouts")
@@ -53,10 +70,21 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.textFields["plan-name"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["save-plan"].isEnabled, "An empty plan must not be savable")
         capture(app, name: "native-new-plan")
+        app.buttons["pick-exercise"].tap()
+        XCTAssertTrue(app.navigationBars["קטלוג תרגילים"].waitForExistence(timeout: 5))
+        capture(app, name: "native-exercise-catalog")
+        app.buttons["catalog-Push_Up"].firstMatch.tap()
+        XCTAssertTrue(app.textFields["שכיבות סמיכה"].waitForExistence(timeout: 5), "Picking a catalog exercise fills the exercise name")
+        XCTAssertFalse(app.buttons["save-plan"].isEnabled, "A plan still needs a name before it can be saved")
         app.buttons["ביטול"].tap()
         app.buttons["plan-99999999-9999-4999-8999-999999999999"].tap()
         XCTAssertTrue(app.buttons["start-workout"].waitForExistence(timeout: 5))
         capture(app, name: "native-plan")
+        app.buttons["demo-Cable_Crossover"].tap()
+        XCTAssertTrue(app.navigationBars["פרפר בכבלים"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["דגשי ביצוע"].exists)
+        capture(app, name: "native-exercise-demo")
+        app.buttons["סגור"].tap()
         app.buttons["start-workout"].tap()
         XCTAssertTrue(app.staticTexts["0 מתוך 6 סטים"].waitForExistence(timeout: 5))
         let firstSet = app.buttons.matching(identifier: "סמן סט 1 כהושלם").element(boundBy: 0)
@@ -130,6 +158,116 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["איך מגיעים לזה עם תזונה צמחונית?"].waitForExistence(timeout: 5) || app.buttons["איך מגיעים לזה עם תזונה צמחונית?"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["2/20 הודעות היום"].exists)
         capture(app, name: "native-coach-chat")
+    }
+    func testAITrainerFlowRequiresApprovalBeforeSaving() {
+        let app = launch("coach")
+        XCTAssertTrue(app.descendants(matching: .any)["calories-card"].firstMatch.waitForExistence(timeout: 15))
+        app.buttons["tab-workouts"].tap()
+        app.buttons["trainer-button"].tap()
+        XCTAssertTrue(app.navigationBars["מאמן AI"].waitForExistence(timeout: 5))
+        capture(app, name: "native-trainer-form")
+        var tries = 0
+        while !app.buttons["trainer-generate"].exists && tries < 6 { app.swipeUp(); tries += 1 }
+        XCTAssertTrue(app.buttons["trainer-generate"].exists, "The form must be able to reach its submit button")
+        app.buttons["trainer-generate"].tap()
+        XCTAssertTrue(app.buttons["trainer-apply"].waitForExistence(timeout: 5), "The proposal must be shown for approval before anything is saved")
+        XCTAssertTrue(app.staticTexts["שכיבות סמיכה"].exists)
+        capture(app, name: "native-trainer-proposal")
+    }
+    func testHouseholdHomeShoppingChoresAndCalendar() {
+        let app = launch("home")
+        let tasksChip = app.buttons["section-a0000000-0000-4000-8000-000000000001"]
+        _ = tasksChip.waitForExistence(timeout: 10); capture(app, name: "native-home-landing")
+        XCTAssertTrue(tasksChip.exists, "The household home is the landing screen")
+        let toggle = app.buttons["task-toggle-b0000000-0000-4000-8000-000000000001"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        capture(app, name: "native-home-tasks")
+        let apply = app.buttons["suggestion-apply-e0000000-0000-4000-8000-000000000001"]
+        XCTAssertTrue(apply.exists, "Open assistant suggestions are shown with an apply button")
+        apply.tap()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: apply); waitForExpectations(timeout: 5)
+        toggle.tap()
+        let gone = NSPredicate(format: "exists == false")
+        expectation(for: gone, evaluatedWith: toggle); waitForExpectations(timeout: 5)  // moves to the completed group at once
+        app.buttons["section-a0000000-0000-4000-8000-000000000002"].tap()
+        XCTAssertTrue(app.staticTexts["חלב"].waitForExistence(timeout: 5))
+        capture(app, name: "native-home-shopping")
+        app.buttons["section-a0000000-0000-4000-8000-000000000003"].tap()
+        XCTAssertTrue(app.staticTexts["להוציא את הזבל"].waitForExistence(timeout: 5))
+        capture(app, name: "native-home-chores")
+        let notesChip = app.buttons["section-a0000000-0000-4000-8000-000000000004"]
+        if !notesChip.isHittable { app.buttons["section-a0000000-0000-4000-8000-000000000003"].swipeRight() }
+        notesChip.tap()
+        XCTAssertTrue(app.staticTexts["קוד ל-WiFi של האורחים"].waitForExistence(timeout: 5))
+        capture(app, name: "native-home-notes")
+        app.buttons["add-meal"].tap()
+        XCTAssertTrue(app.textFields["quick-add-title"].waitForExistence(timeout: 5))
+        capture(app, name: "native-home-quick-add")
+        app.buttons["ביטול"].tap()
+        app.buttons["root-calendar"].tap()
+        XCTAssertTrue(app.buttons["event-d0000000-0000-4000-8000-000000000001"].waitForExistence(timeout: 5))
+        capture(app, name: "native-calendar")
+    }
+    func testHouseholdMenuCreatesSectionSearchesAndListsMembers() {
+        let app = launch("home")
+        XCTAssertTrue(app.buttons["home-menu"].waitForExistence(timeout: 15))
+        app.buttons["home-menu"].tap()
+        app.buttons["מדור חדש"].tap()
+        let name = app.textFields["section-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("מוצרי ניקיון")
+        app.buttons["section-save"].tap()
+        XCTAssertTrue(app.buttons["מוצרי ניקיון"].waitForExistence(timeout: 5), "A new section appears as a chip and is selected")
+        app.buttons["home-menu"].tap()
+        app.buttons["בני הבית"].tap()
+        XCTAssertTrue(app.staticTexts["נועה"].waitForExistence(timeout: 5))
+        capture(app, name: "native-home-members")
+        app.buttons["סגור"].tap()
+        app.buttons["home-search"].tap()
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("חלב")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "חלב")).firstMatch.waitForExistence(timeout: 5))
+        capture(app, name: "native-home-search")
+    }
+    func testHouseholdTaskEditorAddsSubtask() {
+        let app = launch("home")
+        let row = app.buttons["task-open-b0000000-0000-4000-8000-000000000002"]
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        var scrolls = 0
+        // Nudge the page in small steps until the row sits in the middle band, clear of the header and the floating add button.
+        while (row.frame.minY > app.frame.height * 0.6 || row.frame.minY < app.frame.height * 0.28) && scrolls < 10 {
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: row.frame.minY > app.frame.height * 0.6 ? 0.7 : 0.4))
+            let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: row.frame.minY > app.frame.height * 0.6 ? 0.5 : 0.6))
+            from.press(forDuration: 0.1, thenDragTo: to); scrolls += 1
+        }
+        dismissSystemAlerts(for: app)
+        row.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)).tap()
+        dismissSystemAlerts(for: app)
+        let field = app.textFields["subtask-field"]
+        var tries = 0
+        while !field.exists && tries < 6 { app.swipeUp(); tries += 1 }
+        XCTAssertTrue(field.exists, "The editor offers subtasks")
+        field.tap(); field.typeText("לצלם את החשבון\n")
+        XCTAssertTrue(app.staticTexts["לצלם את החשבון"].waitForExistence(timeout: 5))
+        capture(app, name: "native-home-subtask")
+    }
+    func testHomeAssistantProposesActionsAndWaitsForConfirmation() {
+        let app = launch("home")
+        XCTAssertTrue(app.buttons["assistant-button"].waitForExistence(timeout: 15))
+        app.buttons["assistant-button"].tap()
+        let field = app.descendants(matching: .any)["assistant-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5)); field.tap(); field.typeText("add dish soap")
+        app.buttons["assistant-send"].tap()
+        let confirm = app.buttons["assistant-confirm-0"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 12), "Proposed actions need an explicit confirmation")
+        capture(app, name: "native-home-assistant")
+        confirm.tap()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: confirm); waitForExpectations(timeout: 5)
+    }
+    func testHomeWellnessCardOpensHealth() {
+        let app = launch("home")
+        let card = app.buttons["wellness-entry"]
+        XCTAssertTrue(card.waitForExistence(timeout: 15)); card.tap()
+        XCTAssertTrue(app.buttons["tab-workouts"].waitForExistence(timeout: 10), "Wellness card should open the health module")
     }
     func testLoginRequiresFourDigits() {
         let app = launch("login")
