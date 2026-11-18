@@ -234,6 +234,44 @@ public actor Backend {
         let (_, status) = try await authorized("/rest/v1/activity_log", method: "POST", expectedOwner: owner, body: body)
         guard (200..<300).contains(status) else { throw BackendError.server(status) }
     }
+    // MARK: Push notifications (APNs device registration and per-member preferences)
+    /// Registers (or re-assigns) this installation's APNs token for the signed-in member. `sandbox` is for Xcode debug builds.
+    public func registerPushDevice(token: String, memberID: String, sandbox: Bool, owner: String) async throws {
+        guard token.range(of: "^[0-9a-fA-F]{32,200}$", options: .regularExpression) != nil, UUID(uuidString: memberID) != nil else { throw BackendError.invalidResponse }
+        let fields: JSONValue = .object(["member_id": .string(memberID), "environment": .string(sandbox ? "sandbox" : "production"), "updated_at": .string(ISO8601DateFormatter().string(from: Date()))])
+        let (data, status) = try await authorized("/rest/v1/apns_devices", method: "PATCH", expectedOwner: owner, body: fields, query: [.init(name: "token", value: "eq.\(token.lowercased())")])
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        if try json(data).arrayValue.isEmpty {
+            var insert = fields; if case .object(var f) = insert { f["token"] = .string(token.lowercased()); insert = .object(f) }
+            let (_, created) = try await authorized("/rest/v1/apns_devices", method: "POST", expectedOwner: owner, body: insert)
+            guard (200..<300).contains(created) else { throw BackendError.server(created) }
+        }
+    }
+    public func unregisterPushDevice(token: String, owner: String) async throws {
+        guard token.range(of: "^[0-9a-fA-F]{32,200}$", options: .regularExpression) != nil else { throw BackendError.invalidResponse }
+        let (_, status) = try await authorized("/rest/v1/apns_devices", method: "DELETE", expectedOwner: owner, query: [.init(name: "token", value: "eq.\(token.lowercased())")])
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+    }
+    public static let notificationPrefKeys: Set<String> = ["on_create", "on_complete", "on_assigned_me", "on_shopping", "on_delete", "on_broadcast", "muted"]
+    /// The member's notification preferences, or nil if they never changed any (everything defaults to on).
+    public func notificationPrefs(memberID: String, owner: String) async throws -> JSONValue? {
+        guard UUID(uuidString: memberID) != nil else { throw BackendError.invalidResponse }
+        let (data, status) = try await authorized("/rest/v1/notification_prefs", expectedOwner: owner, query: [.init(name: "select", value: Self.notificationPrefKeys.sorted().joined(separator: ",")), .init(name: "member_id", value: "eq.\(memberID)")])
+        guard status == 200 else { throw BackendError.server(status) }
+        return try json(data).arrayValue.first
+    }
+    public func saveNotificationPrefs(memberID: String, prefs: [String: Bool], owner: String) async throws {
+        guard UUID(uuidString: memberID) != nil, !prefs.isEmpty, Set(prefs.keys).isSubset(of: Self.notificationPrefKeys) else { throw BackendError.invalidResponse }
+        var fields: [String: JSONValue] = prefs.mapValues { .bool($0) }
+        fields["updated_at"] = .string(ISO8601DateFormatter().string(from: Date()))
+        let (data, status) = try await authorized("/rest/v1/notification_prefs", method: "PATCH", expectedOwner: owner, body: .object(fields), query: [.init(name: "member_id", value: "eq.\(memberID)")])
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        if try json(data).arrayValue.isEmpty {
+            fields["member_id"] = .string(memberID)
+            let (_, created) = try await authorized("/rest/v1/notification_prefs", method: "POST", expectedOwner: owner, body: .object(fields))
+            guard (200..<300).contains(created) else { throw BackendError.server(created) }
+        }
+    }
     /// Read-only RPCs that return rows (allow-listed).
     public func rpcRows(_ name: String, owner: String, args: [String: JSONValue]) async throws -> [JSONValue] {
         guard Self.readRPCs.contains(name) else { throw BackendError.invalidResponse }

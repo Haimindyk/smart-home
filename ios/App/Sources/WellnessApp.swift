@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct WellnessApp: App {
+    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate
     @StateObject private var store = AppStore()
     @StateObject private var home = HomeStore()
     init() {}
@@ -9,7 +10,7 @@ struct WellnessApp: App {
     var body: some Scene {
         WindowGroup {
             AppRoot()
-                .task { PhoneConnectivity.shared.start(store: store) }
+                .task { PhoneConnectivity.shared.start(store: store); PushManager.shared.bind(store) }
                 .environmentObject(store)
                 .environmentObject(home)
                 .task { home.bind(store) }

@@ -383,6 +383,16 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Bread")).firstMatch.waitForExistence(timeout: 10), "The portion picker opens for the manual food")
         capture(app, name: "native-manual-food-portion")
     }
+    func testNotificationSettingsScreenOpens() {
+        let app = launch("meal")
+        XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 15)); app.buttons["settings-button"].tap()
+        let entry = app.buttons["notification-settings"]
+        var tries = 0
+        while !entry.exists && tries < 4 { app.swipeUp(); tries += 1 }
+        XCTAssertTrue(entry.waitForExistence(timeout: 5)); entry.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["push-enable"].waitForExistence(timeout: 8) || app.buttons["פתיחת הגדרות המכשיר"].waitForExistence(timeout: 2), "Notification settings show the permission control")
+        capture(app, name: "native-notification-settings")
+    }
     func testHomeWellnessCardOpensHealth() {
         let app = launch("home")
         let card = app.buttons["wellness-entry"]

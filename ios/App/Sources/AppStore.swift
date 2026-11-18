@@ -90,7 +90,7 @@ final class AppStore: ObservableObject {
         guard !busy, let backend else { return }
         busy = true; error = nil
         defer { busy = false }
-        do { session = try await backend.login(pin: pin); phase = .signedIn; await refresh() }
+        do { session = try await backend.login(pin: pin); phase = .signedIn; await refresh(); await PushManager.shared.refresh(); await PushManager.shared.uploadIfPossible() }
         catch { self.error = Self.message(error) }
     }
     func refresh() async {
@@ -156,6 +156,7 @@ final class AppStore: ObservableObject {
         await refresh()
     }
     func logout() async {
+        if let token = PushManager.shared.deviceToken, let owner = session?.owner { try? await backend?.unregisterPushDevice(token: token, owner: owner) }
         revision += 1; healthRevision += 1
         session = nil; meals = []; goals = []; plans = []; workouts = []; profile = .null; profileRow = nil; waterLogs = []; weightLogs = []
         candidates = []; selection = []; steps = nil; healthLoaded = false; importMessage = nil; error = nil
@@ -304,6 +305,28 @@ final class AppStore: ObservableObject {
         return meals.filter { $0.data["favorite"].boolValue == true }.sorted { ($0.data["date"].stringValue ?? "") > ($1.data["date"].stringValue ?? "") }.filter { meal in
             seen.insert(meal.data["name"].stringValue?.isEmpty == false ? meal.data["name"].stringValue! : meal.id).inserted
         }
+    }
+    // MARK: - Push notifications
+    /// Tells the server which member this installation belongs to, so activity can be delivered through APNs.
+    func registerPushToken(_ token: String) async {
+        guard let owner = session?.owner, let member = session?.member, let backend else { return }
+#if DEBUG
+        if session?.accessToken == "ui-test" { return }
+        let sandbox = true
+#else
+        let sandbox = false
+#endif
+        try? await backend.registerPushDevice(token: token, memberID: member, sandbox: sandbox, owner: owner)
+    }
+    func notificationPrefs() async -> [String: Bool] {
+        var prefs: [String: Bool] = ["on_create": true, "on_complete": true, "on_assigned_me": true, "on_shopping": true, "on_delete": true, "on_broadcast": true, "muted": false]
+        guard let owner = session?.owner, let member = session?.member, let backend, let row = try? await backend.notificationPrefs(memberID: member, owner: owner) else { return prefs }
+        for key in prefs.keys { if let v = row[key].boolValue { prefs[key] = v } }
+        return prefs
+    }
+    func saveNotificationPrefs(_ prefs: [String: Bool]) async -> Bool {
+        guard let owner = session?.owner, let member = session?.member, let backend else { return false }
+        do { try await backend.saveNotificationPrefs(memberID: member, prefs: prefs, owner: owner); return true } catch { self.error = "לא הצלחנו לשמור את הגדרות ההתראות."; return false }
     }
     // MARK: - Food library (personal foods and recipes)
     /// Remembers a scanned or label product so it can be logged again in one tap (the web app does this when a product is logged).
