@@ -108,6 +108,64 @@ function truncateForPush(text: string, maxLen = MAX_PUSH_BODY_LENGTH): string {
   return `${cut.trimEnd()}…`;
 }
 
+
+// ---------------------------------------------------------------------------
+// Native iOS delivery through APNs (token-based auth). The only secret is APNS_KEY_P8 (the .p8 contents);
+// the key id, team id and bundle id are identifiers, not secrets, and can be overridden with APNS_KEY_ID,
+// APNS_TEAM_ID and APNS_TOPIC. Without APNS_KEY_P8 the iOS path is skipped and Web Push keeps working as before.
+// ---------------------------------------------------------------------------
+type ApnsDeviceRow = { id: string; member_id: string | null; token: string; environment: string };
+
+let cachedApnsJwt: { token: string; issuedAt: number } | null = null;
+
+function base64Url(bytes: Uint8Array | string): string {
+  const raw = typeof bytes === "string" ? new TextEncoder().encode(bytes) : bytes;
+  let binary = "";
+  for (const b of raw) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function apnsJwt(): Promise<string | null> {
+  const pem = Deno.env.get("APNS_KEY_P8");
+  const keyId = Deno.env.get("APNS_KEY_ID") ?? "TN6SK4LJ85";
+  const teamId = Deno.env.get("APNS_TEAM_ID") ?? "D9LMURYTY5";
+  if (!pem || !keyId || !teamId) return null;
+  const now = Math.floor(Date.now() / 1000);
+  // APNs rejects tokens older than an hour and throttles re-issuing; reuse one for ~50 minutes.
+  if (cachedApnsJwt && now - cachedApnsJwt.issuedAt < 3000) return cachedApnsJwt.token;
+  const der = Uint8Array.from(atob(pem.replace(/-----[A-Z ]+-----/g, "").replace(/\s+/g, "")), (c) => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey("pkcs8", der, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const unsigned = `${base64Url(JSON.stringify({ alg: "ES256", kid: keyId }))}.${base64Url(JSON.stringify({ iss: teamId, iat: now }))}`;
+  const signature = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, new TextEncoder().encode(unsigned)));
+  const token = `${unsigned}.${base64Url(signature)}`;
+  cachedApnsJwt = { token, issuedAt: now };
+  return token;
+}
+
+/** Returns "ok", "dead" (the token should be removed) or "failed". */
+async function sendApns(device: ApnsDeviceRow, payload: { title: string; body: string; tag: string }): Promise<"ok" | "dead" | "failed"> {
+  const jwt = await apnsJwt();
+  const topic = Deno.env.get("APNS_TOPIC") ?? "com.haimindyk.smarthome.wellness";
+  if (!jwt) return "failed";
+  const host = device.environment === "sandbox" ? "api.sandbox.push.apple.com" : "api.push.apple.com";
+  const response = await fetch(`https://${host}/3/device/${device.token}`, {
+    method: "POST",
+    headers: {
+      authorization: `bearer ${jwt}`,
+      "apns-topic": topic,
+      "apns-push-type": "alert",
+      "apns-priority": "10",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ aps: { alert: { title: payload.title, body: payload.body }, sound: "default", "thread-id": payload.tag } }),
+  });
+  if (response.ok) return "ok";
+  const reason = (await response.json().catch(() => ({})) as { reason?: string }).reason;
+  console.error(`send-push: APNs ${response.status} ${reason ?? ""} for device ${device.id}`);
+  if (response.status === 410 || reason === "BadDeviceToken" || reason === "Unregistered" || reason === "DeviceTokenNotForTopic") return "dead";
+  return "failed";
+}
+
 function getBearerToken(req: Request): string | null {
   const header = req.headers.get("Authorization") ?? req.headers.get("authorization");
   if (!header?.startsWith("Bearer ")) return null;
@@ -189,10 +247,11 @@ Deno.serve(async (req) => {
     }
   }
 
-  const [{ data: subscriptions }, { data: prefsRows }, { data: members }] = await Promise.all([
+  const [{ data: subscriptions }, { data: prefsRows }, { data: members }, { data: apnsDevices }] = await Promise.all([
     supabase.from("push_subscriptions").select("id, member_id, endpoint, p256dh, auth"),
     supabase.from("notification_prefs").select("*"),
     supabase.from("members").select("id, email, display_name, avatar_emoji, avatar_photo_url, locale"),
+    supabase.from("apns_devices").select("id, member_id, token, environment"),
   ]);
 
   const prefsByMember = new Map<string, NotificationPrefsRow>();
@@ -219,6 +278,67 @@ Deno.serve(async (req) => {
   let sent = 0;
   let skipped = 0;
 
+  // Per-member decision shared by Web Push and APNs: null = stay silent, otherwise the notification content.
+  const buildNotification = (memberId: string): { title: string; body: string; tag: string; icon?: string } | null => {
+    const prefs = prefsByMember.get(memberId) ?? { member_id: memberId, ...DEFAULT_PREFS };
+    if (prefs.muted) {
+      return null;
+    }
+
+    const isAssignee = assigneeIds.includes(memberId);
+
+    // Targeting precedence (deliberate, see PR description):
+    // 1. Being assigned is the strongest signal. If the member has
+    //    on_assigned_me on, they hear about it even if on_create happens
+    //    to be off for them — an assignment is arguably a distinct kind
+    //    of event from "someone created something", even though both
+    //    ride on the same activity_log INSERT.
+    // 2. Shopping-list items are gated purely by on_shopping, standing in
+    //    for on_create/on_complete for that category (so someone can mute
+    //    "created"/"completed" noise in general but keep shopping pings,
+    //    or vice versa).
+    // 3. Everything else falls back to the action-specific pref. Actions
+    //    with no pref of their own (renamed/moved/updated/uncompleted)
+    //    stay silent — they're edits to something you already heard
+    //    about, not a new thing to look at.
+    let notify: boolean;
+    if (action === "message") {
+      // A deliberate broadcast from a member — gated purely by on_broadcast,
+      // never by mute-by-assignee/shopping/etc. logic below.
+      notify = prefs.on_broadcast;
+    } else if (isAssignee && prefs.on_assigned_me) {
+      notify = true;
+    } else if (isShopping) {
+      notify = prefs.on_shopping;
+    } else if (action === "created") {
+      notify = prefs.on_create;
+    } else if (action === "completed") {
+      notify = prefs.on_complete;
+    } else if (action === "deleted" || action === "restored") {
+      notify = prefs.on_delete;
+    } else {
+      notify = false;
+    }
+
+    if (!notify) {
+      return null;
+    }
+
+    const recipient = membersById.get(memberId);
+    let title: string;
+    let body: string;
+    if (action === "message") {
+      title = actorName ? `📣 ${actorName}` : "📣 K&H";
+      body = summary ?? "";
+    } else {
+      const verb = verbFor(action, recipient?.locale ?? null);
+      title = actorName ?? "K&H";
+      body = summary ? `${verb} ${summary}` : verb;
+    }
+
+    return { title, body: truncateForPush(body), tag: `${entityType}-${entityId}`, icon: actor?.avatar_photo_url ?? undefined };
+  };
+
   await Promise.all(
     ((subscriptions ?? []) as PushSubscriptionRow[]).map(async (sub) => {
       // Never notify the person who made the change themselves.
@@ -226,73 +346,12 @@ Deno.serve(async (req) => {
         skipped++;
         return;
       }
-
-      const prefs = prefsByMember.get(sub.member_id) ?? { member_id: sub.member_id, ...DEFAULT_PREFS };
-      if (prefs.muted) {
+      const note = buildNotification(sub.member_id);
+      if (!note) {
         skipped++;
         return;
       }
-
-      const isAssignee = assigneeIds.includes(sub.member_id);
-
-      // Targeting precedence (deliberate, see PR description):
-      // 1. Being assigned is the strongest signal. If the member has
-      //    on_assigned_me on, they hear about it even if on_create happens
-      //    to be off for them — an assignment is arguably a distinct kind
-      //    of event from "someone created something", even though both
-      //    ride on the same activity_log INSERT.
-      // 2. Shopping-list items are gated purely by on_shopping, standing in
-      //    for on_create/on_complete for that category (so someone can mute
-      //    "created"/"completed" noise in general but keep shopping pings,
-      //    or vice versa).
-      // 3. Everything else falls back to the action-specific pref. Actions
-      //    with no pref of their own (renamed/moved/updated/uncompleted)
-      //    stay silent — they're edits to something you already heard
-      //    about, not a new thing to look at.
-      let notify: boolean;
-      if (action === "message") {
-        // A deliberate broadcast from a member — gated purely by on_broadcast,
-        // never by mute-by-assignee/shopping/etc. logic below.
-        notify = prefs.on_broadcast;
-      } else if (isAssignee && prefs.on_assigned_me) {
-        notify = true;
-      } else if (isShopping) {
-        notify = prefs.on_shopping;
-      } else if (action === "created") {
-        notify = prefs.on_create;
-      } else if (action === "completed") {
-        notify = prefs.on_complete;
-      } else if (action === "deleted" || action === "restored") {
-        notify = prefs.on_delete;
-      } else {
-        notify = false;
-      }
-
-      if (!notify) {
-        skipped++;
-        return;
-      }
-
-      const recipient = membersById.get(sub.member_id);
-      let title: string;
-      let body: string;
-      if (action === "message") {
-        title = actorName ? `📣 ${actorName}` : "📣 K&H";
-        body = summary ?? "";
-      } else {
-        const verb = verbFor(action, recipient?.locale ?? null);
-        title = actorName ?? "K&H";
-        body = summary ? `${verb} ${summary}` : verb;
-      }
-
-      const payload = {
-        title,
-        body: truncateForPush(body),
-        url: "/",
-        tag: `${entityType}-${entityId}`,
-        icon: actor?.avatar_photo_url ?? undefined,
-      };
-
+      const payload = { title: note.title, body: note.body, url: "/", tag: note.tag, icon: note.icon };
       try {
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
@@ -303,11 +362,36 @@ Deno.serve(async (req) => {
         const statusCode = (err as { statusCode?: number; status?: number })?.statusCode ??
           (err as { statusCode?: number; status?: number })?.status;
         if (statusCode === 410 || statusCode === 404) {
-          // Dead subscription (unsubscribed, browser data cleared, etc.) —
-          // stop retrying it forever.
+          // Dead subscription (unsubscribed, browser data cleared, etc.) — stop retrying it forever.
           await supabase.from("push_subscriptions").delete().eq("id", sub.id);
         }
         console.error(`send-push: failed for subscription ${sub.id}`, statusCode, err);
+        skipped++;
+      }
+    })
+  );
+
+  // Native iOS devices (APNs), same rules and preferences.
+  await Promise.all(
+    ((apnsDevices ?? []) as ApnsDeviceRow[]).map(async (device) => {
+      if (!device.member_id || device.member_id === actorId) {
+        skipped++;
+        return;
+      }
+      const note = buildNotification(device.member_id);
+      if (!note) {
+        skipped++;
+        return;
+      }
+      try {
+        const result = await sendApns(device, note);
+        if (result === "ok") sent++;
+        else {
+          if (result === "dead") await supabase.from("apns_devices").delete().eq("id", device.id);
+          skipped++;
+        }
+      } catch (err) {
+        console.error(`send-push: APNs failed for device ${device.id}`, err);
         skipped++;
       }
     })

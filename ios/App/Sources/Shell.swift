@@ -35,7 +35,7 @@ struct RootShell: View {
         // Other household members' changes show up without pulling to refresh (the web app uses realtime; this polls while the home or calendar is open).
         .task(id: tab) { guard tab != .health else { return }; while !Task.isCancelled { try? await Task.sleep(for: .seconds(25)); if !Task.isCancelled, scenePhase == .active { await home.refreshIfLive() } } }
         .onChange(of: home.openHealthRequested) { _, requested in if requested { home.openHealthRequested = false; withAnimation(.snappy) { tab = .health } } }
-        .task { home.bind(store); if !started { started = true; tab = store.startsOnHealth ? .health : .home; await home.refresh() } }
+        .task { home.bind(store); if !started { started = true; tab = store.startsOnHealth ? .health : .home; await home.refresh(); await PushManager.shared.refresh(); await PushManager.shared.uploadIfPossible() } }
         .safeAreaInset(edge: .bottom, spacing: 0) { bar }
         .sheet(isPresented: $addingMeal) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }
         .sheet(isPresented: $addingTask) { QuickAddSheet().environmentObject(home).presentationDetents([.medium]).presentationDragIndicator(.visible) }

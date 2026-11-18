@@ -257,6 +257,32 @@ final class BackendTests: XCTestCase {
         pinTaken = true
         do { _ = try await api.registerMember(name: "x", pin: "1234", emoji: "🙂", color: "#6366f1", owner: owner); XCTFail("duplicate pin") } catch { XCTAssertEqual(error as? BackendError, .conflict) }
     }
+    func testPushDeviceRegistrationAndPreferencesAreValidatedAndUpserted() async throws {
+        let owner = owner
+        var seen: [String] = []
+        var existing = false
+        let lock = NSLock()
+        let api = try await signedInBackend { request in
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            lock.lock(); seen.append("\(request.httpMethod ?? "") \(request.url!.path)?\(request.url!.query ?? "")"); lock.unlock()
+            if request.httpMethod == "PATCH" { return (200, existing ? "[{\"token\":\"x\"}]" : "[]") }
+            return (201, "[]")
+        }
+        let member = "22222222-2222-4222-8222-222222222222", token = String(repeating: "ab", count: 32)
+        try await api.registerPushDevice(token: token.uppercased(), memberID: member, sandbox: false, owner: owner)
+        XCTAssertTrue(seen.contains { $0.hasPrefix("PATCH /rest/v1/apns_devices?token=eq.\(token)") }, "token is stored lowercase")
+        XCTAssertTrue(seen.contains { $0.hasPrefix("POST /rest/v1/apns_devices") }, "inserted when no row matched")
+        seen.removeAll(); existing = true
+        try await api.registerPushDevice(token: token, memberID: member, sandbox: true, owner: owner)
+        XCTAssertFalse(seen.contains { $0.hasPrefix("POST ") }, "an existing token is only re-assigned")
+        for bad in ["zz", "", String(repeating: "a", count: 10)] { do { try await api.registerPushDevice(token: bad, memberID: member, sandbox: false, owner: owner); XCTFail("bad token") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) } }
+        try await api.unregisterPushDevice(token: token, owner: owner)
+        XCTAssertTrue(seen.contains { $0.hasPrefix("DELETE /rest/v1/apns_devices?token=eq.") })
+        existing = false; seen.removeAll()
+        try await api.saveNotificationPrefs(memberID: member, prefs: ["muted": true, "on_shopping": false], owner: owner)
+        XCTAssertTrue(seen.contains { $0.hasPrefix("PATCH /rest/v1/notification_prefs") } && seen.contains { $0.hasPrefix("POST /rest/v1/notification_prefs") })
+        do { try await api.saveNotificationPrefs(memberID: member, prefs: ["member_id": true], owner: owner); XCTFail("unknown key") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+    }
     func testBroadcastPostsAnActivityRowAndRejectsEmptyText() async throws {
         let owner = owner
         var seen: [String] = []
