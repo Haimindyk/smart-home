@@ -407,6 +407,7 @@ struct TaskPanelBody: View {
         TaskRow(task: task, depth: depth, notesStyle: notesStyle) { editing = task }
             .padding(.leading, CGFloat(depth) * 22)
             .swipeToDelete { Task { await home.delete(task) } }
+            .modifier(ReorderDrag(task: task, enabled: depth == 0 && !notesStyle && !task.isCompleted))
             .contextMenu {
                 if !notesStyle { Button { Task { await home.toggle(task) } } label: { Label(task.isCompleted ? "בטל סימון" : "סמן כבוצע", systemImage: "checkmark.circle") } }
                 Button { editing = task } label: { Label("עריכה", systemImage: "pencil") }
@@ -416,6 +417,22 @@ struct TaskPanelBody: View {
                 }
                 Button(role: .destructive) { Task { await home.delete(task) } } label: { Label("מחיקה", systemImage: "trash") }
             }
+    }
+}
+
+/// Long-press and drag a task onto another to reorder the list (the web app's drag handles).
+private struct ReorderDrag: ViewModifier {
+    @EnvironmentObject private var home: HomeStore
+    let task: HTask
+    let enabled: Bool
+    func body(content: Content) -> some View {
+        if enabled {
+            content.draggable(task.id) { Text(task.title).font(.hb(.body)).padding(10).background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 12, style: .continuous)) }
+                .dropDestination(for: String.self) { ids, _ in
+                    guard let id = ids.first else { return false }
+                    Task { await home.reorder(id, onto: task.id) }; return true
+                }
+        } else { content }
     }
 }
 

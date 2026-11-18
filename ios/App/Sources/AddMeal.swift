@@ -32,9 +32,22 @@ struct AddMealSheet: View {
                         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
                 }
                 if searching { ProgressView().padding(.top, 30) }
-                else if results.isEmpty && !searched && query.isEmpty && !store.recentMeals.isEmpty {
+                else if results.isEmpty && !searched && query.isEmpty && (!store.recentMeals.isEmpty || !store.recipes.isEmpty || !store.personalFoods.isEmpty) {
                     ScrollView { LazyVStack(alignment: .leading, spacing: 10) {
-                        Text("אחרונים").sectionTitle()
+                        if !store.recipes.isEmpty {
+                            Text("המתכונים שלי").sectionTitle()
+                            ForEach(store.recipes) { recipe in
+                                Button { Task { if await store.logRecipe(recipe, kind: currentKind()) { dismiss() } } } label: {
+                                    HStack { Image(systemName: "book.closed").foregroundStyle(Color.wellnessSecondary); Text(recipe.data["name"].stringValue ?? "מתכון").font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessInk); Spacer(); Text("מנה אחת").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }
+                                        .padding(14).background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
+                                }.buttonStyle(PressableStyle())
+                            }
+                        }
+                        if !store.personalFoods.isEmpty {
+                            Text("המועדפים שלי").sectionTitle()
+                            ForEach(store.personalFoods.prefix(12)) { row in Button { picked = FoodChoice(food: row.data) } label: { FoodRow(food: row.data) }.buttonStyle(PressableStyle()) }
+                        }
+                        if !store.recentMeals.isEmpty { Text("אחרונים").sectionTitle() }
                         ForEach(store.recentMeals) { meal in
                             Button { Task { if await store.relogMeal(meal, kind: currentKind()) { dismiss() } } } label: { RecentRow(meal: meal) }.buttonStyle(PressableStyle())
                         }

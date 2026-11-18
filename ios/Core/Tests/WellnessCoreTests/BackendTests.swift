@@ -243,6 +243,20 @@ final class BackendTests: XCTestCase {
         do { _ = try await api.uploadImage(Data([1, 2, 3]), owner: owner); XCTFail("must reject non-JPEG") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
         do { _ = try await api.uploadImage(Data(), owner: owner); XCTFail("must reject empty") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
     }
+    func testRegisterMemberValidatesPinAndMapsDuplicatePin() async throws {
+        let owner = owner
+        var pinTaken = false
+        let api = try await signedInBackend { request in
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            if request.url!.path == "/functions/v1/health-account" { return pinTaken ? (400, "{\"error\":\"pin_taken\"}") : (200, "{\"member\":{\"id\":\"m1\",\"display_name\":\"נועה\"}}") }
+            return (200, "{}")
+        }
+        let member = try await api.registerMember(name: " נועה ", pin: "1234", emoji: "🙂", color: "#6366f1", owner: owner)
+        XCTAssertEqual(member["id"].stringValue, "m1")
+        for bad in ["123", "12a4", "12345", ""] { do { _ = try await api.registerMember(name: "x", pin: bad, emoji: "🙂", color: "#6366f1", owner: owner); XCTFail("pin \(bad) must be rejected") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) } }
+        pinTaken = true
+        do { _ = try await api.registerMember(name: "x", pin: "1234", emoji: "🙂", color: "#6366f1", owner: owner); XCTFail("duplicate pin") } catch { XCTAssertEqual(error as? BackendError, .conflict) }
+    }
     func testCalendarFeedURLUsesFunctionsHost() async throws {
         let owner = owner
         let api = try await signedInBackend { request in request.url!.path == "/auth/v1/user" ? (200, "{\"id\":\"\(owner)\"}") : (200, "{}") }

@@ -33,6 +33,7 @@ struct SettingsScreen: View {
                         }.disabled((Double(weightText.replacingOccurrences(of: ",", with: ".")) ?? 0) < 20)
                     }
                 }
+                Section { NavigationLink { FoodLibraryScreen() } label: { Label("הספרייה שלי (מועדפים ומתכונים)", systemImage: "books.vertical") }.accessibilityIdentifier("food-library") }
                 Section("פרטיות") {
                     Text("קוד הכניסה לא נשמר. פרטי ההתחברות מוגנים ב־Keychain של המכשיר.")
                     Text("המידע מבריאות מיובא רק אחרי בחירת אימונים ואישור שלך.")

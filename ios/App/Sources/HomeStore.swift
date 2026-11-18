@@ -119,6 +119,17 @@ final class HomeStore: ObservableObject {
         await update(task, fields: ["position": .string(position)]) { $0.position = position }
     }
 
+    /// Drag and drop: puts `taskID` where `targetID` is (below it when dragging downward, above it when dragging upward).
+    func reorder(_ taskID: String, onto targetID: String) async {
+        guard taskID != targetID, let moving = tasks.first(where: { $0.id == taskID }), let target = tasks.first(where: { $0.id == targetID }),
+              moving.sectionID == target.sectionID, moving.parentID == nil, target.parentID == nil, !moving.isCompleted, !target.isCompleted else { return }
+        let siblings = tasks.filter { $0.sectionID == moving.sectionID && $0.parentID == nil && !$0.isCompleted }.sorted { $0.position < $1.position }
+        guard let from = siblings.firstIndex(where: { $0.id == taskID }), let to = siblings.firstIndex(where: { $0.id == targetID }) else { return }
+        _ = (from, to)
+        guard let position = Reorder.position(siblings.map { ($0.id, $0.position) }, moving: taskID, onto: targetID) else { return }
+        await update(moving, fields: ["position": .string(position)]) { $0.position = position }
+    }
+
     // MARK: Assistant suggestions and notes
     func dismiss(_ suggestion: HSuggestion) async {
         let backup = suggestions; suggestions.removeAll { $0.id == suggestion.id }
@@ -352,6 +363,22 @@ final class HomeStore: ObservableObject {
 #endif
         guard let app, let owner = app.session?.owner, let backend = app.backend else { return nil }
         return try? await PriceComparison.compare(items, excluding: excluded, source: BackendPriceSource(backend: backend, owner: owner))
+    }
+    enum AddMemberResult { case added(HMember), pinTaken, failed }
+    /// Registers a new household member with a 4-digit PIN.
+    func addMember(name: String, pin: String, emoji: String, color: String) async -> AddMemberResult {
+#if DEBUG
+        if app?.backend == nil, app?.session?.accessToken == "ui-test" {
+            guard let m = HMember(.object(["id": .string(UUID().uuidString.lowercased()), "display_name": .string(name), "avatar_emoji": .string(emoji), "color": .string(color)])) else { return .failed }
+            members.append(m); return .added(m)
+        }
+#endif
+        guard let app, let owner = app.session?.owner, let backend = app.backend else { return .failed }
+        do {
+            let row = try await backend.registerMember(name: name, pin: pin, emoji: emoji, color: color, owner: owner)
+            guard app.session?.owner == owner, let m = HMember(row) else { return .failed }
+            members.append(m); members.sort { $0.name < $1.name }; return .added(m)
+        } catch BackendError.conflict { return .pinTaken } catch { return .failed }
     }
     /// Saves the signed-in member's profile; an optional JPEG becomes the new profile photo.
     @discardableResult

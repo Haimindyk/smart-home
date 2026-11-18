@@ -35,7 +35,8 @@ struct EditMealSheet: View {
                     }
                 } header: { Text("פריטים") } footer: { Text(items.count > 1 ? "החלק פריט הצידה כדי להסיר אותו." : "אי אפשר להסיר את הפריט האחרון. אפשר למחוק את הארוחה כולה מהמסך הראשי.") }
             }
-            .wellnessList().navigationTitle("עריכת ארוחה").navigationBarTitleDisplayMode(.inline)
+            .wellnessList().navigationTitle("עריכת ארוחה")
+            .safeAreaInset(edge: .bottom) { Button { Task { _ = await store.saveRecipe(name: name.isEmpty ? (items.first?["food"]["name"].stringValue ?? "מתכון") : name, servings: 1, items: items) } } label: { Label("שמירה כמתכון", systemImage: "book.closed").font(.hb(.subheadline, .semibold)).padding(.horizontal, 18).frame(minHeight: 44).background(.regularMaterial, in: Capsule()) }.padding(.bottom, 6).accessibilityIdentifier("save-recipe") }.navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("ביטול") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

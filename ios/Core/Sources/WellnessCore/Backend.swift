@@ -214,6 +214,18 @@ public actor Backend {
         guard let url = URL(string: "/storage/v1/object/public/avatars/\(path)", relativeTo: root)?.absoluteURL, url.scheme == "https", url.host == root.host else { throw BackendError.invalidResponse }
         return url.absoluteString
     }
+    /// Registers a new household member with a 4-digit PIN (edge function `health-account`, action `register`). A PIN that is already used throws `.conflict`.
+    public func registerMember(name: String, pin: String, emoji: String, color: String, owner: String) async throws -> JSONValue {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, clean.count <= 60, pin.count == 4, pin.allSatisfy({ $0.isASCII && $0.isNumber }), emoji.count <= 8, color.range(of: "^#[0-9a-fA-F]{6}$", options: .regularExpression) != nil else { throw BackendError.invalidResponse }
+        let (data, status) = try await authorized("/functions/v1/health-account", method: "POST", expectedOwner: owner,
+                                                  body: .object(["action": .string("register"), "name": .string(clean), "pin": .string(pin), "emoji": .string(emoji), "color": .string(color)]))
+        if status == 400, (try? json(data))?["error"].stringValue == "pin_taken" { throw BackendError.conflict }
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        let member = try json(data)["member"]
+        guard member["id"].stringValue != nil else { throw BackendError.invalidResponse }
+        return member
+    }
     /// Read-only RPCs that return rows (allow-listed).
     public func rpcRows(_ name: String, owner: String, args: [String: JSONValue]) async throws -> [JSONValue] {
         guard Self.readRPCs.contains(name) else { throw BackendError.invalidResponse }

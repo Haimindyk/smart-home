@@ -323,6 +323,35 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(rami.waitForExistence(timeout: 10), "Chains are listed with totals")
         capture(app, name: "native-price-comparison")
     }
+    func testAddingMemberShowsInvitationWithPin() {
+        let app = launch("home")
+        XCTAssertTrue(app.buttons["home-menu"].waitForExistence(timeout: 15)); app.buttons["home-menu"].tap()
+        app.buttons["בני הבית"].tap()
+        let add = app.buttons["add-member"]
+        XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let name = app.textFields["member-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("Dana")
+        let pin = app.secureTextFields["member-pin"]
+        XCTAssertTrue(pin.waitForExistence(timeout: 5)); pin.tap(); pin.typeText("4821")
+        let save = app.buttons["member-save"]
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: save); waitForExpectations(timeout: 8)
+        save.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "4821")).firstMatch.waitForExistence(timeout: 12), "The new member's PIN is shown for sharing")
+        capture(app, name: "native-member-added")
+    }
+    func testFoodLibraryListsRecipesAndOpensEditor() {
+        let app = launch("meal")
+        XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 15)); app.buttons["settings-button"].tap()
+        let library = app.buttons["food-library"]
+        var tries = 0
+        while !library.exists && tries < 4 { app.swipeUp(); tries += 1 }
+        XCTAssertTrue(library.waitForExistence(timeout: 5)); library.tap()
+        let recipe = app.buttons["recipe-55555555-5555-4555-8555-555555555555"]
+        XCTAssertTrue(recipe.waitForExistence(timeout: 8), "Saved recipes are listed")
+        capture(app, name: "native-food-library")
+        recipe.tap()
+        XCTAssertTrue(app.textFields["recipe-name"].waitForExistence(timeout: 5), "Recipe editor opens")
+    }
     func testHomeWellnessCardOpensHealth() {
         let app = launch("home")
         let card = app.buttons["wellness-entry"]

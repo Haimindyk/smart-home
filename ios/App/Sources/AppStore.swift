@@ -12,6 +12,8 @@ final class AppStore: ObservableObject {
     @Published var error: String?
     @Published var selectedDate = Date()
     @Published private(set) var meals: [HealthRow] = []
+    @Published private(set) var personalFoods: [HealthRow] = []
+    @Published private(set) var recipes: [HealthRow] = []
     @Published private(set) var goals: [HealthRow] = []
     @Published private(set) var plans: [HealthRow] = []
     @Published private(set) var workouts: [HealthRow] = []
@@ -38,7 +40,7 @@ final class AppStore: ObservableObject {
                 session = Session(accessToken: "ui-test", refreshToken: "ui-test", owner: UITestFixtures.owner, member: "11111111-1111-4111-8111-111111111111")
                 profile = .object(["timezone": .string("UTC"), "birthDate": .string("1990-01-01"), "aiProviderConsent": .bool(scenario == "--ui-test-coach")])
                 goals = UITestFixtures.goals(date: dateKey)
-                if scenario == "--ui-test-meal" || scenario == "--ui-test-coach" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey); plans = UITestFixtures.plans(); weightLogs = UITestFixtures.weights(zone: timeZone) }
+                if scenario == "--ui-test-meal" || scenario == "--ui-test-coach" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey); plans = UITestFixtures.plans(); weightLogs = UITestFixtures.weights(zone: timeZone); recipes = UITestFixtures.recipes() }
             }
             return
         }
@@ -103,11 +105,14 @@ final class AppStore: ObservableObject {
             async let h = backend.rows(table: "health_profiles", owner: owner)
             async let wl = backend.rows(table: "water_logs", owner: owner)
             async let wt = backend.rows(table: "weight_logs", owner: owner)
+            async let pf = backend.rows(table: "personal_foods", owner: owner)
+            async let rc = backend.rows(table: "recipes", owner: owner)
             let snapshot = try await (m, g, p, w, h)
             let extras = try await (wl, wt)
+            let library = try await (pf, rc)
             guard request == revision, session?.owner == owner else { return }
             meals = snapshot.0; goals = snapshot.1; plans = snapshot.2; workouts = snapshot.3; profile = snapshot.4.first?.data ?? .null; profileRow = snapshot.4.first
-            waterLogs = extras.0; weightLogs = extras.1
+            waterLogs = extras.0; weightLogs = extras.1; personalFoods = library.0; recipes = library.1
             candidates = pendingAppleWorkouts(candidates, existing: importedIDs)
             selection.formIntersection(Set(candidates.map(\.id)))
             publishToWatch()
@@ -233,10 +238,12 @@ final class AppStore: ObservableObject {
         let date = dateKey
         let item: JSONValue = .object(["id": .string(UUID().uuidString.lowercased()), "food": food, "quantity": .number(quantity)])
         let payload: JSONValue = .object(["date": .string(date), "kind": .string(kind), "name": .string(name), "items": .array([item]), "imagePath": .null])
-        return await write("לא הצלחנו לשמור את הארוחה.") { backend, owner in
+        let ok = await write("לא הצלחנו לשמור את הארוחה.") { backend, owner in
             let row = try await backend.save(table: "meals", owner: owner, payload: payload)
             if session?.owner == owner { meals.append(row) }
         }
+        if ok { await rememberFood(food) }
+        return ok
     }
     /// Latest distinct meals (by name), newest first, for one-tap re-logging.
     var recentMeals: [HealthRow] {
@@ -266,6 +273,64 @@ final class AppStore: ObservableObject {
         return await write("לא הצלחנו לשמור את השינויים בארוחה.") { backend, owner in
             let saved = try await backend.save(table: "meals", owner: owner, payload: payload, existing: row)
             if session?.owner == owner, let index = meals.firstIndex(where: { $0.id == row.id }) { meals[index] = saved }
+        }
+    }
+    // MARK: - Food library (personal foods and recipes)
+    /// Remembers a scanned or label product so it can be logged again in one tap (the web app does this when a product is logged).
+    func rememberFood(_ food: JSONValue) async {
+        guard let barcode = food["barcode"].stringValue, !personalFoods.contains(where: { $0.data["barcode"].stringValue == barcode }) else { return }
+        guard let owner = session?.owner, let backend else { return }
+        if let row = try? await backend.save(table: "personal_foods", owner: owner, payload: food), session?.owner == owner { personalFoods.append(row) }
+    }
+    func removePersonalFood(_ row: HealthRow) async -> Bool {
+        await write("לא הצלחנו להסיר מהספרייה.") { backend, owner in
+            try await backend.softDelete(table: "personal_foods", row: row, owner: owner)
+            if session?.owner == owner { personalFoods.removeAll { $0.id == row.id } }
+        }
+    }
+    /// Saves a meal's items as a recipe. Recipes are priced per gram, so every item must be measured in grams (as on the web).
+    func saveRecipe(name: String, servings: Double, items: [JSONValue]) async -> Bool {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, clean.count <= 200, servings > 0, servings <= 1000, !items.isEmpty, items.count <= 100,
+              items.allSatisfy({ ($0["food"]["basis"].stringValue ?? "g") == "g" }) else { error = "מתכון יכול להכיל רק מרכיבים שנמדדים בגרמים."; return false }
+        let payload: JSONValue = .object(["name": .string(clean), "servings": .number(servings), "items": .array(items)])
+        return await write("לא הצלחנו לשמור את המתכון.") { backend, owner in
+            let row = try await backend.save(table: "recipes", owner: owner, payload: payload)
+            if session?.owner == owner { recipes.append(row) }
+        }
+    }
+    func updateRecipe(_ row: HealthRow, name: String, servings: Double, grams: [String: Double]) async -> Bool {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard case .object(var fields) = row.data, !clean.isEmpty, clean.count <= 200, servings > 0, servings <= 1000, grams.values.allSatisfy({ $0 > 0 && $0 <= 10_000 }) else { return false }
+        let items = row.data["items"].arrayValue.map { item -> JSONValue in
+            guard case .object(var f) = item, let id = f["id"]?.stringValue, let g = grams[id] else { return item }
+            f["quantity"] = .number(g); return .object(f)
+        }
+        fields["name"] = .string(clean); fields["servings"] = .number(servings); fields["items"] = .array(items)
+        let payload = JSONValue.object(fields)
+        return await write("לא הצלחנו לשמור את המתכון.") { backend, owner in
+            let saved = try await backend.save(table: "recipes", owner: owner, payload: payload, existing: row)
+            if session?.owner == owner, let i = recipes.firstIndex(where: { $0.id == row.id }) { recipes[i] = saved }
+        }
+    }
+    func removeRecipe(_ row: HealthRow) async -> Bool {
+        await write("לא הצלחנו למחוק את המתכון.") { backend, owner in
+            try await backend.softDelete(table: "recipes", row: row, owner: owner)
+            if session?.owner == owner { recipes.removeAll { $0.id == row.id } }
+        }
+    }
+    /// Logs one serving of a recipe as a meal (each item scaled by 1/servings).
+    func logRecipe(_ row: HealthRow, kind: String) async -> Bool {
+        let servings = max(row.data["servings"].doubleValue ?? 1, 0.1)
+        let items = row.data["items"].arrayValue.map { item -> JSONValue in
+            guard case .object(var f) = item else { return item }
+            f["id"] = .string(UUID().uuidString.lowercased()); f["quantity"] = .number(((f["quantity"]?.doubleValue ?? 0) / servings * 100).rounded() / 100); return .object(f)
+        }
+        guard !items.isEmpty else { return false }
+        let payload: JSONValue = .object(["date": .string(dateKey), "kind": .string(kind), "name": .string(row.data["name"].stringValue ?? ""), "items": .array(items), "imagePath": .null])
+        return await write("לא הצלחנו להוסיף את הארוחה.") { backend, owner in
+            let saved = try await backend.save(table: "meals", owner: owner, payload: payload)
+            if session?.owner == owner { meals.append(saved) }
         }
     }
     // MARK: - AI trainer (wellness-ai: program / adjust / apply)

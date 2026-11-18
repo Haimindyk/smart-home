@@ -16,6 +16,9 @@ enum UITestFixtures {
     static func meals(date: String) -> [HealthRow] {
         row(id: "33333333-3333-4333-8333-333333333333", data: "{\"date\":\"\(date)\",\"kind\":\"lunch\",\"name\":\"ארוחת בדיקה\",\"imagePath\":null,\"items\":[{\"id\":\"44444444-4444-4444-8444-444444444444\",\"quantity\":100,\"food\":{\"id\":\"test-tuna\",\"name\":\"טונה\",\"basis\":\"g\",\"source\":\"manual\",\"per100\":{\"kcal\":150,\"protein\":25,\"carbs\":0,\"fat\":5}}}]}")
     }
+    static func recipes() -> [HealthRow] {
+        row(id: "55555555-5555-4555-8555-555555555555", data: "{\"name\":\"סלט טונה\",\"servings\":2,\"items\":[{\"id\":\"66666666-6666-4666-8666-666666666666\",\"quantity\":200,\"food\":{\"id\":\"test-tuna\",\"name\":\"טונה\",\"basis\":\"g\",\"source\":\"manual\",\"per100\":{\"kcal\":150,\"protein\":25,\"carbs\":0,\"fat\":5}}}]}")
+    }
     static func weights(zone: TimeZone) -> [HealthRow] {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
         let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = zone; f.dateFormat = "yyyy-MM-dd"

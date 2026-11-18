@@ -1,12 +1,15 @@
 import SwiftUI
 import PhotosUI
 
+enum AvatarOptions {
+    static let emojis = ["🙂", "🧑", "👤", "🧔", "👩", "🧑‍🦱", "🧑‍🦰", "👨", "🐶", "💙"]
+    static let colors = ["#6366f1", "#3b82f6", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#a855f7", "#ef4444"]
+}
+
 /// "My profile": name, emoji, color and an optional photo (the web app's profile dialog).
 struct ProfileEditorSheet: View {
     @EnvironmentObject private var home: HomeStore
     @Environment(\.dismiss) private var dismiss
-    private static let emojis = ["🙂", "🧑", "👤", "🧔", "👩", "🧑‍🦱", "🧑‍🦰", "👨", "🐶", "💙"]
-    private static let colors = ["#6366f1", "#3b82f6", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#a855f7", "#ef4444"]
     @State private var name = ""
     @State private var emoji = "🙂"
     @State private var color = "#6366f1"
@@ -29,7 +32,7 @@ struct ProfileEditorSheet: View {
                 Section("שם") { TextField("השם שלך", text: $name).accessibilityIdentifier("profile-name") }
                 Section("אימוג׳י") {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
-                        ForEach(Self.emojis, id: \.self) { e in
+                        ForEach(AvatarOptions.emojis, id: \.self) { e in
                             Button { emoji = e } label: { Text(e).font(.system(size: 26)).frame(maxWidth: .infinity, minHeight: 48).background(emoji == e ? Color.wellnessChip : Color.clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(emoji == e ? Color.wellnessInk : Color.wellnessHairline, lineWidth: emoji == e ? 2 : 1)) }.buttonStyle(.plain)
                         }
@@ -37,7 +40,7 @@ struct ProfileEditorSheet: View {
                 }
                 Section("צבע") {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 8), spacing: 8) {
-                        ForEach(Self.colors, id: \.self) { c in
+                        ForEach(AvatarOptions.colors, id: \.self) { c in
                             Button { color = c } label: { Circle().fill(Color(hex: c)).frame(height: 32).overlay(Circle().strokeBorder(Color.wellnessInk, lineWidth: color == c ? 3 : 0).padding(-3)) }.buttonStyle(.plain).accessibilityLabel("צבע").accessibilityAddTraits(color == c ? [.isSelected] : [])
                         }
                     }.padding(.vertical, 6)
