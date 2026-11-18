@@ -258,6 +258,8 @@ final class BackendTests: XCTestCase {
         let rows = try await api.householdRows(table: "tasks", owner: owner, filters: [.init(name: "section_id", value: "eq.s1")], order: "position.asc")
         XCTAssertEqual(rows.count, 2)
         XCTAssertTrue(seen.contains { $0.contains("deleted_at=is.null") && $0.contains("section_id=eq.s1") && $0.contains("order=position.asc") }, "soft-deleted rows must be excluded")
+        _ = try await api.householdRows(table: "members", owner: owner, columns: "id,display_name", order: "display_name.asc")
+        XCTAssertTrue(seen.contains { $0.contains("/members?") && $0.contains("select=id,display_name") || $0.contains("/members?") && $0.contains("select=id%2Cdisplay_name") }, "members must not select the protected pin column")
         let id = "22222222-2222-4222-8222-222222222222"
         _ = try await api.householdInsert(table: "tasks", owner: owner, fields: ["id": .string(id), "title": .string("חלב")])
         _ = try await api.householdUpdate(table: "tasks", owner: owner, id: id, fields: ["is_completed": .bool(true)])
