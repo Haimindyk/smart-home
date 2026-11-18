@@ -132,12 +132,12 @@ public actor Backend {
     private static let householdRPCs: Set<String> = ["complete_chore"]
 
     /// Reads a household table, paging up to 10,000 rows. `deleted_at is null` is applied for tables that soft-delete.
-    public func householdRows(table: String, owner: String, filters: [URLQueryItem] = [], order: String? = nil, limit: Int = 1000, singlePage: Bool = false) async throws -> [JSONValue] {
+    public func householdRows(table: String, owner: String, columns: String = "*", filters: [URLQueryItem] = [], order: String? = nil, limit: Int = 1000, singlePage: Bool = false) async throws -> [JSONValue] {
         guard Self.householdReadable.contains(table) else { throw BackendError.invalidResponse }
         let softDeletes: Set<String> = ["sections", "tasks", "chores", "family_events"]
         var rows: [JSONValue] = [], offset = 0
         while true {
-            var query: [URLQueryItem] = [.init(name: "select", value: "*"), .init(name: "limit", value: String(limit)), .init(name: "offset", value: String(offset))] + filters
+            var query: [URLQueryItem] = [.init(name: "select", value: columns), .init(name: "limit", value: String(limit)), .init(name: "offset", value: String(offset))] + filters
             if softDeletes.contains(table) { query.append(.init(name: "deleted_at", value: "is.null")) }
             if let order { query.append(.init(name: "order", value: order)) }
             let (data, status) = try await authorized("/rest/v1/\(table)", expectedOwner: owner, query: query)

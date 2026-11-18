@@ -44,7 +44,7 @@ final class HomeStore: ObservableObject {
             async let t = backend.householdRows(table: "tasks", owner: owner, order: "position.asc")
             async let c = backend.householdRows(table: "chores", owner: owner, order: "next_due_at.asc")
             async let e = backend.householdRows(table: "family_events", owner: owner, order: "event_date.asc")
-            async let m = backend.householdRows(table: "members", owner: owner, order: "display_name.asc")
+            async let m = backend.householdRows(table: "members", owner: owner, columns: "id,display_name,avatar_emoji,color", order: "display_name.asc")
             async let sg = backend.householdRows(table: "ai_suggestions", owner: owner, filters: [.init(name: "status", value: "eq.open")], order: "created_at.desc", limit: 20, singlePage: true)
             async let pn = backend.householdRows(table: "ai_private_messages", owner: owner, filters: [.init(name: "member_id", value: "eq.\(app.session?.member ?? "")"), .init(name: "read_at", value: "is.null")], order: "created_at.desc", limit: 20, singlePage: true)
             let result = try await (s, t, c, e, m)
