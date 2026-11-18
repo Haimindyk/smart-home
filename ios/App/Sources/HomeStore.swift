@@ -299,6 +299,23 @@ final class HomeStore: ObservableObject {
             $0.assigneeIDs = memberID.map { [$0] } ?? []; $0.assigneeKind = memberID == nil ? "unassigned" : "member"
         }
     }
+    /// Saves the signed-in member's profile; an optional JPEG becomes the new profile photo.
+    @discardableResult
+    func saveProfile(name: String, emoji: String, color: String, photoJPEG: Data?, removePhoto: Bool) async -> Bool {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let me, !clean.isEmpty, clean.count <= 60, color.range(of: "^#[0-9a-fA-F]{6}$", options: .regularExpression) != nil, emoji.count <= 8 else { return false }
+        let old = members
+        var fields: [String: JSONValue] = ["display_name": .string(clean), "avatar_emoji": .string(emoji), "color": .string(color)]
+        if removePhoto && photoJPEG == nil { fields["avatar_photo_url"] = .null }
+        if let i = members.firstIndex(where: { $0.id == me.id }) { members[i].name = clean; members[i].emoji = emoji; members[i].color = color; if removePhoto && photoJPEG == nil { members[i].photoURL = nil } }
+        var uploaded: String?
+        let ok = await run("לא הצלחנו לשמור את הפרופיל.", rollback: { [weak self] in self?.members = old }) { backend, owner in
+            if let photoJPEG { uploaded = try await backend.uploadAvatar(photoJPEG, memberID: me.id, owner: owner); fields["avatar_photo_url"] = .string(uploaded!) }
+            try await backend.updateMemberProfile(id: me.id, owner: owner, fields: fields)
+        }
+        if ok, let uploaded, let i = members.firstIndex(where: { $0.id == me.id }) { members[i].photoURL = URL(string: uploaded) }
+        return ok
+    }
     func delete(_ chore: HChore) async {
         let old = chores; chores.removeAll { $0.id == chore.id }
         _ = await run("לא הצלחנו למחוק את המטלה.", rollback: { [weak self] in self?.chores = old }) { backend, owner in

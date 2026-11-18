@@ -163,6 +163,23 @@ public actor Backend {
         guard let row = try json(data).arrayValue.first else { throw BackendError.conflict }
         return row
     }
+    /// Updates the member's own profile fields (name, emoji, color, photo). Nothing else on `members` is writable.
+    public func updateMemberProfile(id: String, owner: String, fields: [String: JSONValue]) async throws {
+        let allowed: Set<String> = ["display_name", "avatar_emoji", "color", "avatar_photo_url"]
+        guard UUID(uuidString: id) != nil, !fields.isEmpty, Set(fields.keys).isSubset(of: allowed) else { throw BackendError.invalidResponse }
+        let (data, status) = try await authorized("/rest/v1/members", method: "PATCH", expectedOwner: owner, body: .object(fields), query: [.init(name: "id", value: "eq.\(id)")])
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        _ = data
+    }
+    /// Uploads a prepared JPEG profile photo to the public avatars bucket and returns its public https URL.
+    public func uploadAvatar(_ jpeg: Data, memberID: String, owner: String) async throws -> String {
+        guard UUID(uuidString: memberID) != nil, !jpeg.isEmpty, jpeg.count <= 2_097_152, jpeg.starts(with: [0xFF, 0xD8, 0xFF]) else { throw BackendError.invalidResponse }
+        let path = "\(memberID.lowercased())/\(Int(Date().timeIntervalSince1970 * 1000)).jpg"
+        let (_, status) = try await authorized("/storage/v1/object/avatars/\(path)", method: "POST", expectedOwner: owner, binary: (jpeg, "image/jpeg"))
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+        guard let url = URL(string: "/storage/v1/object/public/avatars/\(path)", relativeTo: root)?.absoluteURL, url.scheme == "https", url.host == root.host else { throw BackendError.invalidResponse }
+        return url.absoluteString
+    }
     public func householdRPC(_ name: String, owner: String, args: [String: JSONValue]) async throws {
         guard Self.householdRPCs.contains(name) else { throw BackendError.invalidResponse }
         let (_, status) = try await authorized("/rest/v1/rpc/\(name)", method: "POST", expectedOwner: owner, body: .object(args))

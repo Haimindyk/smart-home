@@ -83,6 +83,7 @@ struct HomeScreen: View {
     @EnvironmentObject private var home: HomeStore
     @State private var showSettings = false
     @State private var showAssistant = false
+    @State private var showProfile = false
     @State private var sheet: HomeSheet?
     @State private var jumping = false
     private var greeting: String {
@@ -112,6 +113,7 @@ struct HomeScreen: View {
             }
             .wellnessScreen().toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
+            .sheet(isPresented: $showProfile) { ProfileEditorSheet().environmentObject(home) }
             .sheet(isPresented: $showAssistant) { AssistantSheet().environmentObject(store).environmentObject(home) }
             .sheet(item: $sheet) { which in
                 switch which {
@@ -177,6 +179,7 @@ struct HomeScreen: View {
                 Text("הבית").font(.hb(.title3, .bold)).padding(.leading, 6)
                 Spacer()
                 Menu {
+                    Button { showProfile = true } label: { Label("הפרופיל שלי", systemImage: "person.crop.circle") }
                     Button { sheet = .members } label: { Label("בני הבית", systemImage: "person.2") }
                     Button { showSettings = true } label: { Label("הגדרות", systemImage: "gearshape") }
                 } label: {

@@ -283,6 +283,18 @@ final class WellnessUITests: XCTestCase {
         noa.tap()
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: noa); waitForExpectations(timeout: 5)
     }
+    func testProfileEditorEditsNameAndSaves() {
+        let app = launch("home")
+        XCTAssertTrue(app.buttons["home-account"].waitForExistence(timeout: 15)); app.buttons["home-account"].tap()
+        let item = app.buttons["הפרופיל שלי"]
+        XCTAssertTrue(item.waitForExistence(timeout: 5)); item.tap()
+        let field = app.textFields["profile-name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        capture(app, name: "native-profile-editor")
+        field.tap(); field.typeText("X")
+        app.buttons["profile-save"].tap()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: field); waitForExpectations(timeout: 8)
+    }
     func testHomeWellnessCardOpensHealth() {
         let app = launch("home")
         let card = app.buttons["wellness-entry"]
