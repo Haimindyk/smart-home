@@ -6,6 +6,7 @@ struct SettingsScreen: View {
     @Environment(\.dismiss) private var dismiss
     var isSheet = false
     @State private var confirmLogout = false
+    @State private var showGoals = false
     @State private var weightText = ""
     var body: some View {
         NavigationStack {
@@ -33,6 +34,7 @@ struct SettingsScreen: View {
                         }.disabled((Double(weightText.replacingOccurrences(of: ",", with: ".")) ?? 0) < 20)
                     }
                 }
+                Section { Button { showGoals = true } label: { Label("הפרופיל והיעדים שלי", systemImage: "target") }.accessibilityIdentifier("profile-goals") }
                 Section { NavigationLink { FoodLibraryScreen() } label: { Label("הספרייה שלי (מועדפים ומתכונים)", systemImage: "books.vertical") }.accessibilityIdentifier("food-library") }
                 Section("פרטיות") {
                     Text("קוד הכניסה לא נשמר. פרטי ההתחברות מוגנים ב־Keychain של המכשיר.")
@@ -44,6 +46,7 @@ struct SettingsScreen: View {
                 }
             }.wellnessList().navigationTitle("הגדרות").navigationBarTitleDisplayMode(isSheet ? .inline : .large)
                 .toolbar { if isSheet { ToolbarItem(placement: .confirmationAction) { Button("סיום") { dismiss() } } } }
+                .sheet(isPresented: $showGoals) { ProfileGoalsSheet().environmentObject(store) }
                 .confirmationDialog("לצאת מהחשבון?", isPresented: $confirmLogout, titleVisibility: .visible) {
                     Button("יציאה", role: .destructive) { Task { await store.logout() } }
                 }

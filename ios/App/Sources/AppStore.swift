@@ -275,6 +275,36 @@ final class AppStore: ObservableObject {
             if session?.owner == owner, let index = meals.firstIndex(where: { $0.id == row.id }) { meals[index] = saved }
         }
     }
+    /// Copies a meal to another day (new item ids, same items and photo).
+    func copyMeal(_ source: HealthRow, to date: Date) async -> Bool {
+        let items = source.data["items"].arrayValue.map { item -> JSONValue in
+            guard case .object(var f) = item else { return item }
+            f["id"] = .string(UUID().uuidString.lowercased()); return .object(f)
+        }
+        guard !items.isEmpty else { return false }
+        let payload: JSONValue = .object(["date": .string(Self.dateKey(date, zone: timeZone)), "kind": source.data["kind"], "name": .string(source.data["name"].stringValue ?? ""), "items": .array(items), "imagePath": .null])
+        return await write("לא הצלחנו להעתיק את הארוחה.") { backend, owner in
+            let row = try await backend.save(table: "meals", owner: owner, payload: payload)
+            if session?.owner == owner { meals.append(row) }
+        }
+    }
+    /// Marks or unmarks a meal as a favorite (listed first when adding a meal).
+    func setFavorite(_ row: HealthRow, _ on: Bool) async -> Bool {
+        guard case .object(var fields) = row.data else { return false }
+        fields["favorite"] = on ? .bool(true) : .null
+        if !on { fields.removeValue(forKey: "favorite") }
+        let payload = JSONValue.object(fields)
+        return await write("לא הצלחנו לעדכן את המועדפים.") { backend, owner in
+            let saved = try await backend.save(table: "meals", owner: owner, payload: payload, existing: row)
+            if session?.owner == owner, let i = meals.firstIndex(where: { $0.id == row.id }) { meals[i] = saved }
+        }
+    }
+    var favoriteMeals: [HealthRow] {
+        var seen = Set<String>()
+        return meals.filter { $0.data["favorite"].boolValue == true }.sorted { ($0.data["date"].stringValue ?? "") > ($1.data["date"].stringValue ?? "") }.filter { meal in
+            seen.insert(meal.data["name"].stringValue?.isEmpty == false ? meal.data["name"].stringValue! : meal.id).inserted
+        }
+    }
     // MARK: - Food library (personal foods and recipes)
     /// Remembers a scanned or label product so it can be logged again in one tap (the web app does this when a product is logged).
     func rememberFood(_ food: JSONValue) async {
@@ -357,6 +387,35 @@ final class AppStore: ObservableObject {
             if session?.owner == owner { profileRow = saved; profile = saved.data }
         }
     }
+
+    // MARK: - Profile and nutrition targets
+    /// Saves the profile (creating it on first use) and a nutrition goal effective from `goal.date`, like the web app's "profile and targets" flow.
+    func saveProfileAndGoal(birthDate: String?, height: Double?, weight: Double?, physiology: String?, activity: String, objective: String, goal: (date: String, kcal: Int, protein: Int, carbs: Int, fat: Int, method: String)) async -> Bool {
+        guard goal.kcal >= 500, goal.kcal <= 10_000, goal.protein >= 0, goal.protein <= 500, goal.carbs >= 0, goal.carbs <= 1500, goal.fat >= 0, goal.fat <= 500,
+              ["manual", "calculated"].contains(goal.method), ["sedentary", "light", "moderate", "high"].contains(activity), ["lose", "maintain", "gain"].contains(objective),
+              height.map({ (80...250).contains($0) }) ?? true, weight.map({ (20...400).contains($0) }) ?? true else { error = "בדוק את הערכים שהוזנו."; return false }
+        var fields: [String: JSONValue]
+        if let row = profileRow, case .object(let f) = row.data { fields = f } else {
+            fields = ["nutritionEnabled": .bool(true), "workoutsEnabled": .bool(true), "timezone": .string(TimeZone.current.identifier), "age": .null, "waterTarget": .number(2000), "aiConsent": .bool(false), "aiProviderConsent": .bool(false)]
+        }
+        fields["nutritionEnabled"] = .bool(true)
+        fields["birthDate"] = birthDate.map { .string($0) } ?? .null
+        fields["height"] = height.map { .number($0) } ?? .null; fields["weight"] = weight.map { .number($0) } ?? .null
+        fields["physiology"] = physiology.map { .string($0) } ?? .null; fields["activity"] = .string(activity); fields["objective"] = .string(objective)
+        let goalPayload: JSONValue = .object(["date": .string(goal.date), "kcal": .number(Double(goal.kcal)), "protein": .number(Double(goal.protein)), "carbs": .number(Double(goal.carbs)), "fat": .number(Double(goal.fat)), "method": .string(goal.method)])
+        let existingGoal = goals.first { $0.data["date"].stringValue == goal.date }
+        let base = profileRow
+#if DEBUG
+        if backend == nil, session?.accessToken == "ui-test" { return true }
+#endif
+        return await write("לא הצלחנו לשמור את הפרופיל והיעדים.") { backend, owner in
+            let savedProfile = try await backend.save(table: "health_profiles", owner: owner, payload: .object(fields), existing: base)
+            if session?.owner == owner { profileRow = savedProfile; profile = savedProfile.data }
+            let savedGoal = try await backend.save(table: "nutrition_goals", owner: owner, payload: goalPayload, existing: existingGoal)
+            if session?.owner == owner { goals.removeAll { $0.id == savedGoal.id }; goals.append(savedGoal) }
+        }
+    }
+    var goalHistory: [HealthRow] { goals.sorted { ($0.data["date"].stringValue ?? "") > ($1.data["date"].stringValue ?? "") } }
 
     // MARK: - Workout plans
     struct PlanExercise: Identifiable, Equatable { var id = UUID(); var name = ""; var catalogId: String?; var muscle = ""; var equipment = ""; var sets = 3; var reps = 10; var weight = 0.0; var rest = 90 }

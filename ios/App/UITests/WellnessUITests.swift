@@ -354,6 +354,35 @@ final class WellnessUITests: XCTestCase {
         recipe.tap()
         XCTAssertTrue(app.textFields["recipe-name"].waitForExistence(timeout: 5), "Recipe editor opens")
     }
+    func testProfileAndTargetsJourneyCalculatesAGoal() {
+        let app = launch("meal")
+        XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 15)); app.buttons["settings-button"].tap()
+        let entry = app.buttons["profile-goals"]
+        var tries = 0
+        while !entry.exists && tries < 4 { app.swipeUp(); tries += 1 }
+        XCTAssertTrue(entry.waitForExistence(timeout: 5)); entry.tap()
+        XCTAssertTrue(app.buttons["choice-lose"].waitForExistence(timeout: 8)); app.buttons["choice-lose"].tap()
+        app.buttons["profile-goals-next"].tap()
+        let height = app.textFields["profile-height"]
+        XCTAssertTrue(height.waitForExistence(timeout: 5)); height.tap(); height.typeText("180")
+        let weight = app.textFields["profile-weight"]; weight.tap(); weight.typeText("80")
+        app.buttons["choice-male"].tap()
+        capture(app, name: "native-profile-journey")
+    }
+    func testManualFoodEntryLeadsToPortionPicker() {
+        let app = launch("meal")
+        XCTAssertTrue(app.buttons["add-meal"].waitForExistence(timeout: 15)); app.buttons["add-meal"].tap()
+        let manual = app.buttons["manual-food"]
+        XCTAssertTrue(manual.waitForExistence(timeout: 8)); manual.tap()
+        let name = app.textFields["manual-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("Bread")
+        let fields = app.textFields.matching(NSPredicate(format: "placeholderValue == %@", "0"))
+        XCTAssertGreaterThanOrEqual(fields.count, 4)
+        for (i, value) in ["250", "9", "45", "3"].enumerated() { let f = fields.element(boundBy: i); f.tap(); f.typeText(value) }
+        app.buttons["manual-continue"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Bread")).firstMatch.waitForExistence(timeout: 10), "The portion picker opens for the manual food")
+        capture(app, name: "native-manual-food-portion")
+    }
     func testHomeWellnessCardOpensHealth() {
         let app = launch("home")
         let card = app.buttons["wellness-entry"]

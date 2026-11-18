@@ -14,6 +14,7 @@ struct AddMealSheet: View {
     @State private var searched = false
     @State private var scanning = false
     @State private var picked: FoodChoice?
+    @State private var manualEntry = false
     @State private var aiMeal = false
     var body: some View {
         NavigationStack {
@@ -31,6 +32,7 @@ struct AddMealSheet: View {
                         .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
                 }
+                Button { manualEntry = true } label: { Label("הוספה ידנית", systemImage: "square.and.pencil").font(.hb(.subheadline, .semibold)).foregroundStyle(Color.wellnessInk).frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain).accessibilityIdentifier("manual-food")
                 if searching { ProgressView().padding(.top, 30) }
                 else if results.isEmpty && !searched && query.isEmpty && (!store.recentMeals.isEmpty || !store.recipes.isEmpty || !store.personalFoods.isEmpty) {
                     ScrollView { LazyVStack(alignment: .leading, spacing: 10) {
@@ -42,6 +44,10 @@ struct AddMealSheet: View {
                                         .padding(14).background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
                                 }.buttonStyle(PressableStyle())
                             }
+                        }
+                        if !store.favoriteMeals.isEmpty {
+                            Text("ארוחות מועדפות").sectionTitle()
+                            ForEach(store.favoriteMeals.prefix(8)) { meal in Button { Task { if await store.relogMeal(meal, kind: currentKind()) { dismiss() } } } label: { RecentRow(meal: meal) }.buttonStyle(PressableStyle()) }
                         }
                         if !store.personalFoods.isEmpty {
                             Text("המועדפים שלי").sectionTitle()
@@ -76,6 +82,7 @@ struct AddMealSheet: View {
                 await run(text, barcode: nil)
             }
             .sheet(isPresented: $aiMeal) { AIMealSheet { dismiss() }.environmentObject(store) }
+            .sheet(isPresented: $manualEntry) { ManualFoodSheet { food in Task { try? await Task.sleep(for: .milliseconds(450)); picked = FoodChoice(food: food) } } }
             .sheet(item: $picked) { choice in PortionSheet(food: choice.food) { dismiss() }.presentationDetents([.large]) }
             .fullScreenCover(isPresented: $scanning) {
                 ZStack(alignment: .topLeading) {
@@ -218,5 +225,42 @@ struct BarcodeScanner: UIViewControllerRepresentable {
             guard !done, let code = (objects.first as? AVMetadataMachineReadableCodeObject)?.stringValue, (8...14).contains(code.count), code.allSatisfy(\.isNumber) else { return }
             done = true; UINotificationFeedbackGenerator().notificationOccurred(.success); onCode?(code)
         }
+    }
+}
+
+
+/// Enter a food by hand: name and nutrition per 100 g (or 100 ml), then choose the portion.
+struct ManualFoodSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let onDone: (JSONValue) -> Void
+    @State private var name = ""
+    @State private var basis = "g"
+    @State private var kcal = ""
+    @State private var protein = ""
+    @State private var carbs = ""
+    @State private var fat = ""
+    private func n(_ s: String) -> Double? { Double(s.replacingOccurrences(of: ",", with: ".")).flatMap { $0 >= 0 ? $0 : nil } }
+    private var valid: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty && (n(kcal) ?? -1) >= 0 && (n(kcal) ?? 0) <= 2000 && n(protein) != nil && n(carbs) != nil && n(fat) != nil }
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("שם המזון") { TextField("למשל: לחם מקמח מלא", text: $name).accessibilityIdentifier("manual-name") }
+                Section("ערכים תזונתיים") {
+                    Picker("ל־100", selection: $basis) { Text("גרם").tag("g"); Text("מ״ל").tag("ml") }.pickerStyle(.segmented)
+                    row("קלוריות ל־100", $kcal); row("חלבון (גרם)", $protein); row("פחמימות (גרם)", $carbs); row("שומן (גרם)", $fat)
+                }
+            }
+            .wellnessList().navigationTitle("הוספה ידנית").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("ביטול") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("המשך") { finish() }.disabled(!valid).accessibilityIdentifier("manual-continue") }
+            }
+        }
+    }
+    private func row(_ title: String, _ binding: Binding<String>) -> some View { HStack { Text(title); Spacer(); TextField("0", text: binding).keyboardType(.decimalPad).multilineTextAlignment(.trailing).frame(width: 90) } }
+    private func finish() {
+        let food: JSONValue = .object(["id": .string(UUID().uuidString.lowercased()), "name": .string(String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))), "basis": .string(basis), "source": .string("manual"),
+                                        "per100": .object(["kcal": .number(n(kcal) ?? 0), "protein": .number(n(protein) ?? 0), "carbs": .number(n(carbs) ?? 0), "fat": .number(n(fat) ?? 0)])])
+        dismiss(); onDone(food)
     }
 }
