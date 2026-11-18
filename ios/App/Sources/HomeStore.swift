@@ -380,6 +380,12 @@ final class HomeStore: ObservableObject {
             members.append(m); members.sort { $0.name < $1.name }; return .added(m)
         } catch BackendError.conflict { return .pinTaken } catch { return .failed }
     }
+    /// Sends a message to the whole household (shows up in history and in the web app's notifications).
+    func sendBroadcast(_ text: String) async -> Bool {
+        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, clean.count <= 500 else { return false }
+        return await run("לא הצלחנו לשלוח את ההודעה.", rollback: {}) { backend, owner in try await backend.sendBroadcast(clean, actorID: me?.id, owner: owner) }
+    }
     /// Saves the signed-in member's profile; an optional JPEG becomes the new profile photo.
     @discardableResult
     func saveProfile(name: String, emoji: String, color: String, photoJPEG: Data?, removePhoto: Bool) async -> Bool {

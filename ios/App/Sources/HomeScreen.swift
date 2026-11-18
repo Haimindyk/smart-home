@@ -84,6 +84,8 @@ struct HomeScreen: View {
     @State private var showSettings = false
     @State private var showAssistant = false
     @State private var showProfile = false
+    @State private var broadcasting = false
+    @State private var broadcastText = ""
     @State private var sheet: HomeSheet?
     @State private var jumping = false
     private var greeting: String {
@@ -113,6 +115,11 @@ struct HomeScreen: View {
             }
             .wellnessScreen().toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
+            .alert("הודעה לכל הבית", isPresented: $broadcasting) {
+                TextField("מה לכתוב?", text: $broadcastText)
+                Button("שליחה") { let text = broadcastText; broadcastText = ""; Task { _ = await home.sendBroadcast(text) } }
+                Button("ביטול", role: .cancel) { broadcastText = "" }
+            } message: { Text("ההודעה תופיע בהיסטוריה ותישלח כהתראה לבני הבית.") }
             .sheet(isPresented: $showProfile) { ProfileEditorSheet().environmentObject(home) }
             .sheet(isPresented: $showAssistant) { AssistantSheet().environmentObject(store).environmentObject(home) }
             .sheet(item: $sheet) { which in
@@ -181,6 +188,7 @@ struct HomeScreen: View {
                 Menu {
                     Button { showProfile = true } label: { Label("הפרופיל שלי", systemImage: "person.crop.circle") }
                     Button { sheet = .members } label: { Label("בני הבית", systemImage: "person.2") }
+                    Button { broadcasting = true } label: { Label("הודעה לכל הבית", systemImage: "megaphone") }
                     Button { showSettings = true } label: { Label("הגדרות", systemImage: "gearshape") }
                 } label: {
                     HStack(spacing: 4) { MemberAvatar(member: home.me, size: 32); Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Color.wellnessSecondary) }

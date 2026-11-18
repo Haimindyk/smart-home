@@ -336,7 +336,9 @@ final class WellnessUITests: XCTestCase {
         let save = app.buttons["member-save"]
         expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: save); waitForExpectations(timeout: 8)
         save.tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "4821")).firstMatch.waitForExistence(timeout: 12), "The new member's PIN is shown for sharing")
+        let shown = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "4821")).firstMatch.waitForExistence(timeout: 12)
+        capture(app, name: "native-member-added")
+        XCTAssertTrue(shown, "The new member's PIN is shown for sharing")
         capture(app, name: "native-member-added")
     }
     func testFoodLibraryListsRecipesAndOpensEditor() {

@@ -226,6 +226,14 @@ public actor Backend {
         guard member["id"].stringValue != nil else { throw BackendError.invalidResponse }
         return member
     }
+    /// Posts a household broadcast message (an `activity_log` row, which also triggers the web app's push notifications).
+    public func sendBroadcast(_ message: String, actorID: String?, owner: String) async throws {
+        let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, text.count <= 500, actorID.map({ UUID(uuidString: $0) != nil }) ?? true else { throw BackendError.invalidResponse }
+        let body: JSONValue = .object(["entity_type": .string("broadcast"), "entity_id": .string(UUID().uuidString.lowercased()), "action": .string("message"), "actor_id": actorID.map { .string($0) } ?? .null, "summary": .string(text)])
+        let (_, status) = try await authorized("/rest/v1/activity_log", method: "POST", expectedOwner: owner, body: body)
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+    }
     /// Read-only RPCs that return rows (allow-listed).
     public func rpcRows(_ name: String, owner: String, args: [String: JSONValue]) async throws -> [JSONValue] {
         guard Self.readRPCs.contains(name) else { throw BackendError.invalidResponse }

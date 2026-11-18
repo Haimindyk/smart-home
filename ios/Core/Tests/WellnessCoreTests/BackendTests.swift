@@ -257,6 +257,20 @@ final class BackendTests: XCTestCase {
         pinTaken = true
         do { _ = try await api.registerMember(name: "x", pin: "1234", emoji: "🙂", color: "#6366f1", owner: owner); XCTFail("duplicate pin") } catch { XCTAssertEqual(error as? BackendError, .conflict) }
     }
+    func testBroadcastPostsAnActivityRowAndRejectsEmptyText() async throws {
+        let owner = owner
+        var seen: [String] = []
+        let lock = NSLock()
+        let api = try await signedInBackend { request in
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            lock.lock(); seen.append("\(request.httpMethod ?? "") \(request.url!.path)"); lock.unlock()
+            return (201, "")
+        }
+        try await api.sendBroadcast("  שלום לכולם  ", actorID: "22222222-2222-4222-8222-222222222222", owner: owner)
+        XCTAssertTrue(seen.contains("POST /rest/v1/activity_log"))
+        do { try await api.sendBroadcast("   ", actorID: nil, owner: owner); XCTFail("empty") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+        do { try await api.sendBroadcast("x", actorID: "not-a-uuid", owner: owner); XCTFail("bad actor") } catch { XCTAssertEqual(error as? BackendError, .invalidResponse) }
+    }
     func testCalendarFeedURLUsesFunctionsHost() async throws {
         let owner = owner
         let api = try await signedInBackend { request in request.url!.path == "/auth/v1/user" ? (200, "{\"id\":\"\(owner)\"}") : (200, "{}") }
