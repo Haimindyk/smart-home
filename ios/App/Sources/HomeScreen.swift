@@ -378,7 +378,7 @@ struct TaskPanelBody: View {
             HStack(spacing: 10) {
                 Image(systemName: "plus").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.wellnessSecondary)
                 TextField(section.kind == "shopping" ? "מה צריך לקנות?" : notesStyle ? "הערה חדשה…" : "משימה חדשה…", text: $draft).submitLabel(.done)
-                    .onSubmit { let text = draft; draft = ""; Task { await home.addTask(title: text, section: section, isNote: notesStyle) } }
+                    .onSubmit { let text = draft; draft = ""; Task { await home.addTask(title: text, section: section, isNote: notesStyle, parseDates: true) } }
                     .accessibilityIdentifier("quick-add-field-\(section.id)")
             }.padding(.horizontal, 14).frame(minHeight: 46).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             if open.isEmpty && done.isEmpty {
@@ -515,6 +515,7 @@ struct TaskEditorSheet: View {
                 if section.kind == "shopping" {
                     Section("כמות") { HStack { TextField("כמות", text: $quantity).keyboardType(.decimalPad); TextField("יחידה (ק״ג, יח׳…)", text: $unit) } }
                 }
+                AttachmentsSection(taskID: task.id)
                 Section { Button("מחיקה", role: .destructive) { confirmDelete = true }.frame(maxWidth: .infinity) }
             }
             .wellnessList().navigationTitle("עריכה").navigationBarTitleDisplayMode(.inline)

@@ -25,6 +25,11 @@ public enum BackendError: Error, Equatable {
 
 public actor Backend {
     private let root: URL
+    /// Public ICS feed of family events (the Edge Function `calendar-feed`), subscribable from Calendar apps.
+    public nonisolated var calendarFeedURL: URL? {
+        guard let host = root.host, host.hasSuffix(".supabase.co") else { return nil }
+        return URL(string: "https://" + host.replacingOccurrences(of: ".supabase.co", with: ".functions.supabase.co") + "/calendar-feed")
+    }
     private let key: String
     private let vault: any SessionVault
     private let network: URLSession
@@ -127,8 +132,8 @@ public actor Backend {
         return result
     }
     // MARK: - Household tables (shared, not owner-scoped: sections, tasks, chores, events, members)
-    public static let householdReadable: Set<String> = ["sections", "tasks", "chores", "chore_completions", "family_events", "members", "activity_log", "barcode_products", "ai_suggestions", "ai_private_messages"]
-    public static let householdWritable: Set<String> = ["sections", "tasks", "chores", "family_events", "ai_suggestions", "ai_private_messages"]
+    public static let householdReadable: Set<String> = ["sections", "tasks", "chores", "chore_completions", "family_events", "members", "activity_log", "barcode_products", "ai_suggestions", "ai_private_messages", "attachments"]
+    public static let householdWritable: Set<String> = ["sections", "tasks", "chores", "family_events", "ai_suggestions", "ai_private_messages", "attachments"]
     private static let householdRPCs: Set<String> = ["complete_chore"]
 
     /// Reads a household table, paging up to 10,000 rows. `deleted_at is null` is applied for tables that soft-delete.
@@ -162,6 +167,34 @@ public actor Backend {
         guard (200..<300).contains(status) else { throw BackendError.server(status) }
         guard let row = try json(data).arrayValue.first else { throw BackendError.conflict }
         return row
+    }
+    // MARK: Attachments (private `attachments` bucket; paths are `<parentId>/<uuid>-<name>`)
+    private static func safeAttachmentPath(_ path: String) -> Bool {
+        path.count <= 300 && !path.contains("..") && !path.hasPrefix("/") && path.split(separator: "/").count == 2 &&
+            path.unicodeScalars.allSatisfy { $0.value > 31 && $0.value != 127 && !"\\?#%".unicodeScalars.contains($0) }
+    }
+    public func uploadAttachment(_ data: Data, path: String, mimeType: String, owner: String) async throws {
+        guard !data.isEmpty, data.count <= 25 * 1024 * 1024, Self.safeAttachmentPath(path), mimeType.count <= 100, !mimeType.contains("\n") else { throw BackendError.invalidResponse }
+        let encoded = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
+        let (_, status) = try await authorized("/storage/v1/object/attachments/\(encoded)", method: "POST", expectedOwner: owner, binary: (data, mimeType))
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
+    }
+    /// A short-lived signed https URL for viewing an attachment.
+    public func signedAttachmentURL(path: String, owner: String) async throws -> URL {
+        guard Self.safeAttachmentPath(path) else { throw BackendError.invalidResponse }
+        let encoded = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
+        let (data, status) = try await authorized("/storage/v1/object/sign/attachments/\(encoded)", method: "POST", expectedOwner: owner, body: .object(["expiresIn": .number(3600)]))
+        guard status == 200, let signed = try json(data)["signedURL"].stringValue, signed.hasPrefix("/object/sign/attachments/"),
+              let url = URL(string: "/storage/v1" + signed, relativeTo: root)?.absoluteURL, url.scheme == "https", url.host == root.host else { throw BackendError.invalidResponse }
+        return url
+    }
+    /// Removes the stored file and then the attachment row.
+    public func deleteAttachment(id: String, path: String, owner: String) async throws {
+        guard UUID(uuidString: id) != nil, Self.safeAttachmentPath(path) else { throw BackendError.invalidResponse }
+        let encoded = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? path
+        _ = try await authorized("/storage/v1/object/attachments/\(encoded)", method: "DELETE", expectedOwner: owner)
+        let (_, status) = try await authorized("/rest/v1/attachments", method: "DELETE", expectedOwner: owner, query: [.init(name: "id", value: "eq.\(id)")])
+        guard (200..<300).contains(status) else { throw BackendError.server(status) }
     }
     /// Updates the member's own profile fields (name, emoji, color, photo). Nothing else on `members` is writable.
     public func updateMemberProfile(id: String, owner: String, fields: [String: JSONValue]) async throws {

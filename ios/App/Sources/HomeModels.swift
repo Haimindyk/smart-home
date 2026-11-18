@@ -123,3 +123,19 @@ struct HPrivateNote: Identifiable, Equatable {
         self.id = id; memberID = member; self.summary = summary
     }
 }
+
+struct HAttachment: Identifiable, Equatable {
+    let id: String; var taskID: String?; var choreID: String?; var path: String; var fileName: String; var mimeType: String?; var size: Int; var kind: String
+    init?(_ j: JSONValue) {
+        guard let id = j.str("id"), let path = j.str("storage_path"), let name = j.str("file_name") else { return nil }
+        self.id = id; taskID = j.str("task_id"); choreID = j.str("chore_id"); self.path = path; fileName = name; mimeType = j.str("mime_type"); size = Int(j.num("size_bytes") ?? 0); kind = j.str("kind") ?? "file"
+    }
+    static func kind(forMime mime: String) -> String {
+        if mime.hasPrefix("image/") { return "image" }; if mime == "application/pdf" { return "pdf" }
+        if mime.hasPrefix("audio/") { return "audio" }; if mime.hasPrefix("video/") { return "video" }; return "file"
+    }
+    static func safeName(_ name: String) -> String {
+        let cleaned = String(name.unicodeScalars.map { $0.value < 32 || "/\\?#%".unicodeScalars.contains($0) ? "_" : Character($0) }).trimmingCharacters(in: .whitespaces)
+        return String((cleaned.isEmpty ? "file" : cleaned).suffix(80))
+    }
+}

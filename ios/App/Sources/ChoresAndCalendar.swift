@@ -105,9 +105,11 @@ struct QuickAddSheet: View {
 
 struct CalendarScreen: View {
     @EnvironmentObject private var home: HomeStore
+    @EnvironmentObject private var store: AppStore
     @State private var month = Date()
     @State private var selected: Date?
     @State private var editing: HEvent?
+    @State private var subscribing = false
     private var cal: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = home.timeZone; c.firstWeekday = 1; c.locale = Locale(identifier: "he_IL"); return c }
     private struct Occurrence: Identifiable { let event: HEvent; let date: Date; var id: String { event.id + "\(date.timeIntervalSince1970)" } }
     private var monthStart: Date { cal.date(from: cal.dateComponents([.year, .month], from: month)) ?? month }
@@ -126,6 +128,7 @@ struct CalendarScreen: View {
                     HStack {
                         Text(monthStart, format: .dateTime.month(.wide).year()).font(.hb(.title, .bold))
                         Spacer()
+                        Button { subscribing = true } label: { Image(systemName: "calendar.badge.plus").frame(width: 44, height: 44).background(Color.wellnessCard, in: Circle()) }.accessibilityLabel("הוספה ליומן שלי").accessibilityIdentifier("calendar-subscribe")
                         Button { step(-1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44).background(Color.wellnessCard, in: Circle()) }.accessibilityLabel("חודש קודם")
                         Button { step(1) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44).background(Color.wellnessCard, in: Circle()) }.accessibilityLabel("חודש הבא")
                     }.foregroundStyle(Color.wellnessInk)
@@ -137,6 +140,7 @@ struct CalendarScreen: View {
                     }
                 }.padding(20).padding(.bottom, 90)
             }.wellnessScreen().toolbar(.hidden, for: .navigationBar).refreshable { await home.refresh() }
+            .sheet(isPresented: $subscribing) { SubscribeCalendarSheet().environmentObject(store) }
             .sheet(item: $editing) { EventEditorSheet(event: $0).environmentObject(home).presentationDragIndicator(.visible) }
         }
     }
@@ -263,6 +267,7 @@ struct ChoreEditorSheet: View {
                         }
                     }
                 }
+                AttachmentsSection(choreID: chore.id)
                 Section { Button("מחיקה", role: .destructive) { confirmDelete = true }.frame(maxWidth: .infinity) }
             }
             .wellnessList().navigationTitle("עריכת מטלה").navigationBarTitleDisplayMode(.inline)
@@ -290,6 +295,35 @@ struct ChoreEditorSheet: View {
         await home.update(chore, fields: fields) { c in
             c.title = clean; c.emoji = emoji.isEmpty ? nil : emoji; c.notes = notes.isEmpty ? nil : notes; c.freq = freq; c.intervalN = interval; c.weekdays = days
             c.assigneeIDs = ids; c.assigneeKind = ids.isEmpty ? "anyone" : "member"
+        }
+    }
+}
+
+/// How to subscribe to the family calendar from Apple/Google Calendar (the web app's subscribe dialog).
+struct SubscribeCalendarSheet: View {
+    @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+    @State private var copied = false
+    private var feed: URL? { store.backend?.calendarFeedURL }
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    if let feed {
+                        Button { if var c = URLComponents(url: feed, resolvingAgainstBaseURL: false) { c.scheme = "webcal"; if let url = c.url { openURL(url) } } } label: { Label("פתיחה ביומן", systemImage: "calendar.badge.plus").font(.hb(.headline, .semibold)) }.accessibilityIdentifier("calendar-open")
+                        HStack {
+                            Text(feed.absoluteString).font(.footnote.monospaced()).foregroundStyle(Color.wellnessSecondary).lineLimit(2).environment(\.layoutDirection, .leftToRight).textSelection(.enabled)
+                            Spacer(minLength: 8)
+                            Button { UIPasteboard.general.string = feed.absoluteString; copied = true } label: { Image(systemName: copied ? "checkmark" : "doc.on.doc").frame(width: 44, height: 44) }.buttonStyle(.plain).accessibilityLabel("העתקת קישור היומן")
+                        }
+                    } else { Text("הקישור ליומן אינו זמין כרגע.").foregroundStyle(Color.wellnessSecondary) }
+                } footer: { Text("בטלפון זה פותח את אפליקציית היומן ומציע להוסיף את הלוח כמנוי. אם לא קרה כלום, השתמשו בקישור.") }
+                Section("יומן Apple (iPhone / Mac)") { Text("הגדרות ← יומן ← חשבונות ← הוספת חשבון ← אחר ← \"הוספת יומן מנוי\" ← הדביקו את הקישור.").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary) }
+                Section("Google Calendar (במחשב)") { Text("היכנסו ל-calendar.google.com ← ליד \"יומנים אחרים\" לחצו על + ← \"לפי כתובת URL\" ← הדביקו את הקישור שהעתקתם.").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary) }
+            }
+            .wellnessList().navigationTitle("הוספה ליומן שלי").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("סגור") { dismiss() } } }
         }
     }
 }

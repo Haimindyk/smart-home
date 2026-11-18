@@ -8,6 +8,7 @@ import WellnessCore
 final class HomeStore: ObservableObject {
     /// Set by the home screen's wellness card; the root shell switches to the health tab and clears it.
     @Published var openHealthRequested = false
+    @Published var attachments: [HAttachment] = []
     @Published var sections: [HSection] = []
     @Published var tasks: [HTask] = []
     @Published var chores: [HChore] = []
@@ -31,6 +32,8 @@ final class HomeStore: ObservableObject {
     func chores(in section: String) -> [HChore] { chores.filter { $0.sectionID == section }.sorted { ($0.nextDue ?? .distantFuture) < ($1.nextDue ?? .distantFuture) } }
 
     // MARK: Loading
+    /// Background refresh: only against the real backend, and never while a write is in flight (it would flicker optimistic rows).
+    func refreshIfLive() async { guard app?.backend != nil, !loading else { return }; await refresh() }
     func refresh() async {
         guard let app, let owner = app.session?.owner else { return }
 #if DEBUG
@@ -49,11 +52,12 @@ final class HomeStore: ObservableObject {
             async let pn = backend.householdRows(table: "ai_private_messages", owner: owner, filters: [.init(name: "member_id", value: "eq.\(app.session?.member ?? "")"), .init(name: "read_at", value: "is.null")], order: "created_at.desc", limit: 20, singlePage: true)
             let result = try await (s, t, c, e, m)
             let assistant = (try? await (sg, pn)) ?? ([], [])
+            let files = (try? await backend.householdRows(table: "attachments", owner: owner, order: "created_at.asc")) ?? []
             guard request == revision, app.session?.owner == owner else { return }
             sections = result.0.compactMap(HSection.init).sorted { $0.position < $1.position }
             tasks = result.1.compactMap(HTask.init); chores = result.2.compactMap(HChore.init)
             events = result.3.compactMap(HEvent.init); members = result.4.compactMap(HMember.init)
-            suggestions = assistant.0.compactMap(HSuggestion.init); notes = assistant.1.compactMap(HPrivateNote.init)
+            suggestions = assistant.0.compactMap(HSuggestion.init); notes = assistant.1.compactMap(HPrivateNote.init); attachments = files.compactMap(HAttachment.init)
             if selectedSectionID == nil || !sections.contains(where: { $0.id == selectedSectionID }) { selectedSectionID = sections.first?.id }
         } catch { if request == revision, app.session?.owner == owner { self.error = "לא הצלחנו לטעון את נתוני הבית. אפשר למשוך לרענון." } }
     }
@@ -221,14 +225,18 @@ final class HomeStore: ObservableObject {
         catch { rollback(); if app.session?.owner == owner { self.error = failure }; return false }
     }
 
-    func addTask(title: String, section: HSection, parent: HTask? = nil, isNote: Bool = false, quantity: Double? = nil) async {
-        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Adds a task. With `parseDates`, phrases like "מחר" or "25/1" set the due date and are removed from the title.
+    func addTask(title: String, section: HSection, parent: HTask? = nil, isNote: Bool = false, quantity: Double? = nil, parseDates: Bool = false) async {
+        var due: Date?
+        var clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if parseDates, !isNote, section.kind != "info" { let parsed = QuickAdd.parse(clean, calendar: { var c = Calendar(identifier: .gregorian); c.timeZone = timeZone; return c }()); clean = parsed.title; due = parsed.due }
         guard !clean.isEmpty, clean.count <= 500, let position = try? FractionalIndex.atEnd(tasks.filter { $0.sectionID == section.id && $0.parentID == parent?.id }.map(\.position).max()) else { return }
         let id = UUID().uuidString.lowercased()
         var fields: [String: JSONValue] = ["id": .string(id), "section_id": .string(section.id), "parent_task_id": parent.map { .string($0.id) } ?? .null, "position": .string(position), "title": .string(clean)]
         if let me = me { fields["created_by"] = .string(me.id) }
         if isNote { fields["is_note"] = .bool(true) }
         if let quantity { fields["quantity"] = .number(quantity) }
+        if let due { fields["due_at"] = .string(DateParsing.iso(due)) }
         let local = HTask(.object(fields).withDefaults)
         if let local { tasks.append(local) }
         _ = await run("לא הצלחנו להוסיף את המשימה.", rollback: { [weak self] in self?.tasks.removeAll { $0.id == id } }) { backend, owner in
@@ -306,6 +314,33 @@ final class HomeStore: ObservableObject {
         await update(task, fields: ["assignee_kind": .string(memberID == nil ? "unassigned" : "member"), "assignee_member_ids": .array(memberID.map { [.string($0)] } ?? []), "assignee_member_id": memberID.map { .string($0) } ?? .null]) {
             $0.assigneeIDs = memberID.map { [$0] } ?? []; $0.assigneeKind = memberID == nil ? "unassigned" : "member"
         }
+    }
+    func attachments(task: String? = nil, chore: String? = nil) -> [HAttachment] { attachments.filter { ($0.taskID != nil && $0.taskID == task) || ($0.choreID != nil && $0.choreID == chore) } }
+    /// Uploads a file and records it on a task or chore. Files over 25 MB are refused.
+    func addAttachment(data: Data, fileName: String, mimeType: String, taskID: String? = nil, choreID: String? = nil) async {
+        guard let parent = taskID ?? choreID, !data.isEmpty, data.count <= 25 * 1024 * 1024 else { error = "הקובץ גדול מדי (עד 25MB)."; return }
+        let id = UUID().uuidString.lowercased(), name = HAttachment.safeName(fileName), path = "\(parent.lowercased())/\(id)-\(name)"
+        var fields: [String: JSONValue] = ["id": .string(id), "storage_path": .string(path), "file_name": .string(name), "mime_type": .string(mimeType), "size_bytes": .number(Double(data.count)), "kind": .string(HAttachment.kind(forMime: mimeType))]
+        fields["task_id"] = taskID.map { .string($0) } ?? .null; fields["chore_id"] = choreID.map { .string($0) } ?? .null
+        if let me { fields["created_by"] = .string(me.id) }
+        var uploaded = false
+        let ok = await run("לא הצלחנו להעלות את הקובץ.", rollback: {}) { backend, owner in
+            try await backend.uploadAttachment(data, path: path, mimeType: mimeType, owner: owner); uploaded = true
+            do { _ = try await backend.householdInsert(table: "attachments", owner: owner, fields: fields) }
+            catch { try? await backend.deleteAttachment(id: id, path: path, owner: owner); throw error }
+        }
+        _ = uploaded
+        if ok, let row = HAttachment(.object(fields)) { attachments.append(row) }
+    }
+    func delete(_ attachment: HAttachment) async {
+        let old = attachments; attachments.removeAll { $0.id == attachment.id }
+        _ = await run("לא הצלחנו למחוק את הקובץ.", rollback: { [weak self] in self?.attachments = old }) { backend, owner in
+            try await backend.deleteAttachment(id: attachment.id, path: attachment.path, owner: owner)
+        }
+    }
+    func url(for attachment: HAttachment) async -> URL? {
+        guard let app, let owner = app.session?.owner, let backend = app.backend else { return nil }
+        return try? await backend.signedAttachmentURL(path: attachment.path, owner: owner)
     }
     /// Saves the signed-in member's profile; an optional JPEG becomes the new profile photo.
     @discardableResult
