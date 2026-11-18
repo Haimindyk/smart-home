@@ -114,3 +114,7 @@ bump `MARKETING_VERSION` in `ios/App/project.yml` for a new version. Required
 `APPLE_DEVELOPER_TEAM_ID`, `MACOS_KEYCHAIN_PASSWORD`, `SUPABASE_PUBLIC_KEY`.
 One-time Apple setup: App ID `com.haimindyk.smarthome.wellness` with HealthKit
 enabled and an App Store Connect app record. The icon in `Sources/Assets.xcassets` is a placeholder.
+
+## Releases
+
+Every merge to `main` that touches `ios/` uploads a new TestFlight build. If TestFlight lists a build that cannot be installed ("The app is not available or doesn't exist"), merge any change under `ios/` to produce a fresh build number; a re-run of the same workflow run reuses the same build number and Apple rejects the duplicate.
