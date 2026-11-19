@@ -25,16 +25,32 @@ struct AssigneeButton: View {
     @EnvironmentObject private var home: HomeStore
     let currentID: String?
     var size: CGFloat = 36
+    /// Everyone responsible (tasks can have several); the first one is the "current" pick in the dropdown.
+    var ids: [String] = []
+    /// Tinted capsule with the person's photo and name (the web app's assignee badge) instead of a bare avatar.
+    var badge = false
     let onPick: (String?) -> Void
     @State private var open = false
+    private var people: [HMember] { (ids.isEmpty ? [currentID].compactMap { $0 } : ids).compactMap { home.member($0) } }
     var body: some View {
         Button { open = true } label: {
             Group {
-                if let m = home.member(currentID) { MemberAvatar(member: m, size: size) }
+                if badge, people.count == 1, let m = people.first {
+                    HStack(spacing: 6) {
+                        MemberAvatar(member: m, size: 24)
+                        Text(m.name).font(.hb(.caption, .semibold)).foregroundStyle(Color.wellnessInk).lineLimit(1)
+                    }.padding(.leading, 3).padding(.trailing, 10).frame(height: 30)
+                        .background(Color(hex: m.color).opacity(0.16), in: Capsule())
+                } else if badge, people.count > 1 {
+                    HStack(spacing: -8) {
+                        ForEach(people.prefix(3)) { m in MemberAvatar(member: m, size: 26).overlay(Circle().strokeBorder(Color.wellnessCard, lineWidth: 2)) }
+                        if people.count > 3 { Text("+\(people.count - 3)").font(.hb(.caption2, .bold)).frame(width: 26, height: 26).background(Color.wellnessChip, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessCard, lineWidth: 2)) }
+                    }
+                } else if let m = home.member(currentID) { MemberAvatar(member: m, size: size) }
                 else { Image(systemName: "person.badge.plus").font(.system(size: size * 0.42, weight: .semibold)).foregroundStyle(Color.wellnessSecondary).frame(width: size, height: size).background(Color.wellnessChip, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))) }
             }.frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
         }
-        .buttonStyle(PressableStyle()).accessibilityLabel(home.member(currentID).map { "אחראי: \($0.name). לחיצה לשינוי" } ?? "הגדרת אחראי")
+        .buttonStyle(PressableStyle()).accessibilityLabel(people.isEmpty ? "הגדרת אחראי" : "אחראי: " + people.map(\.name).joined(separator: ", ") + ". לחיצה לשינוי")
         .popover(isPresented: $open) {
             VStack(spacing: 0) {
                 ForEach(home.members) { m in row(m.id, name: m.name, member: m) }
@@ -138,42 +154,41 @@ struct HomeScreen: View {
     // MARK: Wellness entry (the web app's personal space card)
     private var wellnessCard: some View {
         Button { home.openHealthRequested = true } label: {
-            HStack(spacing: 16) {
+            HStack(spacing: 12) {
                 ZStack(alignment: .bottomTrailing) {
-                    Circle().fill(Color.wellnessPrimary.opacity(0.12)).overlay(Circle().strokeBorder(Color.wellnessPrimary.opacity(0.3))).frame(width: 64, height: 64)
-                        .overlay(Image(systemName: "leaf").font(.title2).foregroundStyle(Color.wellnessPrimary))
-                    Image(systemName: "dumbbell.fill").font(.caption.weight(.bold)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 28, height: 28).background(Color.wellnessPrimary, in: Circle()).offset(x: 4, y: 4)
+                    Circle().fill(Color.wellnessPrimary.opacity(0.12)).overlay(Circle().strokeBorder(Color.wellnessPrimary.opacity(0.3))).frame(width: 44, height: 44)
+                        .overlay(Image(systemName: "leaf").font(.headline).foregroundStyle(Color.wellnessPrimary))
+                    Image(systemName: "dumbbell.fill").font(.system(size: 9, weight: .bold)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 20, height: 20).background(Color.wellnessPrimary, in: Circle()).offset(x: 3, y: 3)
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("KH WELLNESS").font(.hb(.caption2, .semibold)).tracking(2.2).foregroundStyle(Color.amberInk)
-                    Text("זמן לעצמך").font(.hb(.title3, .bold)).foregroundStyle(Color.wellnessInk)
-                    Text("התזונה, האימונים וההתקדמות שלך").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("KH WELLNESS").font(.hb(.caption2, .semibold)).tracking(2).foregroundStyle(Color.amberInk)
+                    Text("זמן לעצמך").font(.hb(.headline, .bold)).foregroundStyle(Color.wellnessInk)
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.backward").font(.footnote.weight(.bold)).foregroundStyle(Color.wellnessSecondary)
-            }.wellnessCard(padding: 18)
+            }.wellnessCard(padding: 12)
         }.buttonStyle(PressableStyle()).accessibilityIdentifier("wellness-entry").accessibilityElement(children: .combine).accessibilityHint("פותח את המרחב האישי")
     }
 
     // MARK: Hero
     private var hero: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("הבית").font(.hb(.caption2, .semibold)).tracking(2.2).foregroundStyle(Color.wellnessPrimary)
                 (Text("\(greeting)").foregroundStyle(Color.wellnessInk) + Text(home.me.map { ", " + $0.name } ?? "").foregroundStyle(Color.amberInk))
-                    .font(.hb(.title, .bold)).tracking(-0.5).fixedSize(horizontal: false, vertical: true)
+                    .font(.hb(.title2, .bold)).tracking(-0.4).lineLimit(1).minimumScaleFactor(0.8)
                 Text(Date(), format: .dateTime.weekday(.wide).day().month(.wide)).font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary)
-                Button { sheet = .newSection } label: {
-                    Label("קטגוריה חדשה", systemImage: "plus").font(.hb(.subheadline, .semibold)).padding(.horizontal, 16).frame(minHeight: 44)
-                        .foregroundStyle(Color.wellnessOnPrimary).background(Color.wellnessPrimary, in: Capsule())
-                }.buttonStyle(PressableStyle()).padding(.top, 8).accessibilityIdentifier("hero-new-section")
             }.frame(maxWidth: .infinity, alignment: .leading)
+            Button { sheet = .newSection } label: {
+                Label("קטגוריה", systemImage: "plus").font(.hb(.subheadline, .semibold)).padding(.horizontal, 14).frame(minHeight: 40)
+                    .foregroundStyle(Color.wellnessOnPrimary).background(Color.wellnessPrimary, in: Capsule())
+            }.buttonStyle(PressableStyle()).accessibilityLabel("קטגוריה חדשה").accessibilityIdentifier("hero-new-section")
         }
-        .padding(22)
+        .padding(.horizontal, 16).padding(.vertical, 14)
         .background {
-            RoundedRectangle(cornerRadius: 30, style: .continuous).fill(Color.wellnessCard)
-                .overlay(RadialGradient(colors: [Color.wellnessPrimary.opacity(0.09), .clear], center: UnitPoint(x: 1, y: -0.1), startRadius: 0, endRadius: 320).clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous)))
-                .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(Color.wellnessHairline))
-                .shadow(color: .black.opacity(0.05), radius: 1, y: 1).shadow(color: .black.opacity(0.10), radius: 12, y: 6)
+            RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Color.wellnessCard)
+                .overlay(RadialGradient(colors: [Color.wellnessPrimary.opacity(0.09), .clear], center: UnitPoint(x: 1, y: -0.1), startRadius: 0, endRadius: 260).clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous)))
+                .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Color.wellnessHairline))
+                .shadow(color: .black.opacity(0.05), radius: 1, y: 1).shadow(color: .black.opacity(0.08), radius: 10, y: 5)
         }
     }
 
@@ -274,7 +289,7 @@ struct SectionPanel: View {
         }
     }
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             header
             if section.kind == "shopping" { shoppingActions }
             if section.kind != "info" { ProgressBar(value: progress, tint: Color.wellnessPrimary) }
@@ -284,7 +299,7 @@ struct SectionPanel: View {
             default: TaskPanelBody(section: section, notesStyle: false)
             }
         }
-        .padding(.horizontal, 18).padding(.top, 24).padding(.bottom, 18)
+        .padding(.horizontal, 14).padding(.top, 20).padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 30, style: .continuous).fill(Color.wellnessCard)
@@ -315,23 +330,23 @@ struct SectionPanel: View {
     private var header: some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.06))
+                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.06))
                 if let e = section.emoji, !e.isEmpty { Text(e).font(.system(size: 20)) } else { Image(systemName: section.kindIcon).foregroundStyle(section.kindColor) }
-            }.frame(width: 42, height: 42).accessibilityHidden(true)
+            }.frame(width: 36, height: 36).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(section.name).font(.hb(.title3, .bold)).tracking(-0.3).foregroundStyle(Color.wellnessInk).lineLimit(2)
+                Text(section.name).font(.hb(.headline, .bold)).tracking(-0.2).foregroundStyle(Color.wellnessInk).lineLimit(2)
                 Text(countText).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).monospacedDigit()
             }.frame(maxWidth: .infinity, alignment: .leading)
         }
     }
     private var shoppingActions: some View {
-        HStack(spacing: 8) {
-            Button { scanning = true } label: { Label("סריקת ברקוד", systemImage: "barcode.viewfinder").font(.hb(.footnote, .semibold)).padding(.horizontal, 14).frame(minHeight: 40).foregroundStyle(Color.wellnessOnPrimary).background(Color.wellnessPrimary, in: Capsule()) }
-                .buttonStyle(PressableStyle()).accessibilityIdentifier("scan-barcode")
-            ShareLink(item: home.shareText(for: section)) { Label("שיתוף הרשימה", systemImage: "square.and.arrow.up").font(.hb(.footnote, .semibold)).padding(.horizontal, 14).frame(minHeight: 40).foregroundStyle(Color.wellnessInk).background(Color.wellnessChip, in: Capsule()) }
-                .accessibilityIdentifier("share-list")
-            Button { comparing = true } label: { Label("השוואת מחירים", systemImage: "chart.line.downtrend.xyaxis").font(.hb(.footnote, .semibold)).padding(.horizontal, 14).frame(minHeight: 40).foregroundStyle(Color.wellnessInk).background(Color.wellnessChip, in: Capsule()) }
-                .buttonStyle(PressableStyle()).accessibilityIdentifier("compare-prices")
+        HStack(spacing: 6) {
+            Button { scanning = true } label: { Label("סריקה", systemImage: "barcode.viewfinder").font(.hb(.footnote, .semibold)).lineLimit(1).fixedSize().padding(.horizontal, 12).frame(minHeight: 36).foregroundStyle(Color.wellnessOnPrimary).background(Color.wellnessPrimary, in: Capsule()) }
+                .buttonStyle(PressableStyle()).accessibilityLabel("סריקת ברקוד").accessibilityIdentifier("scan-barcode")
+            ShareLink(item: home.shareText(for: section)) { Label("שיתוף", systemImage: "square.and.arrow.up").font(.hb(.footnote, .semibold)).lineLimit(1).fixedSize().padding(.horizontal, 12).frame(minHeight: 36).foregroundStyle(Color.wellnessInk).background(Color.wellnessChip, in: Capsule()) }
+                .accessibilityLabel("שיתוף הרשימה").accessibilityIdentifier("share-list")
+            Button { comparing = true } label: { Label("מחירים", systemImage: "chart.line.downtrend.xyaxis").font(.hb(.footnote, .semibold)).lineLimit(1).fixedSize().padding(.horizontal, 12).frame(minHeight: 36).foregroundStyle(Color.wellnessInk).background(Color.wellnessChip, in: Capsule()) }
+                .buttonStyle(PressableStyle()).accessibilityLabel("השוואת מחירים").accessibilityIdentifier("compare-prices")
             Spacer(minLength: 0)
         }
     }
@@ -382,23 +397,31 @@ struct TaskPanelBody: View {
     @State private var draft = ""
     @State private var editing: HTask?
     @State private var showDone = false
+    @State private var collapsed: Set<String> = []
+    @State private var addingSubFor: String?
+    @State private var subDraft = ""
     private var open: [HTask] { home.tasks(in: section.id).filter { $0.parentID == nil && !$0.isCompleted } }
     private var done: [HTask] { home.tasks(in: section.id).filter { $0.parentID == nil && $0.isCompleted } }
     private func children(_ t: HTask) -> [HTask] { home.tasks(in: section.id).filter { $0.parentID == t.id } }
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 10) {
-                Image(systemName: "plus").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.wellnessSecondary)
-                TextField(section.kind == "shopping" ? "מה צריך לקנות?" : notesStyle ? "הערה חדשה…" : "משימה חדשה…", text: $draft).submitLabel(.done)
+                Image(systemName: "plus").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 26, height: 26).background(Color.wellnessPrimary.opacity(0.9), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                TextField(section.kind == "shopping" ? "מה צריך לקנות?" : notesStyle ? "הערה חדשה…" : "משימה חדשה…", text: $draft).font(.hb(.subheadline)).submitLabel(.done)
                     .onSubmit { let text = draft; draft = ""; Task { await home.addTask(title: text, section: section, isNote: notesStyle, parseDates: true) } }
                     .accessibilityIdentifier("quick-add-field-\(section.id)")
-            }.padding(.horizontal, 14).frame(minHeight: 46).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }.padding(.horizontal, 10).frame(minHeight: 44).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 16, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
             if open.isEmpty && done.isEmpty {
                 Text(section.kind == "shopping" ? "הרשימה ריקה" : "אין כאן כלום עדיין").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary).frame(maxWidth: .infinity).padding(.vertical, 22)
             }
             ForEach(open) { task in
-                row(task, depth: 0)
-                ForEach(children(task)) { row($0, depth: 1) }
+                let kids = children(task)
+                row(task, depth: 0, kids: kids.count)
+                if addingSubFor == task.id { subtaskField(task) }
+                if !kids.isEmpty && !collapsed.contains(task.id) {
+                    VStack(spacing: 0) { ForEach(kids) { row($0, depth: 1, kids: 0) } }
+                        .padding(.leading, 22).overlay(alignment: .leading) { Rectangle().fill(Color.wellnessHairline).frame(width: 1).padding(.leading, 12).padding(.vertical, 4) }
+                }
             }
             if !done.isEmpty {
                 Button { withAnimation(.snappy) { showDone.toggle() } } label: {
@@ -411,9 +434,19 @@ struct TaskPanelBody: View {
             }
         }.sheet(item: $editing) { TaskEditorSheet(task: $0, section: section).environmentObject(home) }
     }
-    private func row(_ task: HTask, depth: Int) -> some View {
-        TaskRow(task: task, depth: depth, notesStyle: notesStyle) { editing = task }
-            .padding(.leading, CGFloat(depth) * 22)
+    private func subtaskField(_ parent: HTask) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.turn.down.left").font(.footnote).foregroundStyle(Color.wellnessSecondary)
+            TextField("תת-משימה חדשה", text: $subDraft).font(.hb(.subheadline)).submitLabel(.done)
+                .onSubmit { let text = subDraft; subDraft = ""; addingSubFor = nil; if !text.trimmingCharacters(in: .whitespaces).isEmpty { Task { await home.addTask(title: text, section: section, parent: parent) } } }
+                .accessibilityIdentifier("inline-subtask-\(parent.id)")
+        }.padding(.horizontal, 12).frame(minHeight: 40).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 12, style: .continuous)).padding(.leading, 34).padding(.bottom, 4)
+    }
+    private func row(_ task: HTask, depth: Int, kids: Int = 0) -> some View {
+        TaskRow(task: task, depth: depth, notesStyle: notesStyle, childCount: kids, expanded: !collapsed.contains(task.id),
+                onToggleExpand: { withAnimation(.snappy) { if collapsed.contains(task.id) { collapsed.remove(task.id) } else { collapsed.insert(task.id) } } },
+                onAddSubtask: { withAnimation(.snappy) { addingSubFor = addingSubFor == task.id ? nil : task.id; subDraft = "" } },
+                quiet: section.kind == "shopping") { editing = task }
             .swipeToDelete { Task { await home.delete(task) } }
             .modifier(ReorderDrag(task: task, enabled: depth == 0 && !notesStyle && !task.isCompleted))
             .contextMenu {
@@ -449,50 +482,83 @@ struct TaskRow: View {
     let task: HTask
     let depth: Int
     let notesStyle: Bool
+    var childCount = 0
+    var expanded = true
+    var onToggleExpand: (() -> Void)? = nil
+    var onAddSubtask: (() -> Void)? = nil
+    /// Shopping lists stay quiet: no assignee placeholder or subtask button unless they are used.
+    var quiet = false
     let onOpen: () -> Void
+    private static let dayMonth: DateFormatter = { let f = DateFormatter(); f.dateFormat = "d/M"; return f }()
     var body: some View {
-        HStack(alignment: .top, spacing: 6) {
+        HStack(alignment: .center, spacing: 2) {
             if !notesStyle {
-                Button { Task { await home.toggle(task) } } label: {
-                    Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle").font(.hb(.title2)).foregroundStyle(task.isCompleted ? Color.wellnessInk : Color.wellnessSecondary)
-                        .symbolEffect(.bounce, value: task.isCompleted).frame(width: 44, height: 44)
-                }.buttonStyle(.plain).accessibilityLabel(task.isCompleted ? "בטל סימון \(task.title)" : "סמן \(task.title) כבוצע").accessibilityIdentifier("task-toggle-\(task.id)").sensoryFeedback(.success, trigger: task.isCompleted) { _, done in done }
+                if depth == 0 {
+                    if childCount > 0 {
+                        Button { onToggleExpand?() } label: { Image(systemName: "chevron.down").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.wellnessSecondary).rotationEffect(.degrees(expanded ? 0 : 90)).frame(width: 24, height: 40).contentShape(Rectangle()) }
+                            .buttonStyle(.plain).accessibilityLabel(expanded ? "כיווץ תתי־משימות" : "הרחבת תתי־משימות")
+                    } else { Color.clear.frame(width: 6, height: 1) }
+                }
+                Button { Task { await home.toggle(task) } } label: { checkbox.frame(width: 40, height: 44).contentShape(Rectangle()) }
+                    .buttonStyle(.plain).accessibilityLabel(task.isCompleted ? "בטל סימון \(task.title)" : "סמן \(task.title) כבוצע").accessibilityIdentifier("task-toggle-\(task.id)")
+                    .sensoryFeedback(.success, trigger: task.isCompleted) { _, done in done }
             }
             Button(action: onOpen) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
-                        if let e = task.emoji { Text(e) }
-                        Text(task.title).font(.hb(.body, notesStyle ? .semibold : .regular)).strikethrough(task.isCompleted).foregroundStyle(task.isCompleted ? Color.wellnessSecondary : Color.wellnessInk).multilineTextAlignment(.leading)
+                        if let p = task.priority, p > 0 { Circle().fill(p == 3 ? Color.kindChores : p == 2 ? Color.kcalAmber : Color.proteinBlue).frame(width: 7, height: 7).accessibilityLabel(p == 3 ? "דחוף" : p == 2 ? "חשוב" : "רגיל") }
+                        if let e = task.emoji { Text(e).font(.hb(.subheadline)) }
+                        Text(task.title).font(.hb(.callout, notesStyle ? .semibold : .regular)).strikethrough(task.isCompleted).foregroundStyle(task.isCompleted ? Color.wellnessSecondary : Color.wellnessInk).multilineTextAlignment(.leading)
                     }
-                    if notesStyle, let n = task.notes, !n.isEmpty { Text(n).font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary).lineLimit(4).multilineTextAlignment(.leading) }
-                    meta
-                }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, notesStyle ? 10 : 8).contentShape(Rectangle())
+                    if notesStyle, let n = task.notes, !n.isEmpty { Text(n).font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary).lineLimit(4).multilineTextAlignment(.leading) }
+                    badges
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, notesStyle ? 8 : 4).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityIdentifier("task-open-\(task.id)")
-            if !notesStyle || !task.assigneeIDs.isEmpty {
-                AssigneeButton(currentID: task.assigneeIDs.first, size: 34) { id in Task { await home.setAssignee(task, to: id) } }.accessibilityIdentifier("task-assignee-\(task.id)")
+            if !task.assigneeIDs.isEmpty || (!notesStyle && !quiet) {
+                AssigneeButton(currentID: task.assigneeIDs.first, size: 30, ids: task.assigneeIDs, badge: true) { id in Task { await home.setAssignee(task, to: id) } }.accessibilityIdentifier("task-assignee-\(task.id)")
+            }
+            if depth == 0, !notesStyle, !quiet, !task.isCompleted, let onAddSubtask {
+                Button(action: onAddSubtask) { Image(systemName: "plus").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.wellnessSecondary).frame(width: 30, height: 44).contentShape(Rectangle()) }
+                    .buttonStyle(.plain).accessibilityLabel("הוספת תת־משימה").accessibilityIdentifier("task-add-sub-\(task.id)")
             }
         }
-        .padding(.horizontal, notesStyle ? 14 : 4).background(notesStyle ? Color.wellnessCard : Color.clear, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(notesStyle ? Color.wellnessHairline : .clear))
+        .padding(.horizontal, notesStyle ? 12 : 4)
+        .background(notesStyle ? Color.wellnessCard : Color.clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(notesStyle ? Color.wellnessHairline : .clear))
     }
-    @ViewBuilder private var meta: some View {
-        let parts = chips
-        if !parts.isEmpty {
-            HStack(spacing: 6) {
-                ForEach(parts, id: \.text) { chip in Label(chip.text, systemImage: chip.icon).font(.hb(.caption, .medium)).padding(.horizontal, 8).padding(.vertical, 4).foregroundStyle(chip.color).background(chip.color.opacity(0.13), in: Capsule()) }
+    /// Round checkbox (the web app's 20pt circle): hollow ring, filled with a check when done.
+    private var checkbox: some View {
+        ZStack {
+            Circle().strokeBorder(task.isCompleted ? Color.clear : Color.wellnessSecondary.opacity(0.7), lineWidth: 1.6)
+            if task.isCompleted { Circle().fill(Color.wellnessPrimary); Image(systemName: "checkmark").font(.system(size: 11, weight: .heavy)).foregroundStyle(Color.wellnessOnPrimary) }
+        }.frame(width: 22, height: 22).animation(.snappy(duration: 0.2), value: task.isCompleted)
+    }
+    @ViewBuilder private var badges: some View {
+        let items = badgeItems
+        if !items.isEmpty {
+            HStack(spacing: 5) {
+                ForEach(items, id: \.text) { b in
+                    Text(b.text).font(.hb(.caption, .medium)).monospacedDigit().padding(.horizontal, 8).frame(height: 22)
+                        .foregroundStyle(b.fg).background(b.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(b.stroke))
+                }
             }
         }
     }
-    private struct Chip { let text: String; let icon: String; let color: Color }
-    private var chips: [Chip] {
-        var list: [Chip] = []
+    private struct Badge { let text: String; let fg: Color; let bg: Color; let stroke: Color }
+    private var badgeItems: [Badge] {
+        var list: [Badge] = []
+        if let q = task.quantity { list.append(Badge(text: "×\(q.formatted()) \(task.unit ?? "")".trimmingCharacters(in: .whitespaces), fg: Color.wellnessInk, bg: Color.wellnessChip, stroke: .clear)) }
         if let due = task.dueAt {
-            let overdue = due < Date() && !task.isCompleted
-            list.append(Chip(text: due.formatted(.dateTime.day().month(.abbreviated).hour().minute()), icon: "clock", color: overdue ? .fatCoralText : Color.wellnessSecondary))
+            let cal = Calendar.current
+            let overdue = !task.isCompleted && cal.startOfDay(for: due) < cal.startOfDay(for: Date())
+            let today = !task.isCompleted && cal.isDateInToday(due)
+            let text = Self.dayMonth.string(from: due)
+            list.append(overdue ? Badge(text: text, fg: Color.fatCoralText, bg: Color.kindChores.opacity(0.12), stroke: Color.kindChores.opacity(0.35))
+                : today ? Badge(text: text, fg: Color.amberInk, bg: Color.amberTint, stroke: Color.kcalAmber.opacity(0.5))
+                : Badge(text: text, fg: Color.wellnessSecondary, bg: .clear, stroke: Color.wellnessHairline))
         }
-        if let p = task.priority, p > 0 { list.append(Chip(text: p == 3 ? "דחוף" : p == 2 ? "חשוב" : "רגיל", icon: "flag.fill", color: p == 3 ? .fatCoralText : .kcalAmberText)) }
-        if let q = task.quantity { list.append(Chip(text: "\(q.formatted()) \(task.unit ?? "")".trimmingCharacters(in: .whitespaces), icon: "number", color: Color.wellnessSecondary)) }
-        if let price = task.price { list.append(Chip(text: "₪\(price.formatted())", icon: "shekelsign", color: Color.wellnessSecondary)) }
+        if let price = task.price { list.append(Badge(text: "₪\(price.formatted())", fg: Color.wellnessSecondary, bg: Color.wellnessChip, stroke: .clear)) }
         return list
     }
 }
@@ -580,7 +646,7 @@ struct AssistantCards: View {
     @EnvironmentObject private var home: HomeStore
     @State private var applying: String?
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             ForEach(home.suggestions) { s in
                 card(emoji: s.emoji ?? "💡", text: s.summary, ring: Color.wellnessPrimary.opacity(0.3), id: s.id) {
                     HStack(spacing: 6) {
@@ -603,9 +669,9 @@ struct AssistantCards: View {
             Text(text).font(.hb(.subheadline)).foregroundStyle(Color.wellnessInk).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading).layoutPriority(0)
             trailing().layoutPriority(1)
         }
-        .padding(14)
-        .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(ring, lineWidth: 1.2))
+        .padding(10)
+        .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(ring, lineWidth: 1.2))
         .shadow(color: .black.opacity(0.05), radius: 1, y: 1).shadow(color: .black.opacity(0.08), radius: 10, y: 5)
         .transition(.scale.combined(with: .opacity)).accessibilityElement(children: .contain)
     }

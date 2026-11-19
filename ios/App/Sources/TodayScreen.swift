@@ -10,24 +10,29 @@ struct TodayScreen: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("היום שלך").font(.hb(.largeTitle, .bold))
-                        Button { showCalendar = true } label: {
-                            HStack(spacing: 6) {
-                                Text(store.selectedDate, format: .dateTime.month(.wide).year())
-                                Image(systemName: "chevron.down").font(.hb(.caption))
-                            }.foregroundStyle(Color.wellnessSecondary)
-                        }.frame(minHeight: 44).accessibilityLabel("בחירת תאריך").accessibilityIdentifier("date-picker")
+                        Text("היום שלך").font(.hb(.title, .bold))
+                        HStack(spacing: 10) {
+                            Button { showCalendar = true } label: {
+                                HStack(spacing: 6) {
+                                    Text(store.selectedDate, format: .dateTime.month(.wide).year())
+                                    Image(systemName: "chevron.down").font(.hb(.caption))
+                                }.foregroundStyle(Color.wellnessSecondary)
+                            }.frame(minHeight: 36).accessibilityLabel("בחירת תאריך").accessibilityIdentifier("date-picker")
+                            if !Calendar.current.isDateInToday(store.selectedDate) {
+                                Button("היום") { withAnimation(.snappy) { store.selectedDate = Date() } }.font(.hb(.caption, .bold)).padding(.horizontal, 12).frame(minHeight: 32).background(Color.wellnessCard, in: Capsule()).overlay(Capsule().strokeBorder(Color.wellnessHairline)).foregroundStyle(Color.wellnessInk).accessibilityIdentifier("today-button")
+                            }
+                        }
                     }
                         Spacer()
                         Button { showCoach = true } label: {
-                            Image(systemName: "sparkles").font(.hb(.title3)).foregroundStyle(.flame).frame(width: 48, height: 48)
+                            Image(systemName: "sparkles").font(.hb(.headline)).foregroundStyle(.flame).frame(width: 44, height: 44)
                                 .background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline))
                         }.buttonStyle(PressableStyle()).accessibilityLabel("המאמן שלי").accessibilityIdentifier("coach-button")
                         Button { showSettings = true } label: {
-                            Image(systemName: "gearshape.fill").font(.hb(.title3)).foregroundStyle(Color.wellnessInk).frame(width: 48, height: 48)
+                            Image(systemName: "gearshape.fill").font(.hb(.headline)).foregroundStyle(Color.wellnessInk).frame(width: 44, height: 44)
                                 .background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline))
                         }.buttonStyle(PressableStyle()).accessibilityLabel("הגדרות").accessibilityIdentifier("settings-button")
                     }
@@ -47,7 +52,7 @@ struct TodayScreen: View {
                                 .contextMenu { Button(role: .destructive) { mealToDelete = meal } label: { Label("מחיקת הארוחה", systemImage: "trash") } }.accessibilityIdentifier("meal-\(meal.id)")
                         }
                     }
-                }.padding(22).shimmer(store.loading && store.meals.isEmpty && store.goals.isEmpty)
+                }.padding(16).shimmer(store.loading && store.meals.isEmpty && store.goals.isEmpty)
             }
             .wellnessScreen()
             .safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }
@@ -80,19 +85,14 @@ private struct DayRail: View {
         return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0 - weekday + 1, to: start) }
     }
     var body: some View {
-        VStack(spacing: 2) {
-            HStack {
-                Button { withAnimation(.snappy) { shift(-7) } } label: { Image(systemName: "chevron.right").frame(width: 44, height: 32) }.accessibilityLabel("שבוע קודם")
-                Spacer()
-                if !calendar.isDateInToday(store.selectedDate) { Button("היום") { withAnimation(.snappy) { store.selectedDate = Date() } }.font(.hb(.caption, .bold)).padding(.horizontal, 14).frame(minHeight: 44).background(Color.wellnessCard, in: Capsule()).foregroundStyle(Color.wellnessInk) }
-                Spacer()
-                Button { withAnimation(.snappy) { shift(7) } } label: { Image(systemName: "chevron.left").frame(width: 44, height: 32) }.accessibilityLabel("שבוע הבא")
-            }.foregroundStyle(Color.wellnessSecondary)
+        HStack(spacing: 0) {
+            Button { withAnimation(.snappy) { shift(-7) } } label: { Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).frame(width: 28, height: 56) }.accessibilityLabel("שבוע קודם")
             ViewThatFits(in: .horizontal) {
                 dayCells(scrolling: false)
                 ScrollView(.horizontal, showsIndicators: false) { dayCells(scrolling: true) }
             }
-        }
+            Button { withAnimation(.snappy) { shift(7) } } label: { Image(systemName: "chevron.left").font(.footnote.weight(.semibold)).frame(width: 28, height: 56) }.accessibilityLabel("שבוע הבא")
+        }.foregroundStyle(Color.wellnessSecondary)
     }
     @ViewBuilder private func dayCells(scrolling: Bool) -> some View {
         HStack(spacing: 5) {
@@ -100,12 +100,12 @@ private struct DayRail: View {
                     let selected = calendar.isDate(day, inSameDayAs: store.selectedDate)
                     let future = day > Date() && !calendar.isDateInToday(day)
                     Button { withAnimation(.snappy) { store.selectedDate = day } } label: {
-                        VStack(spacing: 8) {
+                        VStack(spacing: 4) {
                             Text(day, format: .dateTime.weekday(.narrow)).font(.hb(.caption)).foregroundStyle(future ? Color.primary.opacity(0.5) : Color.wellnessSecondary)
-                            Text(day, format: .dateTime.day()).font(.hb(.title3, .semibold)).monospacedDigit()
+                            Text(day, format: .dateTime.day()).font(.hb(.headline, .semibold)).monospacedDigit()
                                 .foregroundStyle(future ? Color.primary.opacity(0.5) : Color.wellnessInk).lineLimit(1)
                             Circle().fill(calendar.isDateInToday(day) ? Color.kcalAmber : .clear).frame(width: 4, height: 4)
-                        }.frame(maxWidth: scrolling ? nil : .infinity).frame(minWidth: scrolling ? 56 : 0).padding(.vertical, 10)
+                        }.frame(maxWidth: scrolling ? nil : .infinity).frame(minWidth: scrolling ? 56 : 0).padding(.vertical, 6)
                             .background { if selected { RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.wellnessInk, lineWidth: 1.5) } }
                     }.buttonStyle(.plain)
                     .accessibilityLabel(day.formatted(.dateTime.weekday(.wide).day().month(.wide)))
@@ -120,7 +120,7 @@ private struct DayRail: View {
 
 private struct CalorieCard: View {
     @EnvironmentObject private var store: AppStore
-    @ScaledMetric(relativeTo: .largeTitle) private var bigNumber: CGFloat = 54
+    @ScaledMetric(relativeTo: .largeTitle) private var bigNumber: CGFloat = 40
     private var consumed: Double { nutrientTotal(meals: store.dayMeals, nutrient: "kcal") }
     private var target: Double? { store.goal["kcal"].doubleValue }
     var body: some View {
@@ -131,7 +131,7 @@ private struct CalorieCard: View {
                     .font(.hbFixed(bigNumber, .heavy)).minimumScaleFactor(0.6)
                     .contentTransition(.numericText(value: remaining ?? consumed))
                     .animation(.snappy, value: consumed)
-                Text(remaining == nil ? "קלוריות נאכלו" : "קלוריות נותרו").font(.hb(.title3)).foregroundStyle(Color.wellnessSecondary).lineLimit(2).minimumScaleFactor(0.7)
+                Text(remaining == nil ? "קלוריות נאכלו" : "קלוריות נותרו").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary).lineLimit(2).minimumScaleFactor(0.7)
                 if let target {
                     if let remaining, remaining < 0 {
                         Text("חרגת ב־\(Int((-remaining).rounded())) קק״ל").font(.hb(.caption, .semibold)).foregroundStyle(Color.kcalAmberText)
@@ -140,8 +140,8 @@ private struct CalorieCard: View {
                     }
                 } else { Text("יעד יומי עדיין לא הוגדר").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }
             }.frame(maxWidth: .infinity, alignment: .leading)
-            ProgressRing(value: consumed, target: target, color: .kcalAmber, symbol: "flame.fill", lineWidth: 9).frame(width: 96, height: 96)
-        }.wellnessCard(padding: 24).accessibilityElement(children: .ignore)
+            ProgressRing(value: consumed, target: target, color: .kcalAmber, symbol: "flame.fill", lineWidth: 8).frame(width: 72, height: 72)
+        }.wellnessCard(padding: 16).accessibilityElement(children: .ignore)
             .accessibilityLabel("קלוריות נאכלו")
             .accessibilityValue("\(Int(consumed.rounded()))\(target.map { " מתוך \(Int($0))" } ?? "")")
             .accessibilityIdentifier("calories-card")
@@ -152,7 +152,7 @@ private struct CalorieCard: View {
 private struct SummaryCarousel: View {
     @EnvironmentObject private var store: AppStore
     @State private var page = 0
-    @ScaledMetric(relativeTo: .body) private var height: CGFloat = 172
+    @ScaledMetric(relativeTo: .body) private var height: CGFloat = 128
     private var hasActivity: Bool { store.steps != nil }
     @ViewBuilder private var macroCards: some View {
         NutrientCard(title: "חלבון", nutrient: "protein", symbol: "fish.fill", color: .proteinBlue)
@@ -229,8 +229,8 @@ private struct NutrientCard: View {
         let value = nutrientTotal(meals: store.dayMeals, nutrient: nutrient)
         let target = store.goal[nutrient].doubleValue
         let left = target.map { $0 - value }
-        VStack(spacing: 10) {
-            ProgressRing(value: value, target: target, color: color, symbol: symbol, lineWidth: 5).frame(width: 46, height: 46)
+        VStack(spacing: 6) {
+            ProgressRing(value: value, target: target, color: color, symbol: symbol, lineWidth: 4).frame(width: 36, height: 36)
             VStack(spacing: 3) {
                 Text("\(Int(value.rounded())) ג׳").font(.hb(.headline, .bold))
                     .contentTransition(.numericText(value: value)).animation(.snappy, value: value)
@@ -240,7 +240,7 @@ private struct NutrientCard: View {
                         .font(.hb(.caption2, .medium)).foregroundStyle(left >= 0 ? Color.wellnessSecondary : Color.kcalAmberText)
                 }
             }
-        }.frame(maxWidth: .infinity).padding(.vertical, 18).padding(.horizontal, 5)
+        }.frame(maxWidth: .infinity).padding(.vertical, 12).padding(.horizontal, 5)
             .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.wellnessHairline))
             .shadow(color: .black.opacity(0.04), radius: 12, y: 4)
@@ -282,7 +282,7 @@ private struct MealDetail: View {
     private var meal: HealthRow { store.meals.first { $0.id == initial.id } ?? initial }
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 14) {
                 if mealPhotoPath(meal) != nil { PrivateMealPhoto(meal: meal, thumbnail: false).clipShape(RoundedRectangle(cornerRadius: 24)) }
                 Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded())) קק״ל").font(.hb(.largeTitle, .bold))
                 VStack(spacing: 0) {
@@ -298,7 +298,7 @@ private struct MealDetail: View {
                         Divider()
                     }
                 }.wellnessCard()
-            }.padding(22)
+            }.padding(16)
         }.wellnessScreen().navigationTitle(mealName(meal)).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("עריכה") { editing = true }.accessibilityIdentifier("edit-meal") } }
             .sheet(isPresented: $editing) { EditMealSheet(meal: meal).environmentObject(store) }

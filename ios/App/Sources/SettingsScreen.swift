@@ -34,9 +34,11 @@ struct SettingsScreen: View {
                         }.disabled((Double(weightText.replacingOccurrences(of: ",", with: ".")) ?? 0) < 20)
                     }
                 }
-                Section { Button { showGoals = true } label: { Label("הפרופיל והיעדים שלי", systemImage: "target") }.accessibilityIdentifier("profile-goals") }
-                Section { NavigationLink { NotificationSettingsScreen() } label: { Label("התראות", systemImage: "bell") }.accessibilityIdentifier("notification-settings") }
-                Section { NavigationLink { FoodLibraryScreen() } label: { Label("הספרייה שלי (מועדפים ומתכונים)", systemImage: "books.vertical") }.accessibilityIdentifier("food-library") }
+                Section {
+                    Button { showGoals = true } label: { Label("הפרופיל והיעדים שלי", systemImage: "target") }.accessibilityIdentifier("profile-goals")
+                    NavigationLink { NotificationSettingsScreen() } label: { Label("התראות", systemImage: "bell") }.accessibilityIdentifier("notification-settings")
+                    NavigationLink { FoodLibraryScreen() } label: { Label("הספרייה שלי (מועדפים ומתכונים)", systemImage: "books.vertical") }.accessibilityIdentifier("food-library")
+                }
                 Section("פרטיות") {
                     Text("קוד הכניסה לא נשמר. פרטי ההתחברות מוגנים ב־Keychain של המכשיר.")
                     Text("המידע מבריאות מיובא רק אחרי בחירת אימונים ואישור שלך.")

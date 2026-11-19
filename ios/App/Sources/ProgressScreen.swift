@@ -33,8 +33,8 @@ struct ProgressScreen: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    Text("ההתקדמות שלך").font(.hb(.largeTitle, .bold))
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("ההתקדמות שלך").font(.hb(.title, .bold))
                     HStack(spacing: 12) {
                         stat("ממוצע יומי", average > 0 ? "\(Int(average.rounded()))" : "—", "קק״ל", .kcalAmberText)
                         stat("ימים עם תיעוד", "\(loggedDays)", "מתוך 7", .proteinBlueText)
@@ -67,7 +67,7 @@ struct ProgressScreen: View {
                             .chartYScale(domain: low...high).frame(height: 180)
                         }
                     }
-                }.padding(22)
+                }.padding(16)
             }.wellnessScreen().safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }.toolbar(.hidden, for: .navigationBar).refreshable { await store.refresh() }
         }
     }

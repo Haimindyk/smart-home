@@ -289,6 +289,15 @@ final class HomeStore: ObservableObject {
         }
         if ok { await refresh() }
     }
+    /// The last ten completions of a chore, newest first.
+    func completions(of chore: HChore) async -> [(who: String, when: Date)] {
+#if DEBUG
+        if app?.backend == nil, app?.session?.accessToken == "ui-test" { return [(me?.name ?? "חיים", Date())] }
+#endif
+        guard let app, let owner = app.session?.owner, let backend = app.backend,
+              let rows = try? await backend.householdRows(table: "chore_completions", owner: owner, filters: [.init(name: "chore_id", value: "eq.\(chore.id)")], order: "completed_at.desc", limit: 10, singlePage: true) else { return [] }
+        return rows.compactMap { row in DateParsing.timestamp(row.str("completed_at")).map { (who: member(row.str("completed_by"))?.name ?? "?", when: $0) } }
+    }
     func addChore(title: String, section: HSection, freq: String, interval: Int) async {
         let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty, clean.count <= 300, ["daily", "weekly", "monthly"].contains(freq),

@@ -19,7 +19,7 @@ extension Color {
     static let wellnessInk = adaptive((0.07, 0.07, 0.08), (0.96, 0.96, 0.97))
     static let wellnessOnInk = adaptive((1, 1, 1), (0.07, 0.07, 0.08))
     /// Secondary text with at least 4.5:1 contrast on cards and canvas in both appearances.
-    static let wellnessSecondary = adaptive((0.30, 0.30, 0.33), (0.70, 0.70, 0.74))
+    static let wellnessSecondary = adaptive((0.40, 0.41, 0.45), (0.70, 0.70, 0.74))
     static let wellnessHairline = adaptive((0.914, 0.918, 0.929), (1, 1, 1), lightAlpha: 1, darkAlpha: 0.10)
     /// Filled primary controls: near-black in light mode, warm amber in dark mode (as on the web).
     static let wellnessPrimary = adaptive((0.09, 0.09, 0.09), (0.96, 0.73, 0.22))
@@ -47,7 +47,7 @@ extension ShapeStyle where Self == LinearGradient {
 }
 
 extension View {
-    func wellnessCard(padding: CGFloat = 20) -> some View {
+    func wellnessCard(padding: CGFloat = 16) -> some View {
         self.padding(padding)
             .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Color.wellnessHairline))
@@ -137,5 +137,5 @@ struct Shimmer: ViewModifier {
 extension View {
     func shimmer(_ active: Bool) -> some View { modifier(Shimmer(active: active)) }
     /// Grouped list that follows the app canvas and card colors (light and dark).
-    func wellnessList() -> some View { scrollContentBackground(.hidden).background(Color.wellnessCanvas.ignoresSafeArea()).font(.hb(.body)).tint(Color.wellnessPrimary).listSectionSpacing(16) }
+    func wellnessList() -> some View { scrollContentBackground(.hidden).background(Color.wellnessCanvas.ignoresSafeArea()).font(.hb(.body)).tint(Color.wellnessPrimary).listSectionSpacing(10).environment(\.defaultMinListRowHeight, 40) }
 }
