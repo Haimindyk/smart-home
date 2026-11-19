@@ -185,9 +185,9 @@ struct HomeScreen: View {
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
         .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Color.wellnessCard)
-                .overlay(RadialGradient(colors: [Color.wellnessPrimary.opacity(0.09), .clear], center: UnitPoint(x: 1, y: -0.1), startRadius: 0, endRadius: 260).clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous)))
-                .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.wellnessHairline))
+            RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Color.wellnessCard)
+                .overlay(RadialGradient(colors: [Color.wellnessPrimary.opacity(0.09), .clear], center: UnitPoint(x: 1, y: -0.1), startRadius: 0, endRadius: 260).clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous)))
+                .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Color.wellnessHairline))
                 .shadow(color: .black.opacity(0.05), radius: 1, y: 1).shadow(color: .black.opacity(0.08), radius: 10, y: 5)
         }
     }
@@ -670,8 +670,8 @@ struct AssistantCards: View {
             trailing().layoutPriority(1)
         }
         .padding(10)
-        .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(ring, lineWidth: 1.2))
+        .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(ring, lineWidth: 1.2))
         .shadow(color: .black.opacity(0.05), radius: 1, y: 1).shadow(color: .black.opacity(0.08), radius: 10, y: 5)
         .transition(.scale.combined(with: .opacity)).accessibilityElement(children: .contain)
     }

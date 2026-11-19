@@ -64,8 +64,8 @@ struct ChorePanelBody: View {
                     ChoreHistoryButton(chore: chore)
                 }
                 .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(Color.wellnessChip.opacity(0.45), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
+                .background(Color.wellnessChip.opacity(0.45), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.wellnessHairline))
                 .swipeToDelete { confirmDelete = chore }
             }
         }
