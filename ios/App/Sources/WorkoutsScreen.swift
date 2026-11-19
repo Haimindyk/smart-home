@@ -10,8 +10,8 @@ struct WorkoutsScreen: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    Text("האימונים שלך").font(.hb(.largeTitle, .bold))
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("האימונים שלך").font(.hb(.title, .bold))
                     HStack {
                         Text("התוכניות שלי").sectionTitle()
                         Spacer()
@@ -50,7 +50,7 @@ struct WorkoutsScreen: View {
                             }.wellnessCard()
                         }.buttonStyle(PressableStyle()).accessibilityIdentifier("workout-\(workout.id)")
                     }
-                }.padding(22)
+                }.padding(16)
             }.wellnessScreen().safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }.toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $trainer) { TrainerSheet().environmentObject(store) }
             .sheet(isPresented: $creating) { PlanEditorSheet().environmentObject(store) }

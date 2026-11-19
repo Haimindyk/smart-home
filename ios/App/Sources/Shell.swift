@@ -108,13 +108,13 @@ struct HealthTabBar: View {
             HStack(spacing: 6) {
                 ForEach(HealthTab.allCases, id: \.self) { item in
                     Button { withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.82)) { nav.tab = item } } label: {
-                        Text(item.rawValue).font(.hb(.subheadline, .semibold)).padding(.horizontal, 16).frame(minHeight: 40)
+                        Text(item.rawValue).font(.hb(.subheadline, .semibold)).padding(.horizontal, 14).frame(minHeight: 36)
                             .foregroundStyle(nav.tab == item ? Color.wellnessInk : Color.wellnessSecondary)
                             .background { if nav.tab == item { Capsule().fill(Color.wellnessCard).overlay(Capsule().strokeBorder(Color.wellnessInk, lineWidth: 1.5)).matchedGeometryEffect(id: "seg", in: pill) } else { Capsule().strokeBorder(Color.wellnessHairline) } }
                     }.buttonStyle(.plain).accessibilityAddTraits(nav.tab == item ? [.isSelected] : [])
                         .accessibilityIdentifier("tab-\(String(describing: item))")
                 }
-            }.padding(.horizontal, 20).padding(.vertical, 8)
-        }.frame(height: 58).background(Color.wellnessCanvas)
+            }.padding(.horizontal, 16).padding(.vertical, 4)
+        }.frame(height: 48).background(Color.wellnessCanvas)
     }
 }

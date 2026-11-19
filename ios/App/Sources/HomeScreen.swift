@@ -138,42 +138,41 @@ struct HomeScreen: View {
     // MARK: Wellness entry (the web app's personal space card)
     private var wellnessCard: some View {
         Button { home.openHealthRequested = true } label: {
-            HStack(spacing: 16) {
+            HStack(spacing: 12) {
                 ZStack(alignment: .bottomTrailing) {
-                    Circle().fill(Color.wellnessPrimary.opacity(0.12)).overlay(Circle().strokeBorder(Color.wellnessPrimary.opacity(0.3))).frame(width: 64, height: 64)
-                        .overlay(Image(systemName: "leaf").font(.title2).foregroundStyle(Color.wellnessPrimary))
-                    Image(systemName: "dumbbell.fill").font(.caption.weight(.bold)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 28, height: 28).background(Color.wellnessPrimary, in: Circle()).offset(x: 4, y: 4)
+                    Circle().fill(Color.wellnessPrimary.opacity(0.12)).overlay(Circle().strokeBorder(Color.wellnessPrimary.opacity(0.3))).frame(width: 44, height: 44)
+                        .overlay(Image(systemName: "leaf").font(.headline).foregroundStyle(Color.wellnessPrimary))
+                    Image(systemName: "dumbbell.fill").font(.system(size: 9, weight: .bold)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 20, height: 20).background(Color.wellnessPrimary, in: Circle()).offset(x: 3, y: 3)
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("KH WELLNESS").font(.hb(.caption2, .semibold)).tracking(2.2).foregroundStyle(Color.amberInk)
-                    Text("זמן לעצמך").font(.hb(.title3, .bold)).foregroundStyle(Color.wellnessInk)
-                    Text("התזונה, האימונים וההתקדמות שלך").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("KH WELLNESS").font(.hb(.caption2, .semibold)).tracking(2).foregroundStyle(Color.amberInk)
+                    Text("זמן לעצמך").font(.hb(.headline, .bold)).foregroundStyle(Color.wellnessInk)
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.backward").font(.footnote.weight(.bold)).foregroundStyle(Color.wellnessSecondary)
-            }.wellnessCard(padding: 18)
+            }.wellnessCard(padding: 12)
         }.buttonStyle(PressableStyle()).accessibilityIdentifier("wellness-entry").accessibilityElement(children: .combine).accessibilityHint("פותח את המרחב האישי")
     }
 
     // MARK: Hero
     private var hero: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("הבית").font(.hb(.caption2, .semibold)).tracking(2.2).foregroundStyle(Color.wellnessPrimary)
                 (Text("\(greeting)").foregroundStyle(Color.wellnessInk) + Text(home.me.map { ", " + $0.name } ?? "").foregroundStyle(Color.amberInk))
-                    .font(.hb(.title, .bold)).tracking(-0.5).fixedSize(horizontal: false, vertical: true)
+                    .font(.hb(.title2, .bold)).tracking(-0.4).lineLimit(1).minimumScaleFactor(0.8)
                 Text(Date(), format: .dateTime.weekday(.wide).day().month(.wide)).font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary)
-                Button { sheet = .newSection } label: {
-                    Label("קטגוריה חדשה", systemImage: "plus").font(.hb(.subheadline, .semibold)).padding(.horizontal, 16).frame(minHeight: 44)
-                        .foregroundStyle(Color.wellnessOnPrimary).background(Color.wellnessPrimary, in: Capsule())
-                }.buttonStyle(PressableStyle()).padding(.top, 8).accessibilityIdentifier("hero-new-section")
             }.frame(maxWidth: .infinity, alignment: .leading)
+            Button { sheet = .newSection } label: {
+                Label("קטגוריה", systemImage: "plus").font(.hb(.subheadline, .semibold)).padding(.horizontal, 14).frame(minHeight: 40)
+                    .foregroundStyle(Color.wellnessOnPrimary).background(Color.wellnessPrimary, in: Capsule())
+            }.buttonStyle(PressableStyle()).accessibilityLabel("קטגוריה חדשה").accessibilityIdentifier("hero-new-section")
         }
-        .padding(22)
+        .padding(.horizontal, 16).padding(.vertical, 14)
         .background {
-            RoundedRectangle(cornerRadius: 30, style: .continuous).fill(Color.wellnessCard)
-                .overlay(RadialGradient(colors: [Color.wellnessPrimary.opacity(0.09), .clear], center: UnitPoint(x: 1, y: -0.1), startRadius: 0, endRadius: 320).clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous)))
-                .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(Color.wellnessHairline))
-                .shadow(color: .black.opacity(0.05), radius: 1, y: 1).shadow(color: .black.opacity(0.10), radius: 12, y: 6)
+            RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Color.wellnessCard)
+                .overlay(RadialGradient(colors: [Color.wellnessPrimary.opacity(0.09), .clear], center: UnitPoint(x: 1, y: -0.1), startRadius: 0, endRadius: 260).clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous)))
+                .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.wellnessHairline))
+                .shadow(color: .black.opacity(0.05), radius: 1, y: 1).shadow(color: .black.opacity(0.08), radius: 10, y: 5)
         }
     }
 
@@ -274,7 +273,7 @@ struct SectionPanel: View {
         }
     }
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             header
             if section.kind == "shopping" { shoppingActions }
             if section.kind != "info" { ProgressBar(value: progress, tint: Color.wellnessPrimary) }
@@ -284,7 +283,7 @@ struct SectionPanel: View {
             default: TaskPanelBody(section: section, notesStyle: false)
             }
         }
-        .padding(.horizontal, 18).padding(.top, 24).padding(.bottom, 18)
+        .padding(.horizontal, 14).padding(.top, 20).padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 30, style: .continuous).fill(Color.wellnessCard)
@@ -315,11 +314,11 @@ struct SectionPanel: View {
     private var header: some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.06))
+                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.06))
                 if let e = section.emoji, !e.isEmpty { Text(e).font(.system(size: 20)) } else { Image(systemName: section.kindIcon).foregroundStyle(section.kindColor) }
-            }.frame(width: 42, height: 42).accessibilityHidden(true)
+            }.frame(width: 36, height: 36).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(section.name).font(.hb(.title3, .bold)).tracking(-0.3).foregroundStyle(Color.wellnessInk).lineLimit(2)
+                Text(section.name).font(.hb(.headline, .bold)).tracking(-0.2).foregroundStyle(Color.wellnessInk).lineLimit(2)
                 Text(countText).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).monospacedDigit()
             }.frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -580,7 +579,7 @@ struct AssistantCards: View {
     @EnvironmentObject private var home: HomeStore
     @State private var applying: String?
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             ForEach(home.suggestions) { s in
                 card(emoji: s.emoji ?? "💡", text: s.summary, ring: Color.wellnessPrimary.opacity(0.3), id: s.id) {
                     HStack(spacing: 6) {
@@ -603,9 +602,9 @@ struct AssistantCards: View {
             Text(text).font(.hb(.subheadline)).foregroundStyle(Color.wellnessInk).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading).layoutPriority(0)
             trailing().layoutPriority(1)
         }
-        .padding(14)
-        .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(ring, lineWidth: 1.2))
+        .padding(10)
+        .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(ring, lineWidth: 1.2))
         .shadow(color: .black.opacity(0.05), radius: 1, y: 1).shadow(color: .black.opacity(0.08), radius: 10, y: 5)
         .transition(.scale.combined(with: .opacity)).accessibilityElement(children: .contain)
     }

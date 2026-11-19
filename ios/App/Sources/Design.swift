@@ -47,10 +47,10 @@ extension ShapeStyle where Self == LinearGradient {
 }
 
 extension View {
-    func wellnessCard(padding: CGFloat = 20) -> some View {
+    func wellnessCard(padding: CGFloat = 16) -> some View {
         self.padding(padding)
-            .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Color.wellnessHairline))
+            .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.wellnessHairline))
             .shadow(color: .black.opacity(0.05), radius: 1, y: 1)
             .shadow(color: .black.opacity(0.10), radius: 12, y: 6)
     }
@@ -137,5 +137,5 @@ struct Shimmer: ViewModifier {
 extension View {
     func shimmer(_ active: Bool) -> some View { modifier(Shimmer(active: active)) }
     /// Grouped list that follows the app canvas and card colors (light and dark).
-    func wellnessList() -> some View { scrollContentBackground(.hidden).background(Color.wellnessCanvas.ignoresSafeArea()).font(.hb(.body)).tint(Color.wellnessPrimary).listSectionSpacing(16) }
+    func wellnessList() -> some View { scrollContentBackground(.hidden).background(Color.wellnessCanvas.ignoresSafeArea()).font(.hb(.body)).tint(Color.wellnessPrimary).listSectionSpacing(10).environment(\.defaultMinListRowHeight, 40) }
 }

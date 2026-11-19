@@ -7,10 +7,10 @@ struct ActivityScreen: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 14) {
                     HStack {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("הפעילות שלך").font(.hb(.largeTitle, .bold))
+                            Text("הפעילות שלך").font(.hb(.title, .bold))
                             Text("Apple Watch ו־iPhone").foregroundStyle(Color.wellnessSecondary)
                         }
                         Spacer()
@@ -74,7 +74,7 @@ struct ActivityScreen: View {
                     }
                     if let message = store.importMessage { Label(message, systemImage: "checkmark.circle.fill").foregroundStyle(.green).sensoryFeedback(.success, trigger: message) }
                     Button { privacy = true } label: { Text("מה נשמר בחשבון?").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
-                }.padding(22)
+                }.padding(16)
             }.wellnessScreen().safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }.toolbar(.hidden, for: .navigationBar).refreshable { await store.readHealth() }
                 .sheet(isPresented: $privacy) { HealthPrivacySheet() }
         }
