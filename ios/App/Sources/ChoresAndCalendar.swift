@@ -27,32 +27,76 @@ struct ChorePanelBody: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Image(systemName: "plus").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.wellnessSecondary)
-                TextField("מטלה חדשה (כל שבוע)…", text: $draft).submitLabel(.done)
+                Image(systemName: "plus").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 26, height: 26).background(Color.wellnessPrimary.opacity(0.9), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                TextField("מטלה חדשה (כל שבוע)…", text: $draft).font(.hb(.subheadline)).submitLabel(.done)
                     .onSubmit { let text = draft; draft = ""; Task { await home.addChore(title: text, section: section, freq: "weekly", interval: 1) } }
-            }.padding(.horizontal, 14).frame(minHeight: 46).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }.padding(.horizontal, 10).frame(minHeight: 44).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 16, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
             let chores = home.chores(in: section.id)
             if chores.isEmpty { Text("אין מטלות עדיין").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary).frame(maxWidth: .infinity).padding(.vertical, 22) }
             ForEach(chores) { chore in
                 let s = status(chore)
-                HStack(spacing: 12) {
-                    Text(chore.emoji ?? "🧹").font(.system(size: 22)).frame(width: 46, height: 46).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                let isDue = (chore.nextDue ?? .distantFuture) <= Date()
+                HStack(spacing: 8) {
+                    Button { Task { await home.complete(chore) } } label: {
+                        Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).frame(width: 36, height: 36)
+                            .foregroundStyle(isDue ? Color.wellnessOnPrimary : Color.wellnessInk)
+                            .background(isDue ? Color.wellnessPrimary : Color.clear, in: Circle())
+                            .overlay(Circle().strokeBorder(isDue ? Color.clear : Color.wellnessHairline, lineWidth: 1.5))
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
+                    }.buttonStyle(PressableStyle()).sensoryFeedback(.success, trigger: chore.nextDue).accessibilityLabel("סמן \(chore.title) כבוצע").accessibilityIdentifier("chore-complete-\(chore.id)")
                     Button { editing = chore } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(chore.title).font(.hb(.headline, .semibold)).foregroundStyle(Color.wellnessInk).multilineTextAlignment(.leading)
-                            HStack(spacing: 8) { Text(s.text).font(.hb(.caption, .semibold)).foregroundStyle(s.color); Text(repeatText(chore)).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                if let e = chore.emoji, !e.isEmpty { Text(e).font(.hb(.subheadline)) }
+                                Text(chore.title).font(.hb(.callout, .medium)).foregroundStyle(isDue ? Color.wellnessInk : Color.wellnessSecondary).multilineTextAlignment(.leading)
+                            }
+                            HStack(spacing: 6) {
+                                Text(repeatText(chore)).font(.hb(.caption2, .medium)).padding(.horizontal, 7).frame(height: 20).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                                if !s.text.isEmpty { Text(s.text).font(.hb(.caption2, .semibold)).foregroundStyle(s.color) }
+                            }
                         }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityIdentifier("chore-open-\(chore.id)")
-                    Button { Task { await home.complete(chore) } } label: { Label("בוצע", systemImage: "checkmark").font(.hb(.subheadline, .semibold)).padding(.horizontal, 14).frame(minHeight: 44).foregroundStyle(Color.wellnessOnPrimary).background(Color.wellnessPrimary, in: Capsule()) }
-                        .buttonStyle(PressableStyle()).sensoryFeedback(.success, trigger: chore.nextDue).accessibilityLabel("סמן \(chore.title) כבוצע").accessibilityIdentifier("chore-complete-\(chore.id)")
-                    AssigneeButton(currentID: chore.assigneeIDs.first, size: 34) { id in Task { await home.setAssignee(chore, to: id) } }.accessibilityIdentifier("chore-assignee-\(chore.id)")
-                }.padding(10).swipeToDelete { confirmDelete = chore }
+                    if !chore.assigneeIDs.isEmpty {
+                        AssigneeButton(currentID: chore.assigneeIDs.first, size: 30, ids: chore.assigneeIDs, badge: true) { id in Task { await home.setAssignee(chore, to: id) } }.accessibilityIdentifier("chore-assignee-\(chore.id)")
+                    } else {
+                        AssigneeButton(currentID: nil, size: 30) { id in Task { await home.setAssignee(chore, to: id) } }.accessibilityIdentifier("chore-assignee-\(chore.id)")
+                    }
+                    ChoreHistoryButton(chore: chore)
+                }
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(Color.wellnessChip.opacity(0.45), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
+                .swipeToDelete { confirmDelete = chore }
             }
         }
         .sheet(item: $editing) { ChoreEditorSheet(chore: $0).environmentObject(home) }
         .confirmationDialog("למחוק את המטלה?", isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }), titleVisibility: .visible) {
             Button("מחיקה", role: .destructive) { if let c = confirmDelete { Task { await home.delete(c) } }; confirmDelete = nil }
         }
+    }
+}
+
+/// Last completions of a chore (who and when), in a small popover like the web app's history button.
+struct ChoreHistoryButton: View {
+    @EnvironmentObject private var home: HomeStore
+    let chore: HChore
+    @State private var open = false
+    @State private var rows: [(who: String, when: Date)] = []
+    @State private var loaded = false
+    var body: some View {
+        Button { open = true } label: { Image(systemName: "clock.arrow.circlepath").font(.system(size: 14, weight: .medium)).foregroundStyle(Color.wellnessSecondary).frame(width: 36, height: 44).contentShape(Rectangle()) }
+            .buttonStyle(.plain).accessibilityLabel("היסטוריית ביצוע").accessibilityIdentifier("chore-history-\(chore.id)")
+            .popover(isPresented: $open) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("היסטוריה").font(.hb(.caption, .semibold)).foregroundStyle(Color.wellnessSecondary)
+                    if !loaded { ProgressView() }
+                    else if rows.isEmpty { Text("עוד לא בוצע").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary) }
+                    ForEach(Array(rows.enumerated()), id: \.offset) { _, r in
+                        HStack { Text(r.who).font(.hb(.footnote)); Spacer(minLength: 16); Text(r.when, format: .dateTime.day().month(.abbreviated)).font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary) }
+                    }
+                }.padding(14).frame(minWidth: 230).presentationCompactAdaptation(.popover)
+                    .task { rows = await home.completions(of: chore); loaded = true }
+            }
     }
 }
 
