@@ -116,7 +116,7 @@ struct HomeScreen: View {
                         hero
                         wellnessCard
                         AssistantCards()
-                        if home.sections.isEmpty && !home.loading { ContentUnavailableView("אין עדיין מדורים", systemImage: "square.grid.2x2", description: Text("צור מדור חדש בתפריט ⋯.")) }
+                        if home.sections.isEmpty && !home.loading { ContentUnavailableView { Label("אין עדיין מדורים", systemImage: "square.grid.2x2") } description: { Text("מדורים מארגנים את הבית: קניות, משימות, תחזוקה ועוד.") } actions: { Button { sheet = .newSection } label: { Label("מדור חדש", systemImage: "plus") }.buttonStyle(.borderedProminent).tint(Color.wellnessPrimary) } }
                         ForEach(home.sections) { SectionPanel(section: $0).id($0.id) }
                         Color.clear.frame(height: 110)
                     }.padding(.horizontal, 16).padding(.top, 6).shimmer(home.loading && home.sections.isEmpty)

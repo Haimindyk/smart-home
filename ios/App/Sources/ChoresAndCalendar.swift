@@ -171,6 +171,10 @@ struct CalendarScreen: View {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack {
                         Text(monthStart, format: .dateTime.month(.wide).year()).font(.hb(.title, .bold))
+                        if !cal.isDate(monthStart, equalTo: Date(), toGranularity: .month) || selected != nil {
+                            Button("היום") { withAnimation(.snappy) { month = Date(); selected = cal.startOfDay(for: Date()) } }
+                                .font(.hb(.caption, .bold)).padding(.horizontal, 12).frame(minHeight: 32).background(Color.wellnessCard, in: Capsule()).overlay(Capsule().strokeBorder(Color.wellnessHairline)).accessibilityIdentifier("calendar-today")
+                        }
                         Spacer()
                         Button { subscribing = true } label: { Image(systemName: "calendar.badge.plus").frame(width: 44, height: 44).background(Color.wellnessCard, in: Circle()) }.accessibilityLabel("הוספה ליומן שלי").accessibilityIdentifier("calendar-subscribe")
                         Button { step(-1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44).background(Color.wellnessCard, in: Circle()) }.accessibilityLabel("חודש קודם")
