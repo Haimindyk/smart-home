@@ -402,6 +402,7 @@ struct TaskPanelBody: View {
     @State private var addingSubFor: String?
     @State private var subDraft = ""
     private var open: [HTask] { home.tasks(in: section.id).filter { $0.parentID == nil && !$0.isCompleted } }
+    @State private var addedCount = 0
     private var done: [HTask] { home.tasks(in: section.id).filter { $0.parentID == nil && $0.isCompleted } }
     private func children(_ t: HTask) -> [HTask] { home.tasks(in: section.id).filter { $0.parentID == t.id } }
     var body: some View {
@@ -409,7 +410,8 @@ struct TaskPanelBody: View {
             HStack(spacing: 10) {
                 Image(systemName: "plus").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 26, height: 26).background(Color.wellnessPrimary.opacity(0.9), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 TextField(section.kind == "shopping" ? "מה צריך לקנות?" : notesStyle ? "הערה חדשה…" : "משימה חדשה…", text: $draft).font(.hb(.subheadline)).submitLabel(.done)
-                    .onSubmit { let text = draft; draft = ""; Task { await home.addTask(title: text, section: section, isNote: notesStyle, parseDates: true) } }
+                    .onSubmit { let text = draft.trimmingCharacters(in: .whitespacesAndNewlines); draft = ""; guard !text.isEmpty else { return }; addedCount += 1; Task { await home.addTask(title: text, section: section, isNote: notesStyle, parseDates: true) } }
+                    .sensoryFeedback(.impact(weight: .light), trigger: addedCount)
                     .accessibilityIdentifier("quick-add-field-\(section.id)")
             }.padding(.horizontal, 10).frame(minHeight: 44).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 16, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
             if open.isEmpty && done.isEmpty {
