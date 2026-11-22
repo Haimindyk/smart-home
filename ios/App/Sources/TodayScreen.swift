@@ -7,6 +7,7 @@ struct TodayScreen: View {
     @State private var mealToDelete: HealthRow?
     @State private var showSettings = false
     @State private var showCoach = false
+    @State private var addingMeal = false
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -45,7 +46,13 @@ struct TodayScreen: View {
                         if store.loading { ProgressView().accessibilityLabel("מעדכן ארוחות") }
                     }.padding(.top, 8)
                     if store.dayMeals.isEmpty {
-                        ContentUnavailableView("עוד אין ארוחות ביום הזה", systemImage: "fork.knife", description: Text("הארוחות שלך מהחשבון יופיעו כאן."))
+                        ContentUnavailableView {
+                            Label("עוד אין ארוחות ביום הזה", systemImage: "fork.knife")
+                        } description: {
+                            Text("הוסף ארוחה כדי לעקוב אחרי הקלוריות והמאקרו.")
+                        } actions: {
+                            Button { addingMeal = true } label: { Label("הוסף ארוחה", systemImage: "plus") }.buttonStyle(.borderedProminent).tint(Color.wellnessPrimary).accessibilityIdentifier("empty-add-meal")
+                        }
                     } else {
                         ForEach(store.dayMeals) { meal in
                             NavigationLink { MealDetail(initial: meal) } label: { MealCard(meal: meal) }.buttonStyle(PressableStyle())
@@ -62,6 +69,7 @@ struct TodayScreen: View {
             .confirmationDialog("למחוק את הארוחה?", isPresented: Binding(get: { mealToDelete != nil }, set: { if !$0 { mealToDelete = nil } }), titleVisibility: .visible) {
                 Button("מחיקה", role: .destructive) { if let meal = mealToDelete { Task { _ = await store.deleteMeal(meal) } }; mealToDelete = nil }
             }
+            .sheet(isPresented: $addingMeal) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }
             .sheet(isPresented: $showCoach) { CoachChatView().environmentObject(store) }
             .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
             .sheet(isPresented: $showCalendar) {
