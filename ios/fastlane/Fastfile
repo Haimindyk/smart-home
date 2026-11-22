@@ -4,7 +4,11 @@ default_platform(:ios)
 
 platform :ios do
   before_all do |lane|
-    next unless lane == :beta
+    next unless [:beta, :build_check].include?(lane)
+
+    # GitHub-hosted runners start with an empty keychain: use a temporary one so Xcode's
+    # cloud-managed signing (API key) can create and use the distribution certificate.
+    setup_ci if ENV["FASTLANE_SETUP_CI"] == "1"
 
     # gym's -showBuildSettings probe resolves SPM packages; the 3s default is too tight.
     ENV["FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT"] ||= "120"
@@ -42,8 +46,7 @@ platform :ios do
     File.delete(ENV["ASC_API_KEY_PATH"]) if ENV["ASC_API_KEY_PATH"] && File.exist?(ENV["ASC_API_KEY_PATH"])
   end
 
-  desc "Build, sign, and upload to TestFlight Internal"
-  lane :beta do
+  private_lane :build_signed_app do
     build_number = ENV["GITHUB_RUN_NUMBER"] || (latest_testflight_build_number + 1)
     build_app(
       project: File.expand_path("../App/SmartHomeWellness.xcodeproj", Dir.pwd),
@@ -55,6 +58,16 @@ platform :ios do
         teamID: ENV["APPLE_DEVELOPER_TEAM_ID"]
       }
     )
+  end
+
+  desc "Build and sign exactly like beta, but do not upload (used to validate the release toolchain on pull requests)"
+  lane :build_check do
+    build_signed_app
+  end
+
+  desc "Build, sign, and upload to TestFlight Internal"
+  lane :beta do
+    build_signed_app
     upload_to_testflight(
       api_key: Actions.lane_context[SharedValues::APP_STORE_CONNECT_API_KEY],
       skip_waiting_for_build_processing: true,
