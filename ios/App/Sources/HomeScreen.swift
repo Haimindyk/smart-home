@@ -306,7 +306,7 @@ struct SectionPanel: View {
                 .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(Color.wellnessHairline))
                 .shadow(color: .black.opacity(0.05), radius: 1, y: 1).shadow(color: .black.opacity(0.10), radius: 12, y: 6)
         }
-        .overlay(alignment: .top) { UnevenRoundedRectangle(topLeadingRadius: 30, topTrailingRadius: 30, style: .continuous).fill(section.kindColor).frame(height: 6) }
+        .overlay { Rectangle().fill(section.kindColor).frame(height: 6).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous)).allowsHitTesting(false) }
         .background(GeometryReader { geo in Color.clear.preference(key: PanelOffsetKey.self, value: [section.id: geo.frame(in: .named("home-scroll")).minY]) })
         .accessibilityElement(children: .contain).accessibilityLabel(section.name)
         .sheet(isPresented: $comparing) { PriceComparisonSheet(section: section).environmentObject(home) }
