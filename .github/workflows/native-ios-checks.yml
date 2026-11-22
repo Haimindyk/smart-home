@@ -107,5 +107,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: adhoc-ipa
-          path: ios/fastlane/SmartHomeWellness.ipa
+          path: ios/SmartHomeWellness.ipa
           retention-days: 3
