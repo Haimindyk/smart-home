@@ -8,6 +8,7 @@ struct AIMealSheet: View {
     @Environment(\.dismiss) private var dismiss
     let onSaved: () -> Void
     @State private var photo: PhotosPickerItem?
+    @State private var showCamera = false
     @State private var imageData: Data?
     @State private var note = ""
     @State private var analyzing = false
@@ -36,11 +37,26 @@ struct AIMealSheet: View {
             if let imageData, let image = UIImage(data: imageData) {
                 Image(uiImage: image).resizable().scaledToFill().frame(height: 260).frame(maxWidth: .infinity).clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous)).accessibilityLabel("תמונת הארוחה")
             } else {
-                PhotosPicker(selection: $photo, matching: .images) {
-                    VStack(spacing: 12) { Image(systemName: "camera.viewfinder").font(.system(size: 44)).foregroundStyle(Color.wellnessSecondary); Text("בחר תמונה של הארוחה").font(.hb(.headline, .semibold)); Text("אפשר לצלם בצילום מהיר ולבחור כאן, או לבחור מהגלריה.").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary).multilineTextAlignment(.center) }
-                        .frame(maxWidth: .infinity, minHeight: 220).padding().background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.wellnessHairline, style: StrokeStyle(lineWidth: 1.5, dash: [6])))
-                }.buttonStyle(PressableStyle())
+                VStack(spacing: 12) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "camera.viewfinder").font(.system(size: 44)).foregroundStyle(Color.wellnessSecondary)
+                        Text("צלם או בחר תמונה של הארוחה").font(.hb(.headline, .semibold))
+                        Text("לתוצאה מדויקת יותר צלם מלמעלה באור טוב.").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary).multilineTextAlignment(.center)
+                    }.frame(maxWidth: .infinity, minHeight: 130)
+                    HStack(spacing: 10) {
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                            Button { showCamera = true } label: { Label("צלם ארוחה", systemImage: "camera.fill").frame(maxWidth: .infinity) }
+                                .buttonStyle(PrimaryButton()).accessibilityIdentifier("meal-camera")
+                        }
+                        PhotosPicker(selection: $photo, matching: .images) {
+                            Label("מהגלריה", systemImage: "photo.on.rectangle").font(.hb(.body, .semibold)).frame(maxWidth: .infinity, minHeight: 48)
+                                .background(Color.wellnessCard, in: Capsule()).overlay(Capsule().strokeBorder(Color.wellnessHairline))
+                        }.buttonStyle(PressableStyle())
+                    }
+                }
+                .padding().frame(maxWidth: .infinity)
+                .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.wellnessHairline, style: StrokeStyle(lineWidth: 1.5, dash: [6])))
             }
             TextField("הערה לשיפור הדיוק (לא חובה)", text: $note, axis: .vertical).lineLimit(1...3).padding(14)
                 .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
@@ -50,6 +66,7 @@ struct AIMealSheet: View {
             }.buttonStyle(PrimaryButton()).disabled(imageData == nil || analyzing)
         }.padding(20)
         .onChange(of: photo) { _, item in Task { await load(item) } }
+        .fullScreenCover(isPresented: $showCamera) { CameraPicker { process($0) }.ignoresSafeArea() }
     }
     private func review(_ analysis: AppStore.MealAnalysis) -> some View {
         List {
@@ -85,6 +102,9 @@ struct AIMealSheet: View {
     }
     private func load(_ item: PhotosPickerItem?) async {
         guard let item, let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) else { return }
+        process(image)
+    }
+    private func process(_ image: UIImage) {
         let scale = min(1, 1800 / max(image.size.width, image.size.height))
         let size = CGSize(width: (image.size.width * scale).rounded(), height: (image.size.height * scale).rounded())
         let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = true
@@ -115,5 +135,25 @@ struct AIConsentView: View {
                 if store.busy { ProgressView().tint(Color.wellnessOnPrimary) } else { Text("מאשר/ת שימוש ב־AI האישי") }
             }.buttonStyle(PrimaryButton()).disabled(store.busy)
         }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+/// System camera (photo only). Hands back the captured image, or nothing when cancelled.
+struct CameraPicker: UIViewControllerRepresentable {
+    let onImage: (UIImage) -> Void
+    @Environment(\.dismiss) private var dismiss
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController(); picker.sourceType = .camera; picker.delegate = context.coordinator; return picker
+    }
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: CameraPicker
+        init(_ parent: CameraPicker) { self.parent = parent }
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let image = info[.originalImage] as? UIImage { parent.onImage(image) }
+            parent.dismiss()
+        }
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { parent.dismiss() }
     }
 }
