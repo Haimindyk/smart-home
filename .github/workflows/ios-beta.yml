@@ -20,31 +20,29 @@ jobs:
   build-and-upload:
     name: Build, sign, upload to TestFlight
     if: github.ref == 'refs/heads/main'
-    # Same self-hosted macOS runner used by bruto-neto (GitHub-hosted macOS bills at 10x).
-    runs-on: [self-hosted, macOS]
+    # GitHub-hosted Apple-silicon macOS image with Xcode 27. The Intel self-hosted Mac cannot run Xcode 27,
+    # and iOS 27 devices need an iOS 27 SDK build (Apple also requires it from April 2027).
+    runs-on: xcode-27
     environment: beta
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - name: Verify Xcode and XcodeGen
+      - name: Select Xcode 27.2
         run: |
-          xcode-select -p
-          xcodegen --version || brew install xcodegen
+          sudo xcode-select -s /Applications/Xcode_27.2.app
+          xcodebuild -version
+      - name: Install XcodeGen
+        run: brew install xcodegen
       - name: Test portable logic
         run: swift test --package-path ios/Core
-      # System Ruby (/usr/bin) matches the gems; Homebrew's Ruby would shadow it.
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
       - name: Install Fastlane
         run: |
-          export PATH="/usr/bin:$PATH"
-          bundle install --path vendor/bundle
+          rm -f Gemfile.lock
+          bundle install
         working-directory: ios/fastlane
-      - name: Unlock keychain for non-interactive codesign
-        run: |
-          security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" ~/Library/Keychains/login.keychain-db
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
-            -k "$MACOS_KEYCHAIN_PASSWORD" ~/Library/Keychains/login.keychain-db
-        env:
-          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
       - name: Build & upload to TestFlight
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
@@ -52,9 +50,8 @@ jobs:
           APP_STORE_CONNECT_API_KEY: ${{ secrets.ASC_API_KEY }}
           APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
           SUPABASE_PUBLIC_KEY: ${{ secrets.SUPABASE_PUBLIC_KEY }}
+          FASTLANE_SETUP_CI: "1"
           LANG: en_US.UTF-8
           LC_ALL: en_US.UTF-8
-        run: |
-          export PATH="/usr/bin:$PATH"
-          bundle exec fastlane beta
+        run: bundle exec fastlane beta
         working-directory: ios/fastlane
