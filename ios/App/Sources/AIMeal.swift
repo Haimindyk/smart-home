@@ -62,7 +62,7 @@ struct AIMealSheet: View {
                 .background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
             Spacer()
             Button { Task { await analyze() } } label: {
-                if analyzing { HStack(spacing: 10) { ProgressView().tint(Color.wellnessOnPrimary); Text("מנתח…") } } else { Label("נתח ארוחה", systemImage: "sparkles") }
+                if analyzing { HStack(spacing: 10) { ProgressView().tint(Color.wellnessOnPrimary); Text("מנתח… זה יכול לקחת עד דקה") } } else { Label("נתח ארוחה", systemImage: "sparkles") }
             }.buttonStyle(PrimaryButton()).disabled(imageData == nil || analyzing)
         }.padding(20)
         .onChange(of: photo) { _, item in Task { await load(item) } }
