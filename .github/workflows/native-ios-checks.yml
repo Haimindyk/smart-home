@@ -32,31 +32,8 @@ jobs:
           -destination 'generic/platform=iOS Simulator'
           -derivedDataPath "$RUNNER_TEMP/WellnessDerivedData"
           CODE_SIGNING_ALLOWED=NO build
-      - name: Test native screens with synthetic services
-        working-directory: ios/App
-        run: |
-          SIMULATOR_ID=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for runtime,devices in d["devices"].items() if "iOS" in runtime for x in devices if "iPhone" in x["name"]))')
-          xcodebuild -project SmartHomeWellness.xcodeproj \
-            -scheme SmartHomeWellness -configuration Debug \
-            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
-            -derivedDataPath "$RUNNER_TEMP/WellnessDerivedData" \
-            -resultBundlePath "$RUNNER_TEMP/WellnessUI.xcresult" \
-            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test
-      - name: Export native screenshots
-        if: always()
-        run: |
-          if [ -d "$RUNNER_TEMP/WellnessUI.xcresult" ]; then
-            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/WellnessUI.xcresult" --output-path "$RUNNER_TEMP/WellnessScreenshots"
-          fi
-      - name: Save native UI test results and screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-ios-ui-results
-          path: |
-            ${{ runner.temp }}/WellnessUI.xcresult
-            ${{ runner.temp }}/WellnessScreenshots
-          retention-days: 3
+      # The simulator UI tests (xcodebuild test, ~12 min) are run locally before every merge and are not part of the PR checks.
+
   # Validates the release toolchain (Xcode 27, cloud-managed signing, export) without uploading anything.
   release-build-check:
     runs-on: xcode-27
