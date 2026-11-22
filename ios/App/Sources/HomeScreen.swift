@@ -147,7 +147,7 @@ struct HomeScreen: View {
                 case .members: MembersSheet().environmentObject(home)
                 }
             }
-            .alert("משהו השתבש", isPresented: Binding(get: { home.error != nil }, set: { if !$0 { home.error = nil } })) { Button("סגור", role: .cancel) {} } message: { Text(home.error ?? "") }
+            .errorBanner($home.error)
         }
     }
 

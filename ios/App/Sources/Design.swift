@@ -139,3 +139,30 @@ extension View {
     /// Grouped list that follows the app canvas and card colors (light and dark).
     func wellnessList() -> some View { scrollContentBackground(.hidden).background(Color.wellnessCanvas.ignoresSafeArea()).font(.hb(.body)).tint(Color.wellnessPrimary).listSectionSpacing(10).environment(\.defaultMinListRowHeight, 40) }
 }
+
+/// Non-blocking error banner that slides in from the top and dismisses itself.
+struct ErrorBanner: ViewModifier {
+    @Binding var message: String?
+    func body(content: Content) -> some View {
+        content.overlay(alignment: .top) {
+            if let message {
+                Button { self.message = nil } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.white)
+                        Text(message).font(.hb(.subheadline, .semibold)).foregroundStyle(.white).multilineTextAlignment(.leading)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 12)
+                    .background(Color.red.opacity(0.92), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
+                }
+                .buttonStyle(.plain).padding(.horizontal, 16).padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .sensoryFeedback(.error, trigger: message)
+                .accessibilityIdentifier("error-banner")
+                .task(id: message) { try? await Task.sleep(for: .seconds(4)); withAnimation { self.message = nil } }
+            }
+        }.animation(.spring(duration: 0.35), value: message)
+    }
+}
+extension View { func errorBanner(_ message: Binding<String?>) -> some View { modifier(ErrorBanner(message: message)) } }
