@@ -121,6 +121,7 @@ struct HomeScreen: View {
                         Color.clear.frame(height: 110)
                     }.padding(.horizontal, 16).padding(.top, 6).shimmer(home.loading && home.sections.isEmpty)
                 }
+                .scrollDismissesKeyboard(.interactively)
                 .coordinateSpace(name: "home-scroll")
                 .onPreferenceChange(PanelOffsetKey.self) { offsets in
                     guard !jumping, let best = offsets.filter({ $0.value <= 160 }).max(by: { $0.value < $1.value }) ?? offsets.min(by: { $0.value < $1.value }) else { return }

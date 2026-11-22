@@ -137,7 +137,7 @@ struct Shimmer: ViewModifier {
 extension View {
     func shimmer(_ active: Bool) -> some View { modifier(Shimmer(active: active)) }
     /// Grouped list that follows the app canvas and card colors (light and dark).
-    func wellnessList() -> some View { scrollContentBackground(.hidden).background(Color.wellnessCanvas.ignoresSafeArea()).font(.hb(.body)).tint(Color.wellnessPrimary).listSectionSpacing(10).environment(\.defaultMinListRowHeight, 40) }
+    func wellnessList() -> some View { scrollContentBackground(.hidden).scrollDismissesKeyboard(.interactively).keyboardDoneButton().background(Color.wellnessCanvas.ignoresSafeArea()).font(.hb(.body)).tint(Color.wellnessPrimary).listSectionSpacing(10).environment(\.defaultMinListRowHeight, 40) }
 }
 
 /// Non-blocking error banner that slides in from the top and dismisses itself.
@@ -166,3 +166,13 @@ struct ErrorBanner: ViewModifier {
     }
 }
 extension View { func errorBanner(_ message: Binding<String?>) -> some View { modifier(ErrorBanner(message: message)) } }
+
+extension View {
+    /// "Done" above the keyboard, so number pads (which have no return key) can be dismissed.
+    func keyboardDoneButton() -> some View {
+        toolbar { ToolbarItemGroup(placement: .keyboard) {
+            Spacer()
+            Button("סיום") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }.accessibilityIdentifier("keyboard-done")
+        } }
+    }
+}
