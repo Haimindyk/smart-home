@@ -434,6 +434,9 @@ final class WellnessUITests: XCTestCase {
         app.swipeUp()
         meal.tap()
         let fix = app.buttons["meal-fix-ai"]
+        XCTAssertTrue(app.buttons["meal-item-1"].waitForExistence(timeout: 8), "The estimated cooking oil appears as its own editable ingredient")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "שמן משוער")).firstMatch.exists, "...with its estimate note")
+        capture(app, name: "native-meal-oil-estimate")
         XCTAssertTrue(fix.waitForExistence(timeout: 8), "An estimated meal offers the AI correction")
         app.swipeUp()  // the button sits below the fold, behind the floating tab bar until scrolled
         fix.tap()

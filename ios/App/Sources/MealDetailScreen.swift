@@ -173,6 +173,10 @@ struct MealDetailScreen: View {
                     Text("\(number(quantity)) \(unit) • \(number(part("kcal"))) קל׳").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
                     Text("חלבון: \(number(part("protein"))) ג׳  |  פחמימות: \(number(part("carbs"))) ג׳  |  שומן: \(number(part("fat"))) ג׳").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).fixedSize(horizontal: false, vertical: true)
                     Text("סיבים \(number(part("fiber"), 1)) ג׳ · סוכר מוסף \(number(part("sugar"), 1)) ג׳ · נתרן \(number(part("sodium"))) מ״ג").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).fixedSize(horizontal: false, vertical: true)
+                    if let note = item["assumption"].stringValue, !note.isEmpty {
+                        Label(note, systemImage: "sparkles").font(.hb(.caption)).foregroundStyle(Color.amberInk).lineLimit(4).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 2).accessibilityLabel("הערכה: \(note)")
+                    }
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.left").font(.hb(.caption, .bold)).foregroundStyle(Color.wellnessSecondary)
             }.padding(.vertical, 14).contentShape(Rectangle())
