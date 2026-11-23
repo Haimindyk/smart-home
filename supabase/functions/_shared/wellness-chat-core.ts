@@ -72,34 +72,48 @@ export function diarySummary(
     const items = row.data.items;
     if (!Array.isArray(items)) continue;
     const day = typeof row.data.date === "string" ? row.data.date : date;
-    const isToday = day === date;
-    if (isToday) entries++;
-    const dayTotals = days.get(day) ?? { kcal: 0, protein: 0 };
-    for (const raw of items) {
-      const item = record(raw),
-        food = record(item.food),
-        nutrients = record(food.per100),
-        quantity = number(item.quantity, 0.1, 10000);
-      for (const key of ["kcal", "protein", "carbs", "fat"] as const) {
-        const amount = (number(nutrients[key], 0, 10000) * quantity) / 100;
-        if (isToday) totals[key] += amount;
-        if (key === "kcal" || key === "protein") dayTotals[key] += amount;
+    // A single malformed logged meal must not take the whole assistant down: skip it.
+    const amounts = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+    try {
+      for (const raw of items) {
+        const item = record(raw),
+          food = record(item.food),
+          nutrients = record(food.per100),
+          quantity = number(item.quantity, 0.1, 10000);
+        for (const key of ["kcal", "protein", "carbs", "fat"] as const)
+          amounts[key] += (number(nutrients[key], 0, 10000) * quantity) / 100;
       }
+    } catch {
+      continue;
     }
+    const isToday = day === date;
+    if (isToday) {
+      entries++;
+      for (const key of ["kcal", "protein", "carbs", "fat"] as const)
+        totals[key] += amounts[key];
+    }
+    const dayTotals = days.get(day) ?? { kcal: 0, protein: 0 };
+    dayTotals.kcal += amounts.kcal;
+    dayTotals.protein += amounts.protein;
     days.set(day, dayTotals);
   }
   const last7Days = [...days.entries()]
     .sort(([x], [y]) => (x < y ? 1 : -1))
     .slice(0, 7)
     .map(([day, t]) => ({ date: day, kcal: Math.round(t.kcal), protein: Math.round(t.protein) }));
-  const target = goal
-    ? Object.fromEntries(
+  let target: Record<string, number> | null = null;
+  if (goal) {
+    try {
+      target = Object.fromEntries(
         ["kcal", "protein", "carbs", "fat"].map((k) => [
           k,
           number(goal[k], 0, 10000),
         ]),
-      )
-    : null;
+      );
+    } catch {
+      target = null;
+    }
+  }
   return {
     date,
     loggedMealCount: entries,
