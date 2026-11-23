@@ -6,6 +6,7 @@ private struct FoodChoice: Identifiable { let id = UUID(); let food: JSONValue }
 
 /// Search (name or barcode) -> pick a product -> choose a portion -> saved as a meal.
 struct AddMealSheet: View {
+    var autoScan = false
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
@@ -16,6 +17,7 @@ struct AddMealSheet: View {
     @State private var picked: FoodChoice?
     @State private var manualEntry = false
     @State private var aiMeal = false
+    @State private var autoScanned = false
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
@@ -74,6 +76,7 @@ struct AddMealSheet: View {
             .padding(.horizontal, 20).padding(.top, 8).wellnessScreen()
             .navigationTitle("הוספת ארוחה").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("סגור") { dismiss() } } }
+            .onAppear { if autoScan, !autoScanned { autoScanned = true; scanning = true } }
             .task(id: query) {
                 let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard text.count >= 2 else { results = []; searched = false; return }
