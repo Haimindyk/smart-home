@@ -83,18 +83,29 @@ struct ActivityScreen: View {
 
 private struct HealthPrivacySheet: View {
     @Environment(\.dismiss) private var dismiss
+    private func block(_ symbol: String, _ color: Color, _ title: String, _ paragraphs: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: symbol).font(.system(size: 15, weight: .semibold)).foregroundStyle(color).frame(width: 34, height: 34)
+                    .background(color.opacity(0.16), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                Text(title).font(.hb(.headline, .semibold))
+            }
+            ForEach(paragraphs, id: \.self) { Text($0).font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary).fixedSize(horizontal: false, vertical: true) }
+        }.frame(maxWidth: .infinity, alignment: .leading).wellnessCard(padding: 16)
+    }
     var body: some View {
         NavigationStack {
-            List {
-                Section("נשמר רק אחרי בחירה וייבוא") {
-                    Text("סוג אימון, תאריך, משך, מקור הנתונים, מרחק וקלוריות כשיש נתונים. האימונים נשמרים בחשבון הקיים בשרת האפליקציה.")
-                }
-                Section("נשאר במכשיר") { Text("סיכום הצעדים היומי מוצג כאן ואינו מועלה לשרת.") }
-                Section("בשליטתך") {
-                    Text("אין כתיבה לבריאות או סנכרון ברקע. אפשר לשנות הרשאות ביישום בריאות. ביטול הרשאה אינו מוחק אימונים שכבר ייבאת; אפשר למחוק אותם מיומן האימונים כאן.")
-                    Text("מוצגים עד 500 אימונים מ־30 הימים האחרונים. הרשאת קריאה שנדחתה עשויה להיראות כמו רשימה ריקה — כך Apple מגינה על הפרטיות.")
-                }
-            }.wellnessList().navigationTitle("הנתונים שלך").navigationBarTitleDisplayMode(.inline)
+            ScrollView {
+                VStack(spacing: 14) {
+                    block("icloud.and.arrow.up.fill", Color.proteinBlue, "נשמר רק אחרי בחירה וייבוא",
+                          ["סוג אימון, תאריך, משך, מקור הנתונים, מרחק וקלוריות כשיש נתונים. האימונים נשמרים בחשבון הקיים בשרת האפליקציה."])
+                    block("iphone", Color.carbsGold, "נשאר במכשיר", ["סיכום הצעדים היומי מוצג כאן ואינו מועלה לשרת."])
+                    block("hand.raised.fill", Color.fatCoral, "בשליטתך",
+                          ["אין כתיבה לבריאות או סנכרון ברקע. אפשר לשנות הרשאות ביישום בריאות. ביטול הרשאה אינו מוחק אימונים שכבר ייבאת; אפשר למחוק אותם מיומן האימונים כאן.",
+                           "מוצגים עד 500 אימונים מ־30 הימים האחרונים. הרשאת קריאה שנדחתה עשויה להיראות כמו רשימה ריקה — כך Apple מגינה על הפרטיות."])
+                    Color.clear.frame(height: 20)
+                }.padding(.horizontal, 16).padding(.top, 8)
+            }.background(Color.wellnessCanvas.ignoresSafeArea()).navigationTitle("הנתונים שלך").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("סגור") { dismiss() } } }
         }
     }
