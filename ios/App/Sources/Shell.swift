@@ -17,6 +17,7 @@ struct RootShell: View {
     @State private var addingMeal = false
     @State private var addingTask = false
     @State private var addingEvent = false
+    @StateObject private var network = NetworkMonitor()
     @Namespace private var pill
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -37,6 +38,9 @@ struct RootShell: View {
         .onChange(of: home.openHealthRequested) { _, requested in if requested { home.openHealthRequested = false; withAnimation(.snappy) { tab = .health } } }
         .task { home.bind(store); if !started { started = true; tab = store.startsOnHealth ? .health : .home; await home.refresh(); await PushManager.shared.refresh(); await PushManager.shared.uploadIfPossible() } }
         .safeAreaInset(edge: .bottom, spacing: 0) { bar }
+        .safeAreaInset(edge: .top, spacing: 0) { if !network.online { OfflineBanner().transition(.move(edge: .top).combined(with: .opacity)) } }
+        .animation(.snappy, value: network.online)
+        .onChange(of: network.online) { _, online in if online, started { Task { await home.refreshIfLive() } } }
         .sheet(isPresented: $addingMeal) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }
         .sheet(isPresented: $addingTask) { QuickAddSheet().environmentObject(home).presentationDetents([.medium]).presentationDragIndicator(.visible) }
         .sheet(isPresented: $addingEvent) { EventEditorSheet(event: nil).environmentObject(home).presentationDragIndicator(.visible) }

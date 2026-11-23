@@ -1,4 +1,5 @@
 import SwiftUI
+import Network
 
 /// Shared look & feel: warm canvas, soft white cards, rounded numerals, springy touch feedback.
 private func adaptive(_ light: (Double, Double, Double), _ dark: (Double, Double, Double), lightAlpha: Double = 1, darkAlpha: Double = 1) -> Color {
@@ -174,5 +175,28 @@ extension View {
             Spacer()
             Button("סיום") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }.accessibilityIdentifier("keyboard-done")
         } }
+    }
+}
+
+/// Tracks connectivity so the app can say when it is offline (the web app shows the same banner).
+@MainActor final class NetworkMonitor: ObservableObject {
+    @Published private(set) var online = true
+    private let monitor = NWPathMonitor()
+    init() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            let ok = path.status == .satisfied
+            Task { @MainActor in self?.online = ok }
+        }
+        monitor.start(queue: DispatchQueue(label: "kh.network-monitor"))
+    }
+    deinit { monitor.cancel() }
+}
+struct OfflineBanner: View {
+    var body: some View {
+        Label("אין חיבור לאינטרנט. שינויים לא יישמרו עד שהחיבור יחזור.", systemImage: "wifi.slash")
+            .font(.hb(.footnote, .semibold)).foregroundStyle(Color.amberInk)
+            .frame(maxWidth: .infinity).padding(.vertical, 7).padding(.horizontal, 12)
+            .background(Color.amberTint)
+            .accessibilityIdentifier("offline-banner")
     }
 }
