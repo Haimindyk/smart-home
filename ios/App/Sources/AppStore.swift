@@ -718,7 +718,14 @@ final class AppStore: ObservableObject {
             let saved = try await backend.save(table: "meals", owner: owner, payload: .object(fields), existing: row)
             if session?.owner == owner, let index = meals.firstIndex(where: { $0.id == row.id }) { meals[index] = saved }
             return true
-        } catch { if session?.owner == owner { self.error = "התיקון לא הושלם. בדוק חיבור ונסה שוב." }; return false }
+        } catch {
+            if session?.owner == owner {
+                if case BackendError.server(let code) = error, code == 502 || code == 400 {
+                    self.error = "ה־AI לא הצליח להבין את התיקון. נסה לנסח אחרת, למשל: ״הוסף רוטב טריאקי 15 גרם״ או ״זה היה חזה עוף״."
+                } else { self.error = "התיקון לא הושלם. בדוק חיבור ונסה שוב." }
+            }
+            return false
+        }
     }
     static func timeKey(_ date: Date, zone: TimeZone) -> String {
         let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = zone; f.dateFormat = "HH:mm"; return f.string(from: date)
