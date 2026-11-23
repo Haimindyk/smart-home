@@ -135,9 +135,10 @@ export async function handleChat(req: Request, env: Environment) {
           .from("meals")
           .select("data")
           .eq("owner_user_id", user.id)
-          .eq("data->>date", today)
+          .gte("data->>date", new Date(new Date(today).getTime() - 6 * 86400000).toISOString().slice(0, 10))
+          .lte("data->>date", today)
           .is("deleted_at", null)
-          .limit(100),
+          .limit(400),
         admin
           .from("nutrition_goals")
           .select("data")

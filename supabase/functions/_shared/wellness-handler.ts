@@ -480,16 +480,30 @@ export async function handleWellness(req: Request, env: Environment) {
           preferences!.equipment.includes(e.equipment) &&
           !preferences!.avoid.includes(e.id),
       );
-      const raw = await provider.structured(
-        `You plan exercise for healthy adults. Return {message:Hebrew rationale,plans:[{name:Hebrew,notes:Hebrew,exercises:[{catalogId,sets,reps,rest}]}]}. EXACTLY ${templates} templates for ${split}. Use ONLY the supplied catalog. Cover push,pull,squat,hinge,core across the program. Emphasize requested muscles without neglecting others. 3-10 exercises per template, beginner 1-3 sets, otherwise 1-5; 3-30 reps, rest 30-240 seconds. Fit the user's time; never invent starting weights. Respect avoided exercises/equipment. No rehab, diagnoses or medical prescriptions.`,
-        { preferences, catalog: available },
-        3500,
-        "coach_program",
-      );
-      result = makeProgram(raw, preferences!, startDate) as unknown as Record<
-        string,
-        unknown
-      >;
+      // About 285 s per exercise (3 sets of 10 reps with 75 s rest) plus a 5 minute warm-up: tell the model how many fit.
+      const targetExercises = Math.max(3, Math.min(10, Math.floor((preferences!.minutes * 60 - 300) / 285)));
+      const guidance =
+        `You plan exercise for healthy adults. Return {message:Hebrew rationale,plans:[{name:Hebrew,notes:Hebrew,exercises:[{catalogId,sets,reps,rest}]}]}. EXACTLY ${templates} templates for ${split}. Use ONLY the supplied catalog. Cover push,pull,squat,hinge,core across the program. Emphasize requested muscles without neglecting others. ` +
+        `3-10 exercises per template (aim for ${targetExercises} so the session fits ${preferences!.minutes} minutes), beginner 1-3 sets, otherwise 1-5; 3-30 reps, rest 30-240 seconds. ` +
+        `Order each session with the big multi-joint lifts first, then accessories, then core. Match the goal: strength 3-6 reps with 120-240 s rest; muscle gain 6-12 reps with 60-120 s; fat loss or general fitness 8-15 reps with 45-90 s; endurance 12-20 reps with 30-60 s. ` +
+        `Balance pushing and pulling volume and do not repeat the same exercise across templates unless the split has only one. Never invent starting weights. Respect avoided exercises/equipment. No rehab, diagnoses or medical prescriptions. Hebrew message: two or three short sentences explaining the structure.`;
+      let program: Record<string, unknown> | undefined;
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 2 && !program; attempt++) {
+        const hint =
+          attempt === 0
+            ? ""
+            : ` The previous attempt was rejected (${(lastError as Error).message}). Fix it: use at most ${Math.max(3, targetExercises - 1)} exercises per template, make sure push, pull, squat, hinge and core are all covered, include every requested muscle, and use only catalog ids.`;
+        const raw = await provider.structured(guidance + hint, { preferences, catalog: available }, 3500, "coach_program");
+        try {
+          program = makeProgram(raw, preferences!, startDate) as unknown as Record<string, unknown>;
+        } catch (error) {
+          lastError = error;
+          if (!["invalid_output", "program_too_long", "unbalanced_program"].includes((error as Error).message)) throw error;
+        }
+      }
+      if (!program) throw lastError;
+      result = program;
     } else if (input.action === "adjust") {
       if (env("WELLNESS_MODEL_SOURCE") === "owned")
         throw new Error("not_configured");
