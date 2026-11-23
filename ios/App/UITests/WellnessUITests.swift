@@ -103,6 +103,7 @@ final class WellnessUITests: XCTestCase {
         let app = launch("meal")
         XCTAssertTrue(app.descendants(matching: .any)["calories-card"].firstMatch.waitForExistence(timeout: 15))
         app.buttons["add-meal"].tap()
+        XCTAssertTrue(app.buttons["camera-more"].waitForExistence(timeout: 8)); app.buttons["camera-more"].tap()
         XCTAssertTrue(app.textFields["חיפוש מוצר לפי שם…"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["סריקת ברקוד"].exists)
         capture(app, name: "native-add-meal")
@@ -146,6 +147,7 @@ final class WellnessUITests: XCTestCase {
         }
         app.buttons["tab-today"].tap()
         app.buttons["add-meal"].tap()
+        XCTAssertTrue(app.buttons["camera-more"].waitForExistence(timeout: 8)); app.buttons["camera-more"].tap()
         XCTAssertTrue(app.textFields["חיפוש מוצר לפי שם…"].waitForExistence(timeout: 5))
         audit("add-meal")
         let report = XCTAttachment(string: findings.isEmpty ? "No findings." : findings.joined(separator: "\n"))
@@ -201,6 +203,7 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["קוד ל-WiFi של האורחים"].waitForExistence(timeout: 5))
         capture(app, name: "native-home-notes")
         app.buttons["add-meal"].tap()
+        XCTAssertTrue(app.buttons["camera-more"].waitForExistence(timeout: 8)); app.buttons["camera-more"].tap()
         XCTAssertTrue(app.textFields["quick-add-title"].waitForExistence(timeout: 5))
         capture(app, name: "native-home-quick-add")
         app.buttons["ביטול"].tap()
@@ -374,6 +377,7 @@ final class WellnessUITests: XCTestCase {
     func testManualFoodEntryLeadsToPortionPicker() {
         let app = launch("meal")
         XCTAssertTrue(app.buttons["add-meal"].waitForExistence(timeout: 15)); app.buttons["add-meal"].tap()
+        XCTAssertTrue(app.buttons["camera-more"].waitForExistence(timeout: 8)); app.buttons["camera-more"].tap()
         let manual = app.buttons["manual-food"]
         XCTAssertTrue(manual.waitForExistence(timeout: 8)); manual.tap()
         let name = app.textFields["manual-name"]
@@ -457,6 +461,34 @@ final class WellnessUITests: XCTestCase {
         app.buttons["הוסף כמות"].tap()
         app.buttons["quantity-save"].tap()
         XCTAssertTrue(app.buttons["meal-done"].waitForExistence(timeout: 5), "Saving returns to the meal")
+    }
+    func testCameraScansThenOffersReview() {
+        let app = launch("meal-ai")
+        XCTAssertTrue(app.buttons["add-meal"].waitForExistence(timeout: 15)); app.buttons["add-meal"].tap()
+        let shutter = app.buttons["camera-shutter"]
+        XCTAssertTrue(shutter.waitForExistence(timeout: 8), "The add-meal button opens the camera")
+        XCTAssertTrue(app.buttons["camera-barcode"].exists && app.buttons["camera-describe"].exists && app.buttons["camera-more"].exists, "Barcode, description and more chips are on the camera")
+        capture(app, name: "native-meal-camera")
+        shutter.tap()
+        sleep(1)
+        capture(app, name: "native-meal-aftershutter")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "מנתח את הארוחה")).firstMatch.waitForExistence(timeout: 5), "After the shot the photo is scanned")
+        capture(app, name: "native-meal-scanning")
+        XCTAssertTrue(app.buttons["review-save"].waitForExistence(timeout: 20), "When the analysis is ready the review opens")
+        capture(app, name: "native-meal-review")
+        app.buttons["review-save"].tap()
+        XCTAssertTrue(app.buttons["add-meal"].waitForExistence(timeout: 8), "Saving returns to the health screen")
+    }
+    func testAnalysisKeepsRunningWhenTheCameraIsClosed() {
+        let app = launch("meal-ai")
+        XCTAssertTrue(app.buttons["add-meal"].waitForExistence(timeout: 15)); app.buttons["add-meal"].tap()
+        XCTAssertTrue(app.buttons["camera-shutter"].waitForExistence(timeout: 8)); app.buttons["camera-shutter"].tap()
+        XCTAssertTrue(app.buttons["scan-background"].waitForExistence(timeout: 5)); app.buttons["scan-background"].tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "להמשיך להשתמש באפליקציה")).firstMatch.waitForExistence(timeout: 5), "A banner shows the analysis running in the background")
+        capture(app, name: "native-analysis-banner")
+        XCTAssertTrue(app.buttons["analysis-review"].waitForExistence(timeout: 20), "The banner offers the review when the analysis finishes")
+        app.buttons["analysis-review"].tap()
+        XCTAssertTrue(app.buttons["review-save"].waitForExistence(timeout: 8))
     }
     func testNotificationSettingsScreenOpens() {
         let app = launch("meal")
