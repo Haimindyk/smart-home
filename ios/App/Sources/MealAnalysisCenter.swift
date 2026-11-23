@@ -88,6 +88,8 @@ final class MealAnalysisCenter: ObservableObject {
                 let time = pending.entryTime ?? AppStore.timeKey(pending.createdAt, zone: store.timeZone)
                 let row = await store.saveAnalyzedMealRow(result, items: result.items, kind: AppStore.mealKind(forTime: time), date: pending.entryDate, time: time)
                 self.savedMealID = row?.id
+                // Saved: forget the pending job now, or relaunching the app before the banner is opened would analyse and save the same meal again.
+                if row != nil { UserDefaults.standard.removeObject(forKey: self.defaultsKey) }
             }
             self.finishWith(outcome)
         }
