@@ -173,11 +173,11 @@ private struct SummaryCarousel: View {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) { macroCards }
                     ScrollView { VStack(spacing: 10) { macroCards } }
-                }.padding(.vertical, 8).tag(0)
-                WaterCard().padding(.vertical, 8).tag(1)
-                if hasActivity { StepsCard().padding(.vertical, 8).tag(2) }
+                }.padding(.top, 4).padding(.bottom, 16).tag(0)
+                WaterCard().padding(.top, 4).padding(.bottom, 16).tag(1)
+                if hasActivity { StepsCard().padding(.top, 4).padding(.bottom, 16).tag(2) }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never)).frame(height: height)
+            .tabViewStyle(.page(indexDisplayMode: .never)).frame(height: height + 16)
             .sensoryFeedback(.selection, trigger: page)
             HStack(spacing: 7) {
                     ForEach(0..<(hasActivity ? 3 : 2), id: \.self) { index in
