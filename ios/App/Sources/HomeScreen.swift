@@ -293,7 +293,7 @@ struct SectionPanel: View {
         VStack(alignment: .leading, spacing: 10) {
             header
             if section.kind == "shopping" { shoppingActions }
-            if section.kind != "info" { ProgressBar(value: progress, tint: Color.wellnessPrimary) }
+            if section.kind != "info" { ProgressBar(value: progress, tint: section.kindColor) }
             switch section.kind {
             case "chores": ChorePanelBody(section: section)
             case "info": TaskPanelBody(section: section, notesStyle: true)
@@ -304,11 +304,11 @@ struct SectionPanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 30, style: .continuous).fill(Color.wellnessCard)
+                .overlay(LinearGradient(colors: [section.kindColor.opacity(0.13), section.kindColor.opacity(0.0)], startPoint: .top, endPoint: UnitPoint(x: 0.5, y: 0.3)).clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous)))
                 .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(Color.wellnessHairline))
                 .shadow(color: .black.opacity(0.05), radius: 1, y: 1).shadow(color: .black.opacity(0.10), radius: 12, y: 6)
         }
-        .overlay(alignment: .top) { UnevenRoundedRectangle(topLeadingRadius: 30, topTrailingRadius: 30, style: .continuous).fill(section.kindColor).frame(height: 6) }
-        .background(GeometryReader { geo in Color.clear.preference(key: PanelOffsetKey.self, value: [section.id: geo.frame(in: .named("home-scroll")).minY]) })
+                .background(GeometryReader { geo in Color.clear.preference(key: PanelOffsetKey.self, value: [section.id: geo.frame(in: .named("home-scroll")).minY]) })
         .accessibilityElement(children: .contain).accessibilityLabel(section.name)
         .sheet(isPresented: $comparing) { PriceComparisonSheet(section: section).environmentObject(home) }
         .fullScreenCover(isPresented: $scanning) {
@@ -331,12 +331,14 @@ struct SectionPanel: View {
     private var header: some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.06))
-                if let e = section.emoji, !e.isEmpty { Text(e).font(.system(size: 20)) } else { Image(systemName: section.kindIcon).foregroundStyle(section.kindColor) }
-            }.frame(width: 36, height: 36).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(section.name).font(.hb(.headline, .bold)).tracking(-0.2).foregroundStyle(Color.wellnessInk).lineLimit(2)
-                Text(countText).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).monospacedDigit()
+                Circle().fill(section.kindColor.opacity(0.15))
+                Circle().strokeBorder(section.kindColor.opacity(0.4), lineWidth: 1.5)
+                if let e = section.emoji, !e.isEmpty { Text(e).font(.system(size: 21)) } else { Image(systemName: section.kindIcon).font(.system(size: 17, weight: .semibold)).foregroundStyle(section.kindColor) }
+            }.frame(width: 42, height: 42).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(section.name).font(.hb(.title3, .bold)).tracking(-0.3).foregroundStyle(Color.wellnessInk).lineLimit(2)
+                Text(countText).font(.hb(.caption2, .semibold)).monospacedDigit().foregroundStyle(Color.wellnessInk).padding(.horizontal, 8).frame(height: 20)
+                    .background(section.kindColor.opacity(0.14), in: Capsule())
             }.frame(maxWidth: .infinity, alignment: .leading)
         }
     }
