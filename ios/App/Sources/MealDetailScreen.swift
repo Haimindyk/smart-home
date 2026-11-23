@@ -19,6 +19,19 @@ struct MealDetailScreen: View {
 
     private var meal: HealthRow { store.meals.first { $0.id == initial.id } ?? initial }
     private var items: [JSONValue] { meal.data["items"].arrayValue }
+    /// An estimated meal with a photo that was changed after the first save (a correction): offer to share it so the model can learn.
+    private var canShareForTraining: Bool {
+        store.trainingEnabled && mealPhotoPath(meal) != nil && hasEstimate && meal.version > 1 && !store.trainingShared.contains(meal.id)
+    }
+    private var trainingCard: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "wand.and.stars").foregroundStyle(Color.purple)
+            Text("תיקנת את הזיהוי. לשתף את הדוגמה כדי לשפר את המודל?").font(.hb(.footnote)).frame(maxWidth: .infinity, alignment: .leading)
+            Button { Task { if await store.shareTrainingExample(meal) { show("תודה! הדוגמה נשמרה לבדיקה") } } } label: {
+                Text("שתף").font(.hb(.subheadline, .semibold)).padding(.horizontal, 14).frame(minHeight: 34).background(Color.wellnessChip, in: Capsule())
+            }.accessibilityIdentifier("meal-share-training")
+        }.padding(.horizontal, 14).padding(.vertical, 8).background(Color.purple.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
     private var hasEstimate: Bool { items.contains { ["ai", "usda"].contains($0["food"]["source"].stringValue ?? "") } }
 
     private func total(_ key: String) -> Double? {
@@ -39,6 +52,7 @@ struct MealDetailScreen: View {
         .navigationBarBackButtonHidden(true).toolbar(.hidden, for: .navigationBar)
         .overlay(alignment: .bottom) { if let toast { Text(toast).font(.hb(.subheadline, .semibold)).foregroundStyle(Color.wellnessOnPrimary).padding(.horizontal, 18).padding(.vertical, 12).background(Color.wellnessPrimary, in: Capsule()).padding(.bottom, 24).transition(.move(edge: .bottom).combined(with: .opacity)) } }
         .animation(.snappy, value: toast)
+        .task { await store.loadTrainingStatus() }
         .sheet(isPresented: $editingManually) { EditMealSheet(meal: meal).environmentObject(store) }
         .sheet(isPresented: $correcting) { CorrectMealSheet(mealID: initial.id).environmentObject(store).presentationDetents([.medium, .large]).presentationDragIndicator(.visible) }
         .sheet(isPresented: $addingIngredient) { AddIngredientSheet(mealID: initial.id).environmentObject(store) }
@@ -121,6 +135,7 @@ struct MealDetailScreen: View {
                     .buttonStyle(PressableStyle()).accessibilityIdentifier("meal-add-ingredient")
             }.padding(.top, 6)
             if !hintHidden { hint }
+            if canShareForTraining { trainingCard }
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                     row(index, item)

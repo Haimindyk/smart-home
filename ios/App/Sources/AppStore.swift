@@ -15,6 +15,10 @@ final class AppStore: ObservableObject {
     @Published private(set) var meals: [HealthRow] = []
     /// The meal that was just removed; shown with an Undo button for a few seconds.
     @Published var undoableMeal: HealthRow?
+    /// Opt-in contribution of corrected meals to improve the recognition model (server policy wellness-training-v1).
+    @Published private(set) var trainingEnabled = false
+    @Published private(set) var trainingCount = 0
+    @Published private(set) var trainingShared: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "trainingSharedMeals") ?? [])
     @Published private(set) var personalFoods: [HealthRow] = []
     @Published private(set) var recipes: [HealthRow] = []
     @Published private(set) var goals: [HealthRow] = []
@@ -537,6 +541,39 @@ final class AppStore: ObservableObject {
         return result
     }
     func finishedTimestamp() -> String { Self.iso(Date()) }
+    func loadTrainingStatus() async {
+        if isFixtureSession { return }
+        guard let owner = session?.owner, let backend else { return }
+        guard let result = try? await backend.invoke("wellness-training", body: .object(["action": .string("status")]), owner: owner), session?.owner == owner else { return }
+        trainingEnabled = result["enabled"].boolValue == true
+        trainingCount = Int(result["count"].doubleValue ?? 0)
+    }
+    /// Turning consent off also deletes every shared example (server side).
+    func setTrainingConsent(_ on: Bool) async -> Bool {
+        if isFixtureSession { trainingEnabled = on; if !on { trainingCount = 0; trainingShared = []; UserDefaults.standard.removeObject(forKey: "trainingSharedMeals") }; return true }
+        guard let owner = session?.owner, let backend else { return false }
+        do {
+            _ = try await backend.invoke("wellness-training", body: .object(["action": .string("consent"), "enabled": .bool(on), "policy": .string("wellness-training-v1")]), owner: owner)
+            guard session?.owner == owner else { return false }
+            trainingEnabled = on
+            if !on { trainingCount = 0; trainingShared = []; UserDefaults.standard.removeObject(forKey: "trainingSharedMeals") }
+            await loadTrainingStatus()
+            return true
+        } catch { if session?.owner == owner { self.error = on ? "לא הצלחנו לאשר את ההשתתפות. נדרש פרופיל עם תאריך לידה (גיל 18 ומעלה)." : "לא הצלחנו לבטל את ההסכמה. נסה שוב." }; return false }
+    }
+    /// Shares one saved meal (photo + the items as the user corrected them) as a training example the user approved.
+    func shareTrainingExample(_ meal: HealthRow) async -> Bool {
+        guard trainingEnabled, meal.data["imagePath"].stringValue != nil else { return false }
+        func remember() { trainingShared.insert(meal.id); trainingCount += 1; UserDefaults.standard.set(Array(trainingShared), forKey: "trainingSharedMeals") }
+        if isFixtureSession { remember(); return true }
+        guard let owner = session?.owner, let backend else { return false }
+        do {
+            _ = try await backend.invoke("wellness-training", body: .object(["action": .string("submit"), "task": .string("nutrition_photo"), "sourceId": .string(meal.id), "description": .string(""), "weighed": .bool(false), "confirmShare": .bool(true)]), owner: owner)
+            guard session?.owner == owner else { return false }
+            remember(); await loadTrainingStatus()
+            return true
+        } catch { if session?.owner == owner { self.error = "לא הצלחנו לשתף את הדוגמה. נסה שוב בעוד רגע." }; return false }
+    }
     private var isFixtureSession: Bool { backend == nil && session?.accessToken == "ui-test" }
     /// Removes a meal from the screen at once (animated) and deletes it on the server in the background; it comes back if that fails.
     func removeMealWithUndo(_ row: HealthRow) async {
