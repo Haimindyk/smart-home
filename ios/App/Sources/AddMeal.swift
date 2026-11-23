@@ -57,7 +57,7 @@ struct AddMealSheet: View {
                         ForEach(store.recentMeals) { meal in
                             Button { Task { if await store.relogMeal(meal, kind: currentKind()) { dismiss() } } } label: { RecentRow(meal: meal) }.buttonStyle(PressableStyle())
                         }
-                    } }.sensoryFeedback(.success, trigger: store.meals.count)
+                    } }.scrollClipDisabled().sensoryFeedback(.success, trigger: store.meals.count)
                 }
                 else if results.isEmpty {
                     ContentUnavailableView(searched ? "לא נמצאו מוצרים" : "מה אכלת?", systemImage: searched ? "questionmark.circle" : "fork.knife",
@@ -67,7 +67,7 @@ struct AddMealSheet: View {
                         ForEach(results) { choice in
                             Button { picked = choice } label: { FoodRow(food: choice.food) }.buttonStyle(PressableStyle())
                         }
-                    } }
+                    } }.scrollClipDisabled()
                 }
                 Spacer(minLength: 0)
             }
