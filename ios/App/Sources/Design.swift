@@ -200,3 +200,42 @@ struct OfflineBanner: View {
             .accessibilityIdentifier("offline-banner")
     }
 }
+
+/// Swipe a card to the right to reveal a red delete action. Past the threshold the card springs back and `onConfirm` runs,
+/// so the caller can ask "delete?" and a cancel leaves the card exactly where it was.
+struct SwipeToConfirmDelete: ViewModifier {
+    let onConfirm: () -> Void
+    @State private var offset: CGFloat = 0
+    @State private var armed = false
+    private let threshold: CGFloat = 96
+    func body(content: Content) -> some View {
+        content
+            .offset(x: offset)
+            .background {
+                if offset > 4 {
+                    RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Color.red.opacity(armed ? 0.95 : 0.72))
+                        .overlay(alignment: .leading) {
+                            Image(systemName: "trash.fill").font(.title3.weight(.semibold)).foregroundStyle(.white).scaleEffect(armed ? 1.15 : 1).padding(.leading, 28)
+                        }
+                        .environment(\.layoutDirection, .leftToRight)
+                }
+            }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 18)
+                    .onChanged { value in
+                        guard abs(value.translation.width) > abs(value.translation.height) * 1.3 else { return }
+                        offset = max(0, min(170, value.translation.width))
+                        let now = offset >= threshold
+                        if now != armed { armed = now }
+                    }
+                    .onEnded { _ in
+                        let fire = armed
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { offset = 0; armed = false }
+                        if fire { onConfirm() }
+                    }
+            )
+            .sensoryFeedback(.impact(weight: .medium), trigger: armed) { _, now in now }
+            .accessibilityAction(named: "מחיקה", onConfirm)
+    }
+}
+extension View { func swipeToConfirmDelete(_ onConfirm: @escaping () -> Void) -> some View { modifier(SwipeToConfirmDelete(onConfirm: onConfirm)) } }

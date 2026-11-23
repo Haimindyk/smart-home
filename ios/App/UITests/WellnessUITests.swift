@@ -402,6 +402,18 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["מים"].exists, "...and water")
         let before = app.buttons["הוסף 250 מיליליטר מים"]
         XCTAssertTrue(before.exists)
+    func testSwipingAMealRightAsksBeforeDeleting() {
+        let app = launch("meal")
+        let meal = app.buttons["meal-33333333-3333-4333-8333-333333333333"]
+        XCTAssertTrue(meal.waitForExistence(timeout: 15))
+        let start = meal.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5))
+        let end = meal.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: end)
+        let dialog = app.buttons["מחיקה"]
+        XCTAssertTrue(dialog.waitForExistence(timeout: 5), "Swiping a meal to the right asks before deleting it")
+        capture(app, name: "native-meal-swipe-confirm")
+        app.buttons["ביטול"].tap()
+        XCTAssertTrue(meal.waitForExistence(timeout: 5), "Cancelling leaves the meal in place")
     }
     func testNotificationSettingsScreenOpens() {
         let app = launch("meal")

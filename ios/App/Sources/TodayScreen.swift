@@ -56,6 +56,7 @@ struct TodayScreen: View {
                     } else {
                         ForEach(store.dayMeals) { meal in
                             NavigationLink { MealDetail(initial: meal) } label: { MealCard(meal: meal) }.buttonStyle(PressableStyle())
+                                .swipeToConfirmDelete { mealToDelete = meal }
                                 .contextMenu { Button(role: .destructive) { mealToDelete = meal } label: { Label("מחיקת הארוחה", systemImage: "trash") } }.accessibilityIdentifier("meal-\(meal.id)")
                         }
                     }
