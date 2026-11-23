@@ -292,7 +292,9 @@ final class AppStore: ObservableObject {
         }
     }
     /// Edits name, kind and items of an existing meal; everything else (date, photo, favorite…) is preserved.
-    func updateMeal(_ row: HealthRow, name: String, kind: String, items: [JSONValue]) async -> Bool {
+    func updateMeal(_ staleRow: HealthRow, name: String, kind: String, items: [JSONValue]) async -> Bool {
+        // A sheet may hold an older copy of the meal (e.g. after an AI correction or a time edit): start from the store's latest.
+        let row = meals.first(where: { $0.id == staleRow.id }) ?? staleRow
         guard !items.isEmpty, case .object(var fields) = row.data else { return false }
         fields["name"] = .string(name); fields["kind"] = .string(kind); fields["items"] = .array(items)
         let payload = JSONValue.object(fields)
