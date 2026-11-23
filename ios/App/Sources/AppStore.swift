@@ -39,10 +39,10 @@ final class AppStore: ObservableObject {
             phase = scenario == "--ui-test-login" ? .signedOut : .signedIn
             if phase == .signedIn {
                 session = Session(accessToken: "ui-test", refreshToken: "ui-test", owner: UITestFixtures.owner, member: "11111111-1111-4111-8111-111111111111")
-                profile = .object(["timezone": .string("UTC"), "birthDate": .string("1990-01-01"), "aiProviderConsent": .bool(scenario == "--ui-test-coach")])
+                profile = .object(["timezone": .string("UTC"), "birthDate": .string("1990-01-01"), "aiProviderConsent": .bool(scenario == "--ui-test-coach" || scenario == "--ui-test-meal-ai")])
                 goals = UITestFixtures.goals(date: dateKey)
-                if scenario == "--ui-test-meal" { steps = 1454; burnedKcal = 320 }
-                if scenario == "--ui-test-meal" || scenario == "--ui-test-coach" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey); plans = UITestFixtures.plans(); weightLogs = UITestFixtures.weights(zone: timeZone); recipes = UITestFixtures.recipes() }
+                if scenario == "--ui-test-meal" || scenario == "--ui-test-meal-ai" { steps = 1454; burnedKcal = 320 }
+                if scenario == "--ui-test-meal" || scenario == "--ui-test-meal-ai" || scenario == "--ui-test-coach" { meals = UITestFixtures.meals(date: dateKey, estimated: scenario == "--ui-test-meal-ai"); workouts = UITestFixtures.workouts(date: dateKey); plans = UITestFixtures.plans(); weightLogs = UITestFixtures.weights(zone: timeZone); recipes = UITestFixtures.recipes() }
             }
             return
         }
@@ -596,6 +596,27 @@ final class AppStore: ObservableObject {
             guard let analysisId = raw["analysisId"].stringValue, !items.isEmpty else { self.error = "לא הצלחנו לזהות את הארוחה. אפשר לנסות תמונה אחרת או להוסיף ידנית."; return nil }
             return MealAnalysis(items: items, needsClarification: raw["needsClarification"].boolValue == true, question: raw["question"].stringValue ?? "", analysisId: analysisId, imagePath: path)
         } catch { if session?.owner == owner { self.error = "הניתוח לא הושלם. בדוק חיבור ונסה שוב." }; return nil }
+    }
+    /// "Fix with AI": sends the user's correction ("this is rice, not pasta") to the server, which re-estimates the saved meal's items.
+    func correctMeal(_ row: HealthRow, text: String) async -> Bool {
+        let note = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !note.isEmpty, aiEligible, aiConsented, let owner = session?.owner, let backend, case .object(var fields) = row.data else { return false }
+        busy = true; defer { busy = false }
+        let requestID = UUID().uuidString.lowercased()
+        do {
+            let raw = try await backend.invoke("wellness-ai", body: .object(["action": .string("correct_meal"), "mealId": .string(row.id), "expectedVersion": .number(Double(row.version)), "description": .string(String(note.prefix(2000))), "requestId": .string(requestID)]), owner: owner)
+            let items = raw["items"].arrayValue
+            guard session?.owner == owner else { return false }
+            guard !items.isEmpty else { self.error = "לא הצלחנו לתקן את הארוחה. נסה לנסח אחרת."; return false }
+            fields["items"] = .array(items)
+            var estimate: [String: JSONValue] = [:]
+            if case .object(let old) = row.data["aiEstimate"] { estimate = old }
+            estimate["lastCorrectionId"] = .string(requestID)
+            fields["aiEstimate"] = .object(estimate)
+            let saved = try await backend.save(table: "meals", owner: owner, payload: .object(fields), existing: row)
+            if session?.owner == owner, let index = meals.firstIndex(where: { $0.id == row.id }) { meals[index] = saved }
+            return true
+        } catch { if session?.owner == owner { self.error = "התיקון לא הושלם. בדוק חיבור ונסה שוב." }; return false }
     }
     func saveAnalyzedMeal(_ analysis: MealAnalysis, items: [JSONValue], kind: String) async -> Bool {
         guard !items.isEmpty else { return false }
