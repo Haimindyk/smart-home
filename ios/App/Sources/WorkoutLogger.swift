@@ -9,6 +9,7 @@ struct ActiveWorkoutView: View {
     @State private var rest: Int?
     @State private var restEnd: Date?
     @State private var saving = false
+    @State private var dirty = false
     @State private var confirmFinish = false
     @State private var demoItem: DemoRef?
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -69,16 +70,24 @@ struct ActiveWorkoutView: View {
         let wasDone = set["done"]?.boolValue == true
         set["reps"] = .number(reps); set["weight"] = .number(weight); set["done"] = .bool(done)
         sets[setIndex] = .object(set); exercise["performed"] = .array(sets); list[exIndex] = .object(exercise); payload["exercises"] = .array(list)
-        let snapshot = row
         row = HealthRow(id: row.id, owner_user_id: row.owner_user_id, data: .object(payload), version: row.version, deleted_at: row.deleted_at)
         if done && !wasDone, seconds > 0 { restEnd = Date().addingTimeInterval(Double(seconds)); rest = seconds }
-        Task { await persist(snapshot: snapshot) }
+        Task { await persist() }
     }
-    @MainActor private func persist(snapshot: HealthRow) async {
+    /// Saves are serialized: a tap while a save is in flight only marks the row dirty, and the loop saves the
+    /// latest row with the freshly returned version. Parallel saves with one stale version would conflict and drop edits.
+    @MainActor private func persist() async {
+        if saving { dirty = true; return }
         saving = true; defer { saving = false }
-        if let saved = await store.saveWorkout(snapshot, payload: row.data) { row = HealthRow(id: saved.id, owner_user_id: saved.owner_user_id, data: row.data, version: saved.version, deleted_at: saved.deleted_at) }
+        repeat {
+            dirty = false
+            let current = row
+            guard let saved = await store.saveWorkout(current, payload: current.data) else { return }
+            row = HealthRow(id: saved.id, owner_user_id: saved.owner_user_id, data: row.data, version: saved.version, deleted_at: saved.deleted_at)
+        } while dirty
     }
     @MainActor private func finish() async {
+        while saving { try? await Task.sleep(for: .milliseconds(50)) }
         guard case .object(var payload) = row.data else { return }
         payload["status"] = .string(doneSets == totalSets ? "completed" : "partial"); payload["endedAt"] = .string(store.finishedTimestamp())
         saving = true; defer { saving = false }
