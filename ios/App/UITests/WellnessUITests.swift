@@ -62,7 +62,9 @@ final class WellnessUITests: XCTestCase {
         app.buttons["ביטול"].tap()
         XCTAssertFalse(app.buttons["Back"].exists, "System navigation should also use the app's Hebrew localization")
         capture(app, name: "native-meal-details")
-        app.navigationBars.buttons["BackButton"].tap()  // back from meal details to the health tabs
+        // iOS 27 no longer exposes the system back button as "BackButton"; use the first (leading) nav-bar button instead.
+        let back = app.navigationBars.buttons["BackButton"].exists ? app.navigationBars.buttons["BackButton"] : app.navigationBars.buttons.element(boundBy: 0)
+        back.tap()  // back from meal details to the health tabs
         app.buttons["tab-workouts"].tap()
         XCTAssertTrue(app.buttons["workout-55555555-5555-8555-8555-555555555555"].waitForExistence(timeout: 5))
         capture(app, name: "native-workouts")
@@ -211,13 +213,13 @@ final class WellnessUITests: XCTestCase {
     func testHouseholdMenuCreatesSectionSearchesAndListsMembers() {
         let app = launch("home")
         XCTAssertTrue(app.buttons["home-menu"].waitForExistence(timeout: 15))
-        app.buttons["home-menu"].tap()
+        app.buttons["home-menu"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         app.buttons["מדור חדש"].tap()
         let name = app.textFields["section-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("מוצרי ניקיון")
         app.buttons["section-save"].tap()
         XCTAssertTrue(app.buttons["מוצרי ניקיון"].waitForExistence(timeout: 5), "A new section appears as a chip and is selected")
-        app.buttons["home-menu"].tap()
+        app.buttons["home-menu"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         app.buttons["בני הבית"].tap()
         XCTAssertTrue(app.staticTexts["נועה"].waitForExistence(timeout: 5))
         capture(app, name: "native-home-members")
@@ -325,7 +327,7 @@ final class WellnessUITests: XCTestCase {
     }
     func testAddingMemberShowsInvitationWithPin() {
         let app = launch("home")
-        XCTAssertTrue(app.buttons["home-menu"].waitForExistence(timeout: 15)); app.buttons["home-menu"].tap()
+        XCTAssertTrue(app.buttons["home-menu"].waitForExistence(timeout: 15)); app.buttons["home-menu"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         app.buttons["בני הבית"].tap()
         let add = app.buttons["add-member"]
         XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
