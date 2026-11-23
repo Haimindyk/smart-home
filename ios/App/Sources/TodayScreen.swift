@@ -160,8 +160,8 @@ private struct CalorieCard: View {
 private struct SummaryCarousel: View {
     @EnvironmentObject private var store: AppStore
     @State private var page = 0
-    @ScaledMetric(relativeTo: .body) private var height: CGFloat = 128
-    private var hasActivity: Bool { store.steps != nil }
+    @ScaledMetric(relativeTo: .body) private var macroHeight: CGFloat = 144
+    @ScaledMetric(relativeTo: .body) private var activityHeight: CGFloat = 282
     @ViewBuilder private var macroCards: some View {
         NutrientCard(title: "חלבון", nutrient: "protein", symbol: "fish.fill", color: .proteinBlue)
         NutrientCard(title: "פחמימות", nutrient: "carbs", symbol: "carrot.fill", color: .carbsGold)
@@ -174,59 +174,77 @@ private struct SummaryCarousel: View {
                     HStack(spacing: 12) { macroCards }
                     ScrollView { VStack(spacing: 10) { macroCards } }
                 }.padding(.top, 4).padding(.bottom, 16).tag(0)
-                WaterCard().padding(.top, 4).padding(.bottom, 16).tag(1)
-                if hasActivity { StepsCard().padding(.top, 4).padding(.bottom, 16).tag(2) }
+                ActivityPage().padding(.top, 4).padding(.bottom, 16).tag(1)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never)).frame(height: height + 16)
+            .tabViewStyle(.page(indexDisplayMode: .never)).frame(height: page == 0 ? macroHeight : activityHeight)
+            .animation(.snappy, value: page)
             .sensoryFeedback(.selection, trigger: page)
             HStack(spacing: 7) {
-                    ForEach(0..<(hasActivity ? 3 : 2), id: \.self) { index in
-                        Capsule().fill(index == page ? Color.wellnessInk : Color.primary.opacity(0.18))
-                            .frame(width: index == page ? 22 : 7, height: 7)
-                    }
-                }.animation(.snappy, value: page).environment(\.layoutDirection, .rightToLeft).accessibilityHidden(true)
+                ForEach(0..<2, id: \.self) { index in
+                    Capsule().fill(index == page ? Color.wellnessInk : Color.primary.opacity(0.18))
+                        .frame(width: index == page ? 22 : 7, height: 7)
+                }
+            }.animation(.snappy, value: page).environment(\.layoutDirection, .rightToLeft).accessibilityHidden(true)
         }
+        .task { await store.loadTodayActivity() }
+    }
+}
+
+/// Second carousel page: steps and burned calories side by side, with the water card underneath (as in the web app).
+private struct ActivityPage: View {
+    @EnvironmentObject private var store: AppStore
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                StatTile(title: "צעדים", value: store.steps.map { Int($0.rounded()) }, unit: "/ 10,000", ring: (store.steps ?? 0, 10_000, Color.wellnessInk, "figure.walk"))
+                StatTile(title: "קלוריות שנשרפו", value: store.burnedKcal.map { Int($0.rounded()) }, unit: "קלוריות", ring: (store.burnedKcal ?? 0, nil, Color.kcalAmber, "flame.fill"))
+            }
+            WaterCard()
+        }
+    }
+}
+
+private struct StatTile: View {
+    let title: String
+    let value: Int?
+    let unit: String
+    let ring: (value: Double, target: Double?, color: Color, symbol: String)
+    @ScaledMetric(relativeTo: .title) private var number: CGFloat = 30
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary).lineLimit(1).minimumScaleFactor(0.8)
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(value.map { $0.formatted() } ?? "—").font(.hbFixed(number, .heavy)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+                Text(unit).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).lineLimit(1)
+            }
+            Spacer(minLength: 6)
+            HStack { Spacer(); ProgressRing(value: ring.value, target: ring.target, color: ring.color, symbol: ring.symbol, lineWidth: 4).frame(width: 44, height: 44) }
+        }
+        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading).wellnessCard(padding: 14)
+        .accessibilityElement(children: .combine)
     }
 }
 
 private struct WaterCard: View {
     @EnvironmentObject private var store: AppStore
-    @ScaledMetric(relativeTo: .title) private var waterNumber: CGFloat = 38
+    @ScaledMetric(relativeTo: .title) private var waterNumber: CGFloat = 32
     var body: some View {
         let total = store.dayWater, target = store.waterTarget
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 10) {
+        HStack(spacing: 14) {
+            ProgressRing(value: total, target: target, color: .proteinBlue, symbol: "drop.fill", lineWidth: 7).frame(width: 64, height: 64)
+            VStack(alignment: .leading, spacing: 4) {
                 Text("מים").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(Int(total), format: .number).font(.hbFixed(waterNumber, .heavy)).monospacedDigit().contentTransition(.numericText(value: total))
-                    Text("/ \(Int(target)) מ״ל").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
+                    Text("/ \(Int(target)) מ״ל").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).lineLimit(1).minimumScaleFactor(0.8)
                 }.animation(.snappy, value: total)
-                HStack(spacing: 10) {
-                    Button { Task { await store.addWater(250) } } label: { Label("250", systemImage: "plus").font(.hb(.subheadline, .semibold)).padding(.horizontal, 14).frame(height: 40).background(Color.proteinBlue.opacity(0.14), in: Capsule()).foregroundStyle(Color.proteinBlueText) }
-                        .buttonStyle(PressableStyle()).accessibilityLabel("הוסף 250 מיליליטר מים")
-                    Button { Task { await store.undoWater() } } label: { Image(systemName: "arrow.uturn.backward").frame(width: 40, height: 40).background(Color.wellnessChip, in: Circle()).foregroundStyle(Color.wellnessInk) }
-                        .buttonStyle(PressableStyle()).disabled(store.dayWaterLogs.isEmpty).accessibilityLabel("ביטול הכוס האחרונה")
-                }
             }.frame(maxWidth: .infinity, alignment: .leading)
-            ProgressRing(value: total, target: target, color: .proteinBlue, symbol: "drop.fill", lineWidth: 8).frame(width: 84, height: 84)
-        }.wellnessCard().sensoryFeedback(.impact(weight: .medium), trigger: store.dayWaterLogs.count)
+            Button { Task { await store.undoWater() } } label: { Image(systemName: "minus").font(.system(size: 16, weight: .semibold)).frame(width: 44, height: 44).background(Color.wellnessChip, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline)).foregroundStyle(Color.wellnessInk) }
+                .buttonStyle(PressableStyle()).disabled(store.dayWaterLogs.isEmpty).accessibilityLabel("ביטול הכוס האחרונה")
+            Button { Task { await store.addWater(250) } } label: { Image(systemName: "plus").font(.system(size: 16, weight: .semibold)).frame(width: 44, height: 44).background(Color.proteinBlue.opacity(0.14), in: Circle()).overlay(Circle().strokeBorder(Color.proteinBlue.opacity(0.5))).foregroundStyle(Color.proteinBlue) }
+                .buttonStyle(PressableStyle()).accessibilityLabel("הוסף 250 מיליליטר מים")
+        }.wellnessCard(padding: 14).sensoryFeedback(.impact(weight: .medium), trigger: store.dayWaterLogs.count)
             .accessibilityElement(children: .contain)
-    }
-}
-
-private struct StepsCard: View {
-    @EnvironmentObject private var store: AppStore
-    @ScaledMetric(relativeTo: .title) private var stepsNumber: CGFloat = 40
-    var body: some View {
-        let steps = store.steps ?? 0
-        HStack(spacing: 18) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("צעדים").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
-                Text(steps, format: .number.precision(.fractionLength(0))).font(.hbFixed(stepsNumber, .heavy)).monospacedDigit()
-                Text("היום · Apple Health").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
-            }.frame(maxWidth: .infinity, alignment: .leading)
-            ProgressRing(value: steps, target: 10_000, color: .wellnessInk, symbol: "figure.walk", lineWidth: 8).frame(width: 84, height: 84)
-        }.wellnessCard().accessibilityElement(children: .combine)
     }
 }
 

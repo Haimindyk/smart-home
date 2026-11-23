@@ -56,6 +56,17 @@ final class HealthReader {
             store.execute(query)
         }
     }
+    func todayActiveEnergy() async throws -> Double? {
+        let end = Date(); let start = Calendar.current.startOfDay(for: end)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: energy, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: result?.sumQuantity()?.doubleValue(for: .kilocalorie())) }
+            }
+            store.execute(query)
+        }
+    }
     static func rowID(_ workout: AppleWorkout, owner: String) throws -> String {
         let digest = SHA256.hash(data: Data(try workout.sourceKey(owner: owner).utf8))
         // RFC 9562 UUIDv8: deterministic application-specific SHA-256 bytes.
