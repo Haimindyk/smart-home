@@ -12,13 +12,17 @@ import WellnessCore
 final class MealAnalysisCenter: ObservableObject {
     static let shared = MealAnalysisCenter()
     enum Phase: Equatable { case analyzing, ready, failed(String) }
-    private struct Pending: Codable { var id: String; var imagePath: String?; var note: String; var createdAt: Date }
+    private struct Pending: Codable { var id: String; var imagePath: String?; var note: String; var createdAt: Date; var entryDate: String? = nil; var entryTime: String? = nil }
 
     @Published private(set) var phase: Phase?
     @Published private(set) var preview: UIImage?
     @Published private(set) var analysis: AppStore.MealAnalysis?
     /// Set when the review sheet should be on screen.
     @Published var presenting = false
+    /// The meal that was saved automatically from the finished analysis (nil when saving failed and the review is needed).
+    @Published private(set) var savedMealID: String?
+    /// Set when the saved meal should be opened for editing.
+    @Published var presentingMealID: String?
     private var task: Task<Void, Never>?
     private var background: UIBackgroundTaskIdentifier = .invalid
     private let defaultsKey = "pendingMealAnalysis"
@@ -29,16 +33,16 @@ final class MealAnalysisCenter: ObservableObject {
     func start(jpeg: Data, note: String, store: AppStore) {
         guard !isBusy else { return }
         try? jpeg.write(to: imageURL, options: .atomic)
-        preview = UIImage(data: jpeg); analysis = nil; presenting = false
-        let pending = Pending(id: UUID().uuidString.lowercased(), imagePath: nil, note: note, createdAt: Date())
+        preview = UIImage(data: jpeg); analysis = nil; presenting = false; savedMealID = nil
+        let pending = Pending(id: UUID().uuidString.lowercased(), imagePath: nil, note: note, createdAt: Date(), entryDate: store.dateKey, entryTime: AppStore.timeKey(Date(), zone: store.timeZone))
         save(pending); run(pending, store: store)
     }
     /// Starts analyzing a spoken/typed description (no photo).
     func startText(description: String, store: AppStore) {
         guard !isBusy else { return }
-        preview = nil; analysis = nil; presenting = false
+        preview = nil; analysis = nil; presenting = false; savedMealID = nil
         try? FileManager.default.removeItem(at: imageURL)
-        let pending = Pending(id: UUID().uuidString.lowercased(), imagePath: nil, note: description, createdAt: Date())
+        let pending = Pending(id: UUID().uuidString.lowercased(), imagePath: nil, note: description, createdAt: Date(), entryDate: store.dateKey, entryTime: AppStore.timeKey(Date(), zone: store.timeZone))
         save(pending); run(pending, store: store, textOnly: true)
     }
     /// Called when the app becomes active: an interrupted job is asked for again with the same id.
@@ -49,9 +53,13 @@ final class MealAnalysisCenter: ObservableObject {
         if let data = try? Data(contentsOf: imageURL) { preview = UIImage(data: data) }
         run(pending, store: store, textOnly: pending.imagePath == nil && preview == nil)
     }
+    /// Shows the outcome: the saved meal for editing, or the review when saving did not work.
+    func openResult() {
+        if let id = savedMealID { presentingMealID = id; clear() } else { presenting = true }
+    }
     func clear() {
         task?.cancel(); task = nil
-        phase = nil; analysis = nil; preview = nil; presenting = false
+        phase = nil; analysis = nil; preview = nil; presenting = false; savedMealID = nil
         UserDefaults.standard.removeObject(forKey: defaultsKey)
         try? FileManager.default.removeItem(at: imageURL)
     }
@@ -75,6 +83,12 @@ final class MealAnalysisCenter: ObservableObject {
             }
             let outcome = await store.runMealAnalysis(imagePath: textOnly ? nil : pending.imagePath, requestID: pending.id, description: pending.note)
             guard !Task.isCancelled else { return }
+            if case .ready(let result) = outcome {
+                // Save right away at the time the meal was entered; the time and details can be edited afterwards.
+                let time = pending.entryTime ?? AppStore.timeKey(pending.createdAt, zone: store.timeZone)
+                let row = await store.saveAnalyzedMealRow(result, items: result.items, kind: AppStore.mealKind(forTime: time), date: pending.entryDate, time: time)
+                self.savedMealID = row?.id
+            }
             self.finishWith(outcome)
         }
     }
@@ -111,7 +125,7 @@ final class MealAnalysisCenter: ObservableObject {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
             let content = UNMutableNotificationContent()
-            content.title = "הארוחה שלך מוכנה"; content.body = "הניתוח הושלם. פתח את האפליקציה כדי לבדוק ולשמור."; content.sound = .default
+            content.title = "הארוחה נשמרה ביומן"; content.body = "הניתוח הושלם והארוחה נוספה. אפשר לבדוק ולערוך את הפרטים והשעה."; content.sound = .default
             UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "meal-analysis-ready", content: content, trigger: nil))
         }
     }
@@ -204,13 +218,13 @@ struct MealAnalysisBanner: View {
                 VStack(alignment: .leading, spacing: 2) {
                     switch phase {
                     case .analyzing: Text("מנתח את הארוחה…").font(.hb(.subheadline, .semibold)); Text("אפשר להמשיך להשתמש באפליקציה").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
-                    case .ready: Text("הניתוח מוכן").font(.hb(.subheadline, .semibold)); Text("בדוק ושמור את הארוחה").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
+                    case .ready: Text(center.savedMealID != nil ? "הארוחה נשמרה ביומן" : "הניתוח מוכן").font(.hb(.subheadline, .semibold)); Text(center.savedMealID != nil ? "אפשר לערוך את הפרטים והשעה" : "בדוק ושמור את הארוחה").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary)
                     case .failed(let message): Text("הניתוח נכשל").font(.hb(.subheadline, .semibold)); Text(message).font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).lineLimit(2)
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 switch phase {
                 case .analyzing: ProgressView()
-                case .ready: Button("בדיקה") { center.presenting = true }.font(.hb(.subheadline, .bold)).padding(.horizontal, 16).frame(minHeight: 38).background(Color.wellnessPrimary, in: Capsule()).foregroundStyle(Color.wellnessOnPrimary).accessibilityIdentifier("analysis-review")
+                case .ready: Button(center.savedMealID != nil ? "עריכה" : "בדיקה") { center.openResult() }.font(.hb(.subheadline, .bold)).padding(.horizontal, 16).frame(minHeight: 38).background(Color.wellnessPrimary, in: Capsule()).foregroundStyle(Color.wellnessOnPrimary).accessibilityIdentifier("analysis-review")
                 case .failed: Button { center.clear() } label: { Image(systemName: "xmark").font(.footnote.weight(.bold)).frame(width: 34, height: 34).background(Color.wellnessChip, in: Circle()) }.accessibilityLabel("סגירה")
                 }
             }

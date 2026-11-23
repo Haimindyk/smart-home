@@ -43,6 +43,9 @@ struct RootShell: View {
         .animation(.snappy, value: network.online)
         .onChange(of: network.online) { _, online in if online, started { Task { await home.refreshIfLive() } } }
         .fullScreenCover(isPresented: $addingMeal) { MealCameraScreen().environmentObject(store).environmentObject(home) }
+        .sheet(item: Binding(get: { analysis.presentingMealID.flatMap { id in store.meals.first { $0.id == id } } }, set: { if $0 == nil { analysis.presentingMealID = nil } })) { meal in
+            NavigationStack { MealDetailScreen(initial: meal) }.environmentObject(store).presentationDragIndicator(.visible)
+        }
         .sheet(isPresented: $analysis.presenting) { MealReviewSheet(center: analysis).environmentObject(store).presentationDragIndicator(.visible) }
         .overlay(alignment: .bottom) { MealAnalysisBanner(center: analysis).padding(.bottom, 104).animation(.snappy, value: analysis.phase) }
         .sheet(isPresented: $addingTask) { QuickAddSheet().environmentObject(home).presentationDetents([.medium]).presentationDragIndicator(.visible) }

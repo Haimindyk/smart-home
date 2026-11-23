@@ -13,6 +13,7 @@ struct MealDetailScreen: View {
     @State private var quantityIndex: Int?
     @State private var removeIndex: Int?
     @State private var copying = false
+    @State private var editingTime = false
     @State private var toast: String?
     @AppStorage("mealDetailHintHidden") private var hintHidden = false
     @ScaledMetric(relativeTo: .largeTitle) private var kcalSize: CGFloat = 64
@@ -56,6 +57,7 @@ struct MealDetailScreen: View {
         .sheet(isPresented: $editingManually) { EditMealSheet(meal: meal).environmentObject(store) }
         .sheet(isPresented: $correcting) { CorrectMealSheet(mealID: initial.id).environmentObject(store).presentationDetents([.medium, .large]).presentationDragIndicator(.visible) }
         .sheet(isPresented: $addingIngredient) { AddIngredientSheet(mealID: initial.id).environmentObject(store) }
+        .sheet(isPresented: $editingTime) { MealTimeSheet(meal: meal).environmentObject(store).presentationDetents([.height(330)]).presentationDragIndicator(.visible) }
         .sheet(isPresented: $copying) { CopyMealSheet(mealID: initial.id) { show("הארוחה הועתקה") }.environmentObject(store).presentationDetents([.medium]) }
         .sheet(isPresented: Binding(get: { quantityIndex != nil }, set: { if !$0 { quantityIndex = nil } })) {
             if let index = quantityIndex { QuantitySheet(mealID: initial.id, index: index).environmentObject(store).presentationDetents([.fraction(0.66)]).presentationDragIndicator(.visible) }
@@ -85,8 +87,11 @@ struct MealDetailScreen: View {
     }
     private var kindChip: some View {
         let kind = ["breakfast": "בוקר", "lunch": "צהריים", "dinner": "ערב", "snack": "נשנוש"][meal.data["kind"].stringValue ?? ""] ?? "ארוחה"
-        return Label(kind, systemImage: "clock").font(.hb(.footnote, .semibold)).foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 7)
-            .background(.black.opacity(0.45), in: Capsule())
+        let time = meal.data["time"].stringValue
+        return Button { editingTime = true } label: {
+            Label(time.map { "\(kind) · \($0)" } ?? kind, systemImage: "clock").font(.hb(.footnote, .semibold)).foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 7)
+                .background(.black.opacity(0.45), in: Capsule())
+        }.accessibilityLabel("שעת הארוחה").accessibilityHint("לשינוי השעה").accessibilityIdentifier("meal-time")
     }
     private var topBar: some View {
         HStack(spacing: 8) {
@@ -441,4 +446,29 @@ private struct CopyMealSheet: View {
 
 private extension Array {
     subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
+}
+
+
+/// Picks the time the meal was eaten.
+private struct MealTimeSheet: View {
+    @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    let meal: HealthRow
+    @State private var time = Date()
+    var body: some View {
+        VStack(spacing: 14) {
+            Text("באיזו שעה אכלת?").font(.hb(.headline, .semibold)).padding(.top, 22)
+            DatePicker("שעה", selection: $time, displayedComponents: .hourAndMinute).datePickerStyle(.wheel).labelsHidden().frame(height: 150)
+                .accessibilityIdentifier("meal-time-picker")
+            Button {
+                Task { if await store.updateMealTime(meal, time: AppStore.timeKey(time, zone: store.timeZone)) { dismiss() } }
+            } label: { Text("שמירה").frame(maxWidth: .infinity) }
+                .buttonStyle(PrimaryButton()).padding(.horizontal, 16).disabled(store.busy).accessibilityIdentifier("meal-time-save")
+        }.padding(.bottom, 12)
+        .onAppear {
+            guard let stored = meal.data["time"].stringValue, stored.count == 5 else { return }
+            let parts = stored.split(separator: ":").compactMap { Int($0) }
+            if parts.count == 2, let date = Calendar.current.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: Date()) { time = date }
+        }
+    }
 }
