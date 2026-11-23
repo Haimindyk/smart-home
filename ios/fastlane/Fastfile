@@ -1,3 +1,4 @@
+require "base64"
 # App Store Connect API-key auth (no Apple ID/2FA in CI). Signing is automatic
 # (Xcode-managed). Same pattern as haimindyk/bruto-neto's ios-app/fastlane.
 default_platform(:ios)
@@ -9,6 +10,22 @@ platform :ios do
     # GitHub-hosted runners start with an empty keychain: use a temporary one so Xcode's
     # cloud-managed signing (API key) can create and use the distribution certificate.
     setup_ci if ENV["FASTLANE_SETUP_CI"] == "1"
+
+    # Reuse the developer's own Apple Development certificate (exported as a CI secret) instead of letting Xcode mint a new
+    # "Created via API" certificate on every fresh runner, which used up the account's certificate limit.
+    if ENV["FASTLANE_SETUP_CI"] == "1" && !ENV["DEV_CERT_P12_BASE64"].to_s.empty?
+      p12_path = File.expand_path("dev_cert.p12", Dir.pwd)
+      File.binwrite(p12_path, Base64.decode64(ENV["DEV_CERT_P12_BASE64"]))
+      File.chmod(0o600, p12_path)
+      import_certificate(
+        certificate_path: p12_path,
+        certificate_password: ENV["DEV_CERT_P12_PASSWORD"].to_s,
+        keychain_name: ENV["MATCH_KEYCHAIN_NAME"],
+        keychain_password: ENV["MATCH_KEYCHAIN_PASSWORD"].to_s,
+        log_output: false
+      )
+      File.delete(p12_path)
+    end
 
     # gym's -showBuildSettings probe resolves SPM packages; the 3s default is too tight.
     ENV["FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT"] ||= "120"
