@@ -389,6 +389,20 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Bread")).firstMatch.waitForExistence(timeout: 10), "The portion picker opens for the manual food")
         capture(app, name: "native-manual-food-portion")
     }
+    func testTodayCarouselSecondPageShowsStepsCaloriesAndWater() {
+        let app = launch("meal")
+        XCTAssertTrue(app.staticTexts["חלבון"].waitForExistence(timeout: 15))
+        // The first page is on the right in RTL: swipe right to reach the activity page.
+        let pager = app.collectionViews.firstMatch
+        pager.swipeRight()
+        if !app.staticTexts["צעדים"].waitForExistence(timeout: 2) { pager.swipeLeft() }
+        sleep(1); capture(app, name: "native-today-activity-page")
+        XCTAssertTrue(app.staticTexts["צעדים"].waitForExistence(timeout: 5), "Second page shows steps")
+        XCTAssertTrue(app.staticTexts["קלוריות שנשרפו"].exists, "...burned calories")
+        XCTAssertTrue(app.staticTexts["מים"].exists, "...and water")
+        let before = app.buttons["הוסף 250 מיליליטר מים"]
+        XCTAssertTrue(before.exists)
+    }
     func testNotificationSettingsScreenOpens() {
         let app = launch("meal")
         XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 15)); app.buttons["settings-button"].tap()

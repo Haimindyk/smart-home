@@ -23,6 +23,7 @@ final class AppStore: ObservableObject {
     @Published private(set) var weightLogs: [HealthRow] = []
     @Published private(set) var candidates: [AppleWorkout] = []
     @Published private(set) var steps: Double?
+    @Published private(set) var burnedKcal: Double?
     @Published private(set) var healthLoaded = false
     @Published var selection: Set<UUID> = []
     @Published var importMessage: String?
@@ -40,6 +41,7 @@ final class AppStore: ObservableObject {
                 session = Session(accessToken: "ui-test", refreshToken: "ui-test", owner: UITestFixtures.owner, member: "11111111-1111-4111-8111-111111111111")
                 profile = .object(["timezone": .string("UTC"), "birthDate": .string("1990-01-01"), "aiProviderConsent": .bool(scenario == "--ui-test-coach")])
                 goals = UITestFixtures.goals(date: dateKey)
+                if scenario == "--ui-test-meal" { steps = 1454; burnedKcal = 320 }
                 if scenario == "--ui-test-meal" || scenario == "--ui-test-coach" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey); plans = UITestFixtures.plans(); weightLogs = UITestFixtures.weights(zone: timeZone); recipes = UITestFixtures.recipes() }
             }
             return
@@ -118,6 +120,19 @@ final class AppStore: ObservableObject {
             publishToWatch()
         } catch { if request == revision, session?.owner == owner { self.error = Self.message(error) } }
     }
+    /// Today's steps and active calories for the Today screen. Does nothing for the UI-test fixtures, and fails quietly when Health is unavailable or denied.
+    func loadTodayActivity() async {
+        guard let owner = session?.owner, session?.accessToken != "ui-test" else { return }
+        do {
+            try await health.requestAccess()
+            async let stepCount = health.todaySteps()
+            async let energy = health.todayActiveEnergy()
+            let (s, e) = (try? await stepCount, try? await energy)
+            guard session?.owner == owner else { return }
+            if let s { steps = s }
+            if let e { burnedKcal = e }
+        } catch {}
+    }
     func readHealth() async {
         guard !busy, let owner = session?.owner else { return }
         busy = true; error = nil; importMessage = nil
@@ -159,7 +174,7 @@ final class AppStore: ObservableObject {
         if let token = PushManager.shared.deviceToken, let owner = session?.owner { try? await backend?.unregisterPushDevice(token: token, owner: owner) }
         revision += 1; healthRevision += 1
         session = nil; meals = []; goals = []; plans = []; workouts = []; profile = .null; profileRow = nil; waterLogs = []; weightLogs = []
-        candidates = []; selection = []; steps = nil; healthLoaded = false; importMessage = nil; error = nil
+        candidates = []; selection = []; steps = nil; burnedKcal = nil; healthLoaded = false; importMessage = nil; error = nil
         busy = false; loading = false; phase = .signingOut
         await backend?.signOut()
         phase = .signedOut
