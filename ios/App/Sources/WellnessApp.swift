@@ -73,7 +73,7 @@ private struct LoginScreen: View {
                     Circle().fill(index < pin.count ? Color.wellnessInk : Color.primary.opacity(0.15)).frame(width: 14, height: 14)
                         .scaleEffect(index < pin.count ? 1.15 : 1).animation(.spring(response: 0.25, dampingFraction: 0.6), value: pin.count)
                 }
-            }.accessibilityHidden(true).sensoryFeedback(.selection, trigger: pin.count)
+            }.environment(\.layoutDirection, .leftToRight).accessibilityHidden(true).sensoryFeedback(.selection, trigger: pin.count)
             SecureField("הקוד האישי שלך", text: $pin)
                 .keyboardType(.numberPad).textContentType(.password)
                 .multilineTextAlignment(.center).font(.hb(.title2)).monospacedDigit()
