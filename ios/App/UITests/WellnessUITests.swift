@@ -462,6 +462,20 @@ final class WellnessUITests: XCTestCase {
         app.buttons["quantity-save"].tap()
         XCTAssertTrue(app.buttons["meal-done"].waitForExistence(timeout: 5), "Saving returns to the meal")
     }
+    func testTrainingContributionConsentFlow() {
+        let app = launch("meal")
+        XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 15)); app.buttons["settings-button"].tap()
+        let entry = app.buttons["training-data"]
+        var tries = 0
+        while !entry.exists && tries < 4 { app.swipeUp(); tries += 1 }
+        XCTAssertTrue(entry.waitForExistence(timeout: 5)); entry.tap()
+        let consent = app.buttons["training-consent"]
+        XCTAssertTrue(consent.waitForExistence(timeout: 8), "The model-improvement screen offers the opt-in")
+        XCTAssertFalse(app.staticTexts["training-count"].exists, "Nothing is shared before consent")
+        capture(app, name: "native-training-data")
+        consent.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["training-count"].waitForExistence(timeout: 5), "After opting in, the shared-examples counter appears")
+    }
     func testCameraScansThenOffersReview() {
         let app = launch("meal-ai")
         XCTAssertTrue(app.buttons["add-meal"].waitForExistence(timeout: 15)); app.buttons["add-meal"].tap()

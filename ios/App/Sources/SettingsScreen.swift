@@ -32,6 +32,9 @@ struct SettingsScreen: View {
                         NavigationLink { NotificationSettingsScreen() } label: { row("התראות", "bell.fill", Color.fatCoral) }
                             .buttonStyle(PressableStyle()).accessibilityIdentifier("notification-settings")
                         divider
+                        NavigationLink { TrainingDataScreen() } label: { row("שיפור המודל", "wand.and.stars", Color.purple, detail: "שתף תיקונים כדי שהזיהוי ישתפר") }
+                            .buttonStyle(PressableStyle()).accessibilityIdentifier("training-data")
+                        divider
                         NavigationLink { FoodLibraryScreen() } label: { row("הספרייה שלי", "books.vertical.fill", Color.proteinBlue, detail: "מועדפים ומתכונים") }
                             .buttonStyle(PressableStyle()).accessibilityIdentifier("food-library")
                     }.wellnessCard(padding: 6)
