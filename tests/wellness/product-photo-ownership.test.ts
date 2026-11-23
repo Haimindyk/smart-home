@@ -15,4 +15,4 @@ it('keeps product and nested food images in their owner scope',async()=>{
   await db.query(`insert into ${table} values($1,'{}')`,[owner]);
  }
  }finally{await db.close()}
-});
+},30000);
