@@ -64,6 +64,8 @@ jobs:
           SUPABASE_PUBLIC_KEY: ${{ secrets.SUPABASE_PUBLIC_KEY }}
           GITHUB_RUN_NUMBER: "900"
           FASTLANE_SETUP_CI: "1"
+          DEV_CERT_P12_BASE64: ${{ secrets.DEV_CERT_P12_BASE64 }}
+          DEV_CERT_P12_PASSWORD: ${{ secrets.DEV_CERT_P12_PASSWORD }}
           LANG: en_US.UTF-8
           LC_ALL: en_US.UTF-8
         run: bundle exec fastlane build_check
@@ -100,6 +102,8 @@ jobs:
           SUPABASE_PUBLIC_KEY: ${{ secrets.SUPABASE_PUBLIC_KEY }}
           GITHUB_RUN_NUMBER: "950"
           FASTLANE_SETUP_CI: "1"
+          DEV_CERT_P12_BASE64: ${{ secrets.DEV_CERT_P12_BASE64 }}
+          DEV_CERT_P12_PASSWORD: ${{ secrets.DEV_CERT_P12_PASSWORD }}
           LANG: en_US.UTF-8
           LC_ALL: en_US.UTF-8
         run: bundle exec fastlane adhoc
