@@ -18,6 +18,7 @@ struct RootShell: View {
     @State private var addingTask = false
     @State private var addingEvent = false
     @StateObject private var network = NetworkMonitor()
+    @ObservedObject private var analysis = MealAnalysisCenter.shared
     @Namespace private var pill
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -32,16 +33,18 @@ struct RootShell: View {
         }
         .transition(.opacity)
         .sensoryFeedback(.selection, trigger: tab)
-        .onChange(of: scenePhase) { _, phase in if phase == .active, started { Task { await home.refreshIfLive() } } }
+        .onChange(of: scenePhase) { _, phase in if phase == .active, started { Task { await home.refreshIfLive() }; analysis.resumeIfNeeded(store: store) } }
         // Other household members' changes show up without pulling to refresh (the web app uses realtime; this polls while the home or calendar is open).
         .task(id: tab) { guard tab != .health else { return }; while !Task.isCancelled { try? await Task.sleep(for: .seconds(25)); if !Task.isCancelled, scenePhase == .active { await home.refreshIfLive() } } }
         .onChange(of: home.openHealthRequested) { _, requested in if requested { home.openHealthRequested = false; withAnimation(.snappy) { tab = .health } } }
-        .task { home.bind(store); if !started { started = true; tab = store.startsOnHealth ? .health : .home; await home.refresh(); await PushManager.shared.refresh(); await PushManager.shared.uploadIfPossible() } }
+        .task { home.bind(store); if !started { started = true; tab = store.startsOnHealth ? .health : .home; analysis.resumeIfNeeded(store: store); await home.refresh(); await PushManager.shared.refresh(); await PushManager.shared.uploadIfPossible() } }
         .safeAreaInset(edge: .bottom, spacing: 0) { bar }
         .safeAreaInset(edge: .top, spacing: 0) { if !network.online { OfflineBanner().transition(.move(edge: .top).combined(with: .opacity)) } }
         .animation(.snappy, value: network.online)
         .onChange(of: network.online) { _, online in if online, started { Task { await home.refreshIfLive() } } }
-        .sheet(isPresented: $addingMeal) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }
+        .fullScreenCover(isPresented: $addingMeal) { MealCameraScreen().environmentObject(store).environmentObject(home) }
+        .sheet(isPresented: $analysis.presenting) { MealReviewSheet(center: analysis).environmentObject(store).presentationDragIndicator(.visible) }
+        .overlay(alignment: .bottom) { MealAnalysisBanner(center: analysis).padding(.bottom, 104).animation(.snappy, value: analysis.phase) }
         .sheet(isPresented: $addingTask) { QuickAddSheet().environmentObject(home).presentationDetents([.medium]).presentationDragIndicator(.visible) }
         .sheet(isPresented: $addingEvent) { EventEditorSheet(event: nil).environmentObject(home).presentationDragIndicator(.visible) }
     }

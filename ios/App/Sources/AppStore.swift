@@ -600,28 +600,67 @@ final class AppStore: ObservableObject {
             return session?.owner == owner ? .success(result) : .failure(.sessionChanged)
         } catch let error as BackendError { return .failure(error) } catch { return .failure(.connection) }
     }
+    enum AnalysisOutcome { case ready(MealAnalysis); case failed(String) }
+    var isFixture: Bool { isFixtureSession }
+    func reportError(_ message: String) { error = message }
+    /// Uploads the photo and analyzes it (used by the older "meal from photo" sheet).
     func analyzeMeal(jpeg: Data, description: String) async -> MealAnalysis? {
         guard aiEligible, aiConsented, let owner = session?.owner, let backend else { return nil }
         do {
             let path = try await backend.uploadImage(jpeg, owner: owner)
-            // The AI provider fails now and then; one automatic retry (with a fresh request id) hides most of those.
-            func analyze() async throws -> JSONValue {
-                try await backend.invoke("nutrition-analyze", body: .object(["imagePath": .string(path), "requestId": .string(UUID().uuidString.lowercased()), "mode": .string("meal"), "automatic": .bool(true), "description": .string(description)]), owner: owner)
+            switch await runMealAnalysis(imagePath: path, requestID: UUID().uuidString.lowercased(), description: description) {
+            case .ready(let analysis): return analysis
+            case .failed(let message): if !message.isEmpty, session?.owner == owner { self.error = message }; return nil
             }
-            let raw: JSONValue
-            do { raw = try await analyze() } catch is CancellationError { throw CancellationError() } catch { raw = try await analyze() }
-            guard session?.owner == owner else { return nil }
-            let items = raw["items"].arrayValue.compactMap { item -> JSONValue? in
-                guard let name = item["name"].stringValue, let quantity = item["quantity"].doubleValue, quantity > 0, item["per100"] != .null else { return nil }
-                var food: [String: JSONValue] = ["id": .string(UUID().uuidString.lowercased()), "name": .string(name), "basis": item["basis"].stringValue == "ml" ? .string("ml") : .string("g"), "source": item["source"].stringValue.map { .string($0) } ?? .string("ai"), "per100": item["per100"]]
-                if let sourceId = item["sourceId"].stringValue { food["sourceId"] = .string(sourceId) }
-                var fields: [String: JSONValue] = ["id": .string(UUID().uuidString.lowercased()), "food": .object(food), "quantity": .number(min(10_000, quantity))]
-                if let assumption = item["assumption"].stringValue { fields["assumption"] = .string(assumption) }
-                return .object(fields)
-            }
-            guard let analysisId = raw["analysisId"].stringValue, !items.isEmpty else { self.error = "לא הצלחנו לזהות את הארוחה. אפשר לנסות תמונה אחרת או להוסיף ידנית."; return nil }
-            return MealAnalysis(items: items, needsClarification: raw["needsClarification"].boolValue == true, question: raw["question"].stringValue ?? "", analysisId: analysisId, imagePath: path)
         } catch { if session?.owner == owner { self.error = "הניתוח לא הושלם. בדוק חיבור ונסה שוב." }; return nil }
+    }
+    /// Runs the AI estimate for an uploaded photo (or, with no image, a text description). The request id makes it safe to
+    /// ask again after the app was interrupted: the server returns the stored result, or says it is still busy and we wait.
+    func runMealAnalysis(imagePath: String?, requestID: String, description: String) async -> AnalysisOutcome {
+        guard aiEligible, aiConsented else { return .failed("ה־AI לא זמין. בדוק את הגיל ואת ההסכמה בהגדרות.") }
+        if isFixtureSession {
+            try? await Task.sleep(for: .seconds(7))
+            return .ready(Self.fixtureAnalysis(imagePath: imagePath ?? ""))
+        }
+        guard let owner = session?.owner, let backend else { return .failed("לא מחובר. התחבר מחדש ונסה שוב.") }
+        var id = requestID, retried = false, busyWaits = 0
+        while !Task.isCancelled {
+            do {
+                var body: [String: JSONValue] = ["requestId": .string(id), "mode": .string(imagePath == nil ? "text" : "meal"), "automatic": .bool(true), "description": .string(description)]
+                if let imagePath { body["imagePath"] = .string(imagePath) }
+                let raw = try await backend.invoke("nutrition-analyze", body: .object(body), owner: owner)
+                guard session?.owner == owner else { return .failed("") }
+                let items = raw["items"].arrayValue.compactMap { item -> JSONValue? in
+                    guard let name = item["name"].stringValue, let quantity = item["quantity"].doubleValue, quantity > 0, item["per100"] != .null else { return nil }
+                    var food: [String: JSONValue] = ["id": .string(UUID().uuidString.lowercased()), "name": .string(name), "basis": item["basis"].stringValue == "ml" ? .string("ml") : .string("g"), "source": item["source"].stringValue.map { .string($0) } ?? .string("ai"), "per100": item["per100"]]
+                    if let sourceId = item["sourceId"].stringValue { food["sourceId"] = .string(sourceId) }
+                    var fields: [String: JSONValue] = ["id": .string(UUID().uuidString.lowercased()), "food": .object(food), "quantity": .number(min(10_000, quantity))]
+                    if let assumption = item["assumption"].stringValue { fields["assumption"] = .string(assumption) }
+                    return .object(fields)
+                }
+                guard let analysisId = raw["analysisId"].stringValue, !items.isEmpty else { return .failed("לא הצלחנו לזהות את הארוחה. אפשר לנסות תמונה אחרת או להוסיף ידנית.") }
+                return .ready(MealAnalysis(items: items, needsClarification: raw["needsClarification"].boolValue == true, question: raw["question"].stringValue ?? "", analysisId: analysisId, imagePath: imagePath ?? ""))
+            } catch let error as BackendError {
+                if case .server(409) = error, busyWaits < 40 { busyWaits += 1; try? await Task.sleep(for: .seconds(3)); continue }
+                if !retried { retried = true; id = UUID().uuidString.lowercased(); continue }
+                return .failed("הניתוח לא הושלם. בדוק חיבור ונסה שוב.")
+            } catch is CancellationError { return .failed("") }
+            catch { if !retried { retried = true; id = UUID().uuidString.lowercased(); continue }; return .failed("הניתוח לא הושלם. בדוק חיבור ונסה שוב.") }
+        }
+        return .failed("")
+    }
+    static func fixtureAnalysis(imagePath: String) -> MealAnalysis {
+        func item(_ name: String, _ grams: Double, _ per100: [String: Double], note: String? = nil) -> JSONValue {
+            var fields: [String: JSONValue] = ["id": .string(UUID().uuidString.lowercased()), "quantity": .number(grams),
+                "food": .object(["id": .string(UUID().uuidString.lowercased()), "name": .string(name), "basis": .string("g"), "source": .string("ai"), "per100": .object(per100.mapValues { .number($0) })])]
+            if let note { fields["assumption"] = .string(note) }
+            return .object(fields)
+        }
+        return MealAnalysis(items: [
+            item("חזה עוף בגריל", 200, ["kcal": 153, "protein": 30, "carbs": 0, "fat": 3.5], note: "הנחה: חזה עוף. אפשר לתקן."),
+            item("אורז לבן מבושל", 180, ["kcal": 126, "protein": 2.7, "carbs": 28, "fat": 0.3]),
+            item("שמן בישול — הערכת מתכון", 8, ["kcal": 900, "protein": 0, "carbs": 0, "fat": 100], note: "שמן משוער למנה שנאכלה. ניתן לתקן.")],
+            needsClarification: false, question: "", analysisId: "fixture-analysis", imagePath: imagePath)
     }
     /// "Fix with AI": sends the user's correction ("this is rice, not pasta") to the server, which re-estimates the saved meal's items.
     func correctMeal(_ row: HealthRow, text: String) async -> Bool {
@@ -647,7 +686,9 @@ final class AppStore: ObservableObject {
     func saveAnalyzedMeal(_ analysis: MealAnalysis, items: [JSONValue], kind: String) async -> Bool {
         guard !items.isEmpty else { return false }
         let name = items.first?["food"]["name"].stringValue ?? ""
-        let payload: JSONValue = .object(["date": .string(dateKey), "kind": .string(kind), "name": .string(name), "items": .array(items), "imagePath": .string(analysis.imagePath), "aiEstimate": .object(["analysisId": .string(analysis.analysisId)])])
+        var fields: [String: JSONValue] = ["date": .string(dateKey), "kind": .string(kind), "name": .string(name), "items": .array(items), "aiEstimate": .object(["analysisId": .string(analysis.analysisId)])]
+        if !analysis.imagePath.isEmpty { fields["imagePath"] = .string(analysis.imagePath) }
+        let payload: JSONValue = .object(fields)
         return await write("לא הצלחנו לשמור את הארוחה.") { backend, owner in
             let row = try await backend.save(table: "meals", owner: owner, payload: payload)
             if session?.owner == owner { meals.append(row) }
