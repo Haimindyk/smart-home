@@ -16,9 +16,11 @@ final class WellnessUITests: XCTestCase {
     /// The simulator can raise unrelated system dialogs (e.g. Apple ID verification) over the app; dismiss them.
     func dismissSystemAlerts(for app: XCUIApplication) {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        for label in ["לא כעת", "Not Now", "אל תאפשר", "Don’t Allow", "אישור", "OK"] {
-            let button = springboard.alerts.buttons[label]
-            if button.waitForExistence(timeout: 1.5) { button.tap(); break }
+        // One quick look (an alert that shows up later is handled by the interruption monitor): never wait per label.
+        if springboard.alerts.firstMatch.waitForExistence(timeout: 1) {
+            for label in ["לא כעת", "Not Now", "אל תאפשר", "Don’t Allow", "אישור", "OK"] where springboard.alerts.buttons[label].exists {
+                springboard.alerts.buttons[label].tap(); break
+            }
         }
         if app.state != .runningForeground { app.activate() }
     }
@@ -475,6 +477,12 @@ final class WellnessUITests: XCTestCase {
         capture(app, name: "native-training-data")
         consent.tap()
         XCTAssertTrue(app.descendants(matching: .any)["training-count"].waitForExistence(timeout: 5), "After opting in, the shared-examples counter appears")
+    }
+    func testHealthScreenScrollsToTheEnd() {
+        let app = launch("meal")
+        XCTAssertTrue(app.buttons["add-meal"].waitForExistence(timeout: 15))
+        for _ in 0..<6 { app.swipeUp() }
+        capture(app, name: "native-health-scrolled-end")
     }
     func testCameraScansThenOffersReview() {
         let app = launch("meal-ai")

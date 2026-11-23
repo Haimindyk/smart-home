@@ -75,6 +75,7 @@ struct ActivityScreen: View {
                     if let message = store.importMessage { Label(message, systemImage: "checkmark.circle.fill").foregroundStyle(.green).sensoryFeedback(.success, trigger: message) }
                     Button { privacy = true } label: { Text("מה נשמר בחשבון?").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
                 }.padding(16)
+            .contentMargins(.bottom, 110, for: .scrollContent)  // clear of the floating tab bar and add button
             }.wellnessScreen().safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }.toolbar(.hidden, for: .navigationBar).refreshable { await store.readHealth() }
                 .sheet(isPresented: $privacy) { HealthPrivacySheet() }
         }
