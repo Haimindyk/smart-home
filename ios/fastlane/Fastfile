@@ -60,9 +60,9 @@ platform :ios do
     )
   end
 
-  desc "Build and sign exactly like beta, but do not upload (used to validate the release toolchain on pull requests)"
+  desc "Compile the Release archive without signing or uploading (validates the release toolchain on pull requests). Signing here would mint a new Apple certificate on every PR run and exhaust the account's certificate limit."
   lane :build_check do
-    build_signed_app
+    sh("xcodebuild archive -project \"#{File.expand_path('../App/SmartHomeWellness.xcodeproj', Dir.pwd)}\" -scheme SmartHomeWellness -configuration Release -destination 'generic/platform=iOS' -archivePath \"#{File.expand_path('../build/check.xcarchive', Dir.pwd)}\" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=\"\"")
   end
 
   desc "Ad-hoc build for devices registered in the developer account (installed directly, no TestFlight, not uploaded anywhere)"

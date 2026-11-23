@@ -21,7 +21,13 @@ struct WorkoutsScreen: View {
                             .buttonStyle(PressableStyle()).accessibilityIdentifier("new-plan")
                     }
                     if store.activePlans.isEmpty {
-                        ContentUnavailableView("עוד אין תוכנית", systemImage: "dumbbell", description: Text("תוכניות שתיצור בחשבון יופיעו כאן."))
+                        ContentUnavailableView {
+                            Label("עוד אין תוכנית", systemImage: "dumbbell")
+                        } description: {
+                            Text("צור תוכנית משלך, או בקש מהמאמן ה־AI להרכיב אחת.")
+                        } actions: {
+                            Button { creating = true } label: { Label("תוכנית חדשה", systemImage: "plus") }.buttonStyle(.borderedProminent).tint(Color.wellnessPrimary)
+                        }
                     }
                     ForEach(store.activePlans) { plan in
                         NavigationLink { PlanDetail(plan: plan) } label: {
@@ -37,7 +43,7 @@ struct WorkoutsScreen: View {
                         .contextMenu { Button(role: .destructive) { planToArchive = plan } label: { Label("העבר לארכיון", systemImage: "archivebox") } }
                     }
                     Text("יומן האימונים").sectionTitle()
-                    if history.isEmpty { ContentUnavailableView("עוד אין אימונים ביומן", systemImage: "calendar") }
+                    if history.isEmpty { ContentUnavailableView("עוד אין אימונים ביומן", systemImage: "calendar", description: Text("אימון שתתחיל מתוכנית יירשם כאן.")) }
                     ForEach(history) { workout in
                         NavigationLink { WorkoutDetail(workout: workout) } label: {
                             HStack {
