@@ -4,7 +4,7 @@ default_platform(:ios)
 
 platform :ios do
   before_all do |lane|
-    next unless [:beta, :build_check].include?(lane)
+    next unless [:beta, :build_check, :adhoc].include?(lane)
 
     # GitHub-hosted runners start with an empty keychain: use a temporary one so Xcode's
     # cloud-managed signing (API key) can create and use the distribution certificate.
@@ -46,12 +46,12 @@ platform :ios do
     File.delete(ENV["ASC_API_KEY_PATH"]) if ENV["ASC_API_KEY_PATH"] && File.exist?(ENV["ASC_API_KEY_PATH"])
   end
 
-  private_lane :build_signed_app do
+  private_lane :build_signed_app do |options|
     build_number = ENV["GITHUB_RUN_NUMBER"] || (latest_testflight_build_number + 1)
     build_app(
       project: File.expand_path("../App/SmartHomeWellness.xcodeproj", Dir.pwd),
       scheme: "SmartHomeWellness",
-      export_method: "app-store",
+      export_method: options[:export_method] || "app-store",
       xcargs: "-allowProvisioningUpdates -authenticationKeyPath #{ENV['ASC_API_KEY_PATH']} -authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']} -authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_API_ISSUER_ID']} CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=#{ENV['APPLE_DEVELOPER_TEAM_ID']} CURRENT_PROJECT_VERSION=#{build_number}",
       export_options: {
         signingStyle: "automatic",
@@ -63,6 +63,11 @@ platform :ios do
   desc "Compile the Release archive without signing or uploading (validates the release toolchain on pull requests). Signing here would mint a new Apple certificate on every PR run and exhaust the account's certificate limit."
   lane :build_check do
     sh("xcodebuild archive -project \"#{File.expand_path('../App/SmartHomeWellness.xcodeproj', Dir.pwd)}\" -scheme SmartHomeWellness -configuration Release -destination 'generic/platform=iOS' -archivePath \"#{File.expand_path('../build/check.xcarchive', Dir.pwd)}\" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=\"\"")
+  end
+
+  desc "Ad-hoc build for devices registered in the developer account (installed directly, no TestFlight, not uploaded anywhere)"
+  lane :adhoc do
+    build_signed_app(export_method: "ad-hoc")
   end
 
   desc "Build, sign, and upload to TestFlight Internal"

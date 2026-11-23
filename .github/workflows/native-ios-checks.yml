@@ -68,3 +68,44 @@ jobs:
           LC_ALL: en_US.UTF-8
         run: bundle exec fastlane build_check
         working-directory: ios/fastlane
+
+  # An ad-hoc signed IPA for the devices registered in the developer account. It is only kept as a short-lived
+  # workflow artifact (never published) so it can be installed straight onto a registered iPhone without TestFlight.
+  adhoc-ipa:
+    runs-on: xcode-27
+    environment: beta
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 27.2
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.2.app
+          xcodebuild -version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Install Fastlane
+        run: |
+          rm -f Gemfile.lock
+          bundle install
+        working-directory: ios/fastlane
+      - name: Build and sign ad-hoc
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.ASC_API_KEY }}
+          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
+          SUPABASE_PUBLIC_KEY: ${{ secrets.SUPABASE_PUBLIC_KEY }}
+          GITHUB_RUN_NUMBER: "950"
+          FASTLANE_SETUP_CI: "1"
+          LANG: en_US.UTF-8
+          LC_ALL: en_US.UTF-8
+        run: bundle exec fastlane adhoc
+        working-directory: ios/fastlane
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adhoc-ipa
+          path: ios/SmartHomeWellness.ipa
+          retention-days: 3
