@@ -57,7 +57,7 @@ struct AddMealSheet: View {
                         ForEach(store.recentMeals) { meal in
                             Button { Task { if await store.relogMeal(meal, kind: currentKind()) { dismiss() } } } label: { RecentRow(meal: meal) }.buttonStyle(PressableStyle())
                         }
-                    } }.sensoryFeedback(.success, trigger: store.meals.count)
+                    } }.scrollClipDisabled().sensoryFeedback(.success, trigger: store.meals.count)
                 }
                 else if results.isEmpty {
                     ContentUnavailableView(searched ? "לא נמצאו מוצרים" : "מה אכלת?", systemImage: searched ? "questionmark.circle" : "fork.knife",
@@ -67,7 +67,7 @@ struct AddMealSheet: View {
                         ForEach(results) { choice in
                             Button { picked = choice } label: { FoodRow(food: choice.food) }.buttonStyle(PressableStyle())
                         }
-                    } }
+                    } }.scrollClipDisabled()
                 }
                 Spacer(minLength: 0)
             }
@@ -192,8 +192,38 @@ private struct PortionSheet: View {
     }
 }
 
+/// Camera barcode reader with a visible scan frame and a sweeping line, so it is obvious the scanner is live.
+struct BarcodeScanner: View {
+    let onCode: (String) -> Void
+    @State private var sweep = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private let frame = CGSize(width: 280, height: 170)
+    var body: some View {
+        ZStack {
+            BarcodeCamera(onCode: onCode)
+            Color.black.opacity(0.45).reverseMask { RoundedRectangle(cornerRadius: 22, style: .continuous).frame(width: frame.width, height: frame.height) }.allowsHitTesting(false)
+            RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white, lineWidth: 3).frame(width: frame.width, height: frame.height).allowsHitTesting(false)
+            Rectangle().fill(LinearGradient(colors: [.clear, .red.opacity(0.9), .clear], startPoint: .leading, endPoint: .trailing))
+                .frame(width: frame.width - 28, height: 3).shadow(color: .red.opacity(0.8), radius: 6)
+                .offset(y: sweep ? frame.height / 2 - 16 : -(frame.height / 2 - 16)).allowsHitTesting(false)
+            VStack {
+                Spacer()
+                Label("מחפש ברקוד…", systemImage: "barcode.viewfinder").font(.hb(.headline, .semibold)).foregroundStyle(.white)
+                    .padding(.horizontal, 18).padding(.vertical, 12).background(.black.opacity(0.55), in: Capsule()).padding(.bottom, 60)
+            }.allowsHitTesting(false)
+        }
+        .accessibilityElement(children: .contain).accessibilityLabel("סורק ברקוד פעיל")
+        .onAppear { if !reduceMotion { withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) { sweep = true } } }
+    }
+}
+private extension View {
+    func reverseMask<M: View>(@ViewBuilder _ mask: () -> M) -> some View {
+        self.mask { Rectangle().overlay { mask().blendMode(.destinationOut) }.compositingGroup() }
+    }
+}
+
 /// Camera barcode reader (EAN/UPC/Code128). Reports the first valid code once.
-struct BarcodeScanner: UIViewControllerRepresentable {
+struct BarcodeCamera: UIViewControllerRepresentable {
     let onCode: (String) -> Void
     func makeUIViewController(context: Context) -> ScannerController { let c = ScannerController(); c.onCode = onCode; return c }
     func updateUIViewController(_ controller: ScannerController, context: Context) {}

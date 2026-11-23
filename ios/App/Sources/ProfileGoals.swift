@@ -72,8 +72,10 @@ struct ProfileGoalsSheet: View {
                 if let age = try? GoalCalculator.calendarAge(birthDate: day(birth), on: day(Date())) { Text("הגיל שלך היום: \(age)").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary) }
             }
             HStack(spacing: 12) {
-                TextField("גובה בס״מ", text: $height).keyboardType(.decimalPad).padding(14).background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 14, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.wellnessHairline)).accessibilityIdentifier("profile-height")
-                TextField("משקל בק״ג", text: $weight).keyboardType(.decimalPad).padding(14).background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 14, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.wellnessHairline)).accessibilityIdentifier("profile-weight")
+                VStack(alignment: .leading, spacing: 6) { Text("גובה (ס״מ)").font(.hb(.caption, .semibold)).foregroundStyle(Color.wellnessSecondary)
+                TextField("גובה בס״מ", text: $height).keyboardType(.decimalPad).padding(14).background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 14, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.wellnessHairline)).accessibilityIdentifier("profile-height") }
+                VStack(alignment: .leading, spacing: 6) { Text("משקל (ק״ג)").font(.hb(.caption, .semibold)).foregroundStyle(Color.wellnessSecondary)
+                TextField("משקל בק״ג", text: $weight).keyboardType(.decimalPad).padding(14).background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 14, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.wellnessHairline)).accessibilityIdentifier("profile-weight") }
             }
             Text("נתון פיזיולוגי לחישוב").font(.hb(.subheadline, .semibold))
             HStack(spacing: 12) {

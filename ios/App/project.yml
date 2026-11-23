@@ -44,10 +44,11 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         ITSAppUsesNonExemptEncryption: false
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIAppFonts: [Fonts/Heebo-Regular.ttf, Fonts/Heebo-Medium.ttf, Fonts/Heebo-SemiBold.ttf, Fonts/Heebo-Bold.ttf, Fonts/Heebo-ExtraBold.ttf]
-        NSCameraUsageDescription: המצלמה משמשת רק לסריקת ברקוד של מוצר כדי להוסיף אותו לארוחה. התמונה לא נשמרת.
+        NSCameraUsageDescription: המצלמה משמשת לסריקת ברקוד של מוצר ולצילום ארוחה לניתוח תזונתי בבינה מלאכותית. תמונת ארוחה נשלחת לניתוח רק כשתבחר לנתח אותה.
         NSHealthUpdateUsageDescription: האפליקציה לא כותבת נתונים ל־Apple Health; ההרשאה נדרשת על ידי Apple עבור גישת HealthKit לקריאה בלבד.
         NSHealthShareUsageDescription: הצגת פעילות וייבוא אימונים שתבחר מ־Apple Health לחשבון שלך. לא נכתוב נתונים ל־Apple Health.
         SUPABASE_HOST: $(SUPABASE_HOST)

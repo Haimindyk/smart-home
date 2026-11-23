@@ -1,4 +1,5 @@
 import SwiftUI
+import Network
 
 /// Shared look & feel: warm canvas, soft white cards, rounded numerals, springy touch feedback.
 private func adaptive(_ light: (Double, Double, Double), _ dark: (Double, Double, Double), lightAlpha: Double = 1, darkAlpha: Double = 1) -> Color {
@@ -137,5 +138,65 @@ struct Shimmer: ViewModifier {
 extension View {
     func shimmer(_ active: Bool) -> some View { modifier(Shimmer(active: active)) }
     /// Grouped list that follows the app canvas and card colors (light and dark).
-    func wellnessList() -> some View { scrollContentBackground(.hidden).background(Color.wellnessCanvas.ignoresSafeArea()).font(.hb(.body)).tint(Color.wellnessPrimary).listSectionSpacing(10).environment(\.defaultMinListRowHeight, 40) }
+    func wellnessList() -> some View { scrollContentBackground(.hidden).scrollDismissesKeyboard(.interactively).keyboardDoneButton().background(Color.wellnessCanvas.ignoresSafeArea()).font(.hb(.body)).tint(Color.wellnessPrimary).listSectionSpacing(10).environment(\.defaultMinListRowHeight, 40) }
+}
+
+/// Non-blocking error banner that slides in from the top and dismisses itself.
+struct ErrorBanner: ViewModifier {
+    @Binding var message: String?
+    func body(content: Content) -> some View {
+        content.overlay(alignment: .top) {
+            if let message {
+                Button { self.message = nil } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.white)
+                        Text(message).font(.hb(.subheadline, .semibold)).foregroundStyle(.white).multilineTextAlignment(.leading)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 12)
+                    .background(Color.red.opacity(0.92), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
+                }
+                .buttonStyle(.plain).padding(.horizontal, 16).padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .sensoryFeedback(.error, trigger: message)
+                .accessibilityIdentifier("error-banner")
+                .task(id: message) { try? await Task.sleep(for: .seconds(4)); withAnimation { self.message = nil } }
+            }
+        }.animation(.spring(duration: 0.35), value: message)
+    }
+}
+extension View { func errorBanner(_ message: Binding<String?>) -> some View { modifier(ErrorBanner(message: message)) } }
+
+extension View {
+    /// "Done" above the keyboard, so number pads (which have no return key) can be dismissed.
+    func keyboardDoneButton() -> some View {
+        toolbar { ToolbarItemGroup(placement: .keyboard) {
+            Spacer()
+            Button("סיום") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }.accessibilityIdentifier("keyboard-done")
+        } }
+    }
+}
+
+/// Tracks connectivity so the app can say when it is offline (the web app shows the same banner).
+@MainActor final class NetworkMonitor: ObservableObject {
+    @Published private(set) var online = true
+    private let monitor = NWPathMonitor()
+    init() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            let ok = path.status == .satisfied
+            Task { @MainActor in self?.online = ok }
+        }
+        monitor.start(queue: DispatchQueue(label: "kh.network-monitor"))
+    }
+    deinit { monitor.cancel() }
+}
+struct OfflineBanner: View {
+    var body: some View {
+        Label("אין חיבור לאינטרנט. שינויים לא יישמרו עד שהחיבור יחזור.", systemImage: "wifi.slash")
+            .font(.hb(.footnote, .semibold)).foregroundStyle(Color.amberInk)
+            .frame(maxWidth: .infinity).padding(.vertical, 7).padding(.horizontal, 12)
+            .background(Color.amberTint)
+            .accessibilityIdentifier("offline-banner")
+    }
 }

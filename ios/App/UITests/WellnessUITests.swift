@@ -380,9 +380,11 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(manual.waitForExistence(timeout: 8)); manual.tap()
         let name = app.textFields["manual-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("Bread")
+        let done = app.buttons["keyboard-done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5), "The keyboard has a Done button"); done.tap()
         let fields = app.textFields.matching(NSPredicate(format: "placeholderValue == %@", "0"))
         XCTAssertGreaterThanOrEqual(fields.count, 4)
-        for (i, value) in ["250", "9", "45", "3"].enumerated() { let f = fields.element(boundBy: i); f.tap(); f.typeText(value) }
+        for (i, value) in ["250", "9", "45", "3"].enumerated() { let f = fields.element(boundBy: i); f.tap(); f.typeText(value); if done.exists { done.tap() } }
         app.buttons["manual-continue"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Bread")).firstMatch.waitForExistence(timeout: 10), "The portion picker opens for the manual food")
         capture(app, name: "native-manual-food-portion")

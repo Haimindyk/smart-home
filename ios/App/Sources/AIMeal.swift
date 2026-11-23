@@ -125,16 +125,28 @@ struct AIMealSheet: View {
 struct AIConsentView: View {
     @EnvironmentObject private var store: AppStore
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Image(systemName: "sparkles").font(.hb(.largeTitle)).foregroundStyle(.flame)
+        VStack(spacing: 18) {
+            Spacer(minLength: 0)
+            Image(systemName: "sparkles").font(.system(size: 34, weight: .semibold)).foregroundStyle(.white).frame(width: 84, height: 84)
+                .background(LinearGradient(colors: [Color(red: 1, green: 0.62, blue: 0.25), Color(red: 1, green: 0.38, blue: 0.38)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 27, style: .continuous))
+                .shadow(color: Color(red: 1, green: 0.45, blue: 0.3).opacity(0.35), radius: 16, y: 8)
             Text("אישור שימוש ב־AI").font(.hb(.title2, .bold))
-            Text("אישור שימוש ב־AI שולח את תוכן הבקשה הדרוש ל־Cloudflare. התוצאות דורשות בדיקה ואישור שלך.")
-            Text("שם, PIN ופרופיל גוף מלא אינם נשלחים אוטומטית. אין שימוש בתוכן לאימון המודלים. אפשר לבטל בהגדרות.").foregroundStyle(Color.wellnessSecondary)
-            Spacer()
+            VStack(spacing: 10) {
+                point("paperplane.fill", Color.proteinBlue, "אישור שימוש ב־AI שולח את תוכן הבקשה הדרוש ל־Cloudflare. התוצאות דורשות בדיקה ואישור שלך.")
+                point("lock.shield.fill", Color.carbsGold, "שם, PIN ופרופיל גוף מלא אינם נשלחים אוטומטית. אין שימוש בתוכן לאימון המודלים. אפשר לבטל בהגדרות.")
+            }
+            Spacer(minLength: 0)
             Button { Task { _ = await store.grantAIConsent() } } label: {
                 if store.busy { ProgressView().tint(Color.wellnessOnPrimary) } else { Text("מאשר/ת שימוש ב־AI האישי") }
             }.buttonStyle(PrimaryButton()).disabled(store.busy)
-        }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    private func point(_ symbol: String, _ color: Color, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: symbol).font(.system(size: 15, weight: .semibold)).foregroundStyle(color).frame(width: 36, height: 36)
+                .background(color.opacity(0.16), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            Text(text).font(.hb(.subheadline)).foregroundStyle(Color.wellnessInk).frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+        }.wellnessCard(padding: 14)
     }
 }
 

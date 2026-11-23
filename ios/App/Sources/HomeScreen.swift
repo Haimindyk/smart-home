@@ -116,11 +116,12 @@ struct HomeScreen: View {
                         hero
                         wellnessCard
                         AssistantCards()
-                        if home.sections.isEmpty && !home.loading { ContentUnavailableView("אין עדיין מדורים", systemImage: "square.grid.2x2", description: Text("צור מדור חדש בתפריט ⋯.")) }
+                        if home.sections.isEmpty && !home.loading { ContentUnavailableView { Label("אין עדיין מדורים", systemImage: "square.grid.2x2") } description: { Text("מדורים מארגנים את הבית: קניות, משימות, תחזוקה ועוד.") } actions: { Button { sheet = .newSection } label: { Label("מדור חדש", systemImage: "plus") }.buttonStyle(.borderedProminent).tint(Color.wellnessPrimary) } }
                         ForEach(home.sections) { SectionPanel(section: $0).id($0.id) }
                         Color.clear.frame(height: 110)
                     }.padding(.horizontal, 16).padding(.top, 6).shimmer(home.loading && home.sections.isEmpty)
                 }
+                .scrollDismissesKeyboard(.interactively)
                 .coordinateSpace(name: "home-scroll")
                 .onPreferenceChange(PanelOffsetKey.self) { offsets in
                     guard !jumping, let best = offsets.filter({ $0.value <= 160 }).max(by: { $0.value < $1.value }) ?? offsets.min(by: { $0.value < $1.value }) else { return }
@@ -147,7 +148,7 @@ struct HomeScreen: View {
                 case .members: MembersSheet().environmentObject(home)
                 }
             }
-            .alert("משהו השתבש", isPresented: Binding(get: { home.error != nil }, set: { if !$0 { home.error = nil } })) { Button("סגור", role: .cancel) {} } message: { Text(home.error ?? "") }
+            .errorBanner($home.error)
         }
     }
 
@@ -401,6 +402,7 @@ struct TaskPanelBody: View {
     @State private var addingSubFor: String?
     @State private var subDraft = ""
     private var open: [HTask] { home.tasks(in: section.id).filter { $0.parentID == nil && !$0.isCompleted } }
+    @State private var addedCount = 0
     private var done: [HTask] { home.tasks(in: section.id).filter { $0.parentID == nil && $0.isCompleted } }
     private func children(_ t: HTask) -> [HTask] { home.tasks(in: section.id).filter { $0.parentID == t.id } }
     var body: some View {
@@ -408,7 +410,8 @@ struct TaskPanelBody: View {
             HStack(spacing: 10) {
                 Image(systemName: "plus").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.wellnessOnPrimary).frame(width: 26, height: 26).background(Color.wellnessPrimary.opacity(0.9), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 TextField(section.kind == "shopping" ? "מה צריך לקנות?" : notesStyle ? "הערה חדשה…" : "משימה חדשה…", text: $draft).font(.hb(.subheadline)).submitLabel(.done)
-                    .onSubmit { let text = draft; draft = ""; Task { await home.addTask(title: text, section: section, isNote: notesStyle, parseDates: true) } }
+                    .onSubmit { let text = draft.trimmingCharacters(in: .whitespacesAndNewlines); draft = ""; guard !text.isEmpty else { return }; addedCount += 1; Task { await home.addTask(title: text, section: section, isNote: notesStyle, parseDates: true) } }
+                    .sensoryFeedback(.impact(weight: .light), trigger: addedCount)
                     .accessibilityIdentifier("quick-add-field-\(section.id)")
             }.padding(.horizontal, 10).frame(minHeight: 44).background(Color.wellnessChip, in: RoundedRectangle(cornerRadius: 16, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.wellnessHairline))
             if open.isEmpty && done.isEmpty {
