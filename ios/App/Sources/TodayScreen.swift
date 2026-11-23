@@ -37,7 +37,7 @@ struct TodayScreen: View {
                                 .background(Color.wellnessCard, in: Circle()).overlay(Circle().strokeBorder(Color.wellnessHairline))
                         }.buttonStyle(PressableStyle()).accessibilityLabel("הגדרות").accessibilityIdentifier("settings-button")
                     }
-                    DayRail().daySwipe(store)
+                    DayRail()
                     CalorieCard().daySwipe(store)
                     SummaryCarousel()
                     HStack {
@@ -86,44 +86,53 @@ struct TodayScreen: View {
 
 private struct DayRail: View {
     @EnvironmentObject private var store: AppStore
+    @State private var centered: Date?
+    private let cellWidth: CGFloat = 54
     private var calendar: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = store.timeZone; c.firstWeekday = 1; return c }
+    /// A year back to a month ahead, oldest first (in Hebrew/RTL the oldest day sits on the right).
     private var days: [Date] {
-        let start = calendar.startOfDay(for: store.selectedDate)
-        let weekday = calendar.component(.weekday, from: start)
-        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0 - weekday + 1, to: start) }
+        let today = calendar.startOfDay(for: Date())
+        return (-365...30).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
     }
     var body: some View {
-        HStack(spacing: 0) {
-            Button { withAnimation(.snappy) { shift(-7) } } label: { Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).frame(width: 28, height: 56) }.accessibilityLabel("שבוע קודם")
-            ViewThatFits(in: .horizontal) {
-                dayCells(scrolling: false)
-                ScrollView(.horizontal, showsIndicators: false) { dayCells(scrolling: true) }
+        GeometryReader { geo in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 4) {
+                    ForEach(days, id: \.self) { day in cell(day).id(day) }
+                }.scrollTargetLayout()
             }
-            Button { withAnimation(.snappy) { shift(7) } } label: { Image(systemName: "chevron.left").font(.footnote.weight(.semibold)).frame(width: 28, height: 56) }.accessibilityLabel("שבוע הבא")
-        }.foregroundStyle(Color.wellnessSecondary)
-    }
-    @ViewBuilder private func dayCells(scrolling: Bool) -> some View {
-        HStack(spacing: 5) {
-                ForEach(days, id: \.self) { day in
-                    let selected = calendar.isDate(day, inSameDayAs: store.selectedDate)
-                    let future = day > Date() && !calendar.isDateInToday(day)
-                    Button { withAnimation(.snappy) { store.selectedDate = day } } label: {
-                        VStack(spacing: 4) {
-                            Text(day, format: .dateTime.weekday(.narrow)).font(.hb(.caption)).foregroundStyle(future ? Color.primary.opacity(0.5) : Color.wellnessSecondary)
-                            Text(day, format: .dateTime.day()).font(.hb(.headline, .semibold)).monospacedDigit()
-                                .foregroundStyle(future ? Color.primary.opacity(0.5) : Color.wellnessInk).lineLimit(1)
-                            Circle().fill(calendar.isDateInToday(day) ? Color.kcalAmber : .clear).frame(width: 4, height: 4)
-                        }.frame(maxWidth: scrolling ? nil : .infinity).frame(minWidth: scrolling ? 56 : 0).padding(.vertical, 6)
-                            .background { if selected { RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.wellnessInk, lineWidth: 1.5) } }
-                    }.buttonStyle(.plain)
-                    .accessibilityLabel(day.formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                    .accessibilityAddTraits(selected ? [.isSelected] : [])
-                }
+            .contentMargins(.horizontal, max(0, (geo.size.width - cellWidth) / 2), for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $centered, anchor: .center)
+            .onAppear { centered = calendar.startOfDay(for: store.selectedDate) }
+            .onChange(of: centered) { _, day in
+                guard let day, !calendar.isDate(day, inSameDayAs: store.selectedDate) else { return }
+                store.selectedDate = day
             }
-
+            .onChange(of: store.selectedDate) { _, date in
+                let day = calendar.startOfDay(for: date)
+                if centered != day { withAnimation(.snappy) { centered = day } }
+            }
+        }
+        .frame(height: 72)
+        .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.12), .init(color: .black, location: 0.88), .init(color: .clear, location: 1)], startPoint: .leading, endPoint: .trailing))
+        .accessibilityElement(children: .contain).accessibilityLabel("בחירת יום")
     }
-
-    private func shift(_ amount: Int) { if let date = calendar.date(byAdding: .day, value: amount, to: store.selectedDate) { store.selectedDate = date } }
+    private func cell(_ day: Date) -> some View {
+        let selected = calendar.isDate(day, inSameDayAs: store.selectedDate)
+        let future = day > Date() && !calendar.isDateInToday(day)
+        return Button { withAnimation(.snappy) { centered = day } } label: {
+            VStack(spacing: 4) {
+                Text(day, format: .dateTime.weekday(.narrow)).font(.hb(.caption)).foregroundStyle(future ? Color.primary.opacity(0.5) : Color.wellnessSecondary)
+                Text(day, format: .dateTime.day()).font(.hb(.headline, .semibold)).monospacedDigit()
+                    .foregroundStyle(future ? Color.primary.opacity(0.5) : Color.wellnessInk).lineLimit(1)
+                Circle().fill(calendar.isDateInToday(day) ? Color.kcalAmber : .clear).frame(width: 4, height: 4)
+            }.frame(width: cellWidth).padding(.vertical, 6)
+                .background { if selected { RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.wellnessInk, lineWidth: 1.5) } }
+        }.buttonStyle(.plain)
+        .accessibilityLabel(day.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
 }
 
 private struct CalorieCard: View {
@@ -157,11 +166,12 @@ private struct CalorieCard: View {
 }
 
 /// Two swipeable pages (macros, activity) with page dots, like the web app's summary cards.
+
 private struct SummaryCarousel: View {
     @EnvironmentObject private var store: AppStore
     @State private var page = 0
     @ScaledMetric(relativeTo: .body) private var macroHeight: CGFloat = 144
-    @ScaledMetric(relativeTo: .body) private var activityHeight: CGFloat = 282
+    @ScaledMetric(relativeTo: .body) private var activityHeight: CGFloat = 332
     @ViewBuilder private var macroCards: some View {
         NutrientCard(title: "חלבון", nutrient: "protein", symbol: "fish.fill", color: .proteinBlue)
         NutrientCard(title: "פחמימות", nutrient: "carbs", symbol: "carrot.fill", color: .carbsGold)
@@ -200,7 +210,47 @@ private struct ActivityPage: View {
                 StatTile(title: "קלוריות שנשרפו", value: store.burnedKcal.map { Int($0.rounded()) }, unit: "קלוריות", ring: (store.burnedKcal ?? 0, nil, Color.kcalAmber, "flame.fill"))
             }
             WaterCard()
+            LinkChips()
         }
+    }
+}
+
+/// Where the numbers come from: Apple Health (steps, active calories) and the paired Apple Watch.
+private struct LinkChips: View {
+    @EnvironmentObject private var store: AppStore
+    @ObservedObject private var watch = PhoneConnectivity.shared
+    @Environment(\.openURL) private var openURL
+    private var healthConnected: Bool { store.steps != nil || store.burnedKcal != nil }
+    var body: some View {
+        HStack(spacing: 10) {
+            if healthConnected {
+                chip("heart.fill", "Apple Health", "מחובר", on: true, color: .fatCoral)
+            } else {
+                Button {
+                    Task { await store.loadTodayActivity() }
+                    if let url = URL(string: "x-apple-health://") { openURL(url) }
+                } label: { chip("heart.fill", "Apple Health", "חיבור", on: false, color: .fatCoral) }
+                    .buttonStyle(PressableStyle()).accessibilityIdentifier("connect-health").accessibilityHint("פותח את אפליקציית הבריאות כדי לאשר גישה")
+            }
+            switch watch.link {
+            case .installed: chip("applewatch", "Apple Watch", "מחובר", on: true, color: .proteinBlue)
+            case .paired: chip("applewatch", "Apple Watch", "האפליקציה לא מותקנת בשעון", on: false, color: .proteinBlue)
+            case .none, .unsupported: chip("applewatch", "Apple Watch", "לא מזווג", on: false, color: .proteinBlue)
+            }
+        }.frame(maxWidth: .infinity)
+    }
+    private func chip(_ symbol: String, _ name: String, _ status: String, on: Bool, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(on ? color : Color.wellnessSecondary)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(name).font(.hb(.caption, .semibold)).foregroundStyle(Color.wellnessInk)
+                Text(status).font(.hb(.caption2)).foregroundStyle(on ? Color.proteinBlue : Color.wellnessSecondary).lineLimit(1).minimumScaleFactor(0.8)
+            }
+            Circle().fill(on ? Color.green : Color.primary.opacity(0.25)).frame(width: 7, height: 7)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8).frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.wellnessCard, in: Capsule()).overlay(Capsule().strokeBorder(Color.wellnessHairline))
+        .accessibilityElement(children: .combine)
     }
 }
 

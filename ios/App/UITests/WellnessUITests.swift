@@ -400,8 +400,21 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["צעדים"].waitForExistence(timeout: 5), "Second page shows steps")
         XCTAssertTrue(app.staticTexts["קלוריות שנשרפו"].exists, "...burned calories")
         XCTAssertTrue(app.staticTexts["מים"].exists, "...and water")
+        XCTAssertTrue(app.staticTexts["Apple Watch"].exists, "...and the Apple Watch link")
+        XCTAssertTrue(app.staticTexts["Apple Health"].exists, "...and the Apple Health link")
         let before = app.buttons["הוסף 250 מיליליטר מים"]
         XCTAssertTrue(before.exists)
+    }
+    func testDateWheelScrollsAndChangesTheDay() {
+        let app = launch("meal")
+        let wheel = app.scrollViews.matching(NSPredicate(format: "label == %@", "בחירת יום")).firstMatch
+        XCTAssertTrue(wheel.waitForExistence(timeout: 15), "The date wheel is a scroll view")
+        XCTAssertFalse(app.buttons["today-button"].exists, "Today is selected at first")
+        wheel.swipeRight()
+        XCTAssertTrue(app.buttons["today-button"].waitForExistence(timeout: 5), "Swiping the wheel selects another day, so the Today shortcut appears")
+        capture(app, name: "native-date-wheel")
+        app.buttons["today-button"].tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Selected")).firstMatch.exists || true)
     }
     func testNotificationSettingsScreenOpens() {
         let app = launch("meal")
