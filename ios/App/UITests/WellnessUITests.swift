@@ -402,20 +402,19 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Apple Health"].exists, "...and the Apple Health link")
         XCTAssertTrue(app.buttons["הוסף 250 מיליליטר מים"].exists)
     }
-    func testSwipingAMealRightAsksBeforeDeleting() {
+    func testSwipingAMealRightRemovesItWithUndo() {
         let app = launch("meal")
         let meal = app.buttons["meal-33333333-3333-4333-8333-333333333333"]
         XCTAssertTrue(meal.waitForExistence(timeout: 15))
         let start = meal.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5))
         let end = meal.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
         start.press(forDuration: 0.1, thenDragTo: end)
-        let dialog = app.buttons["מחיקה"]
-        XCTAssertTrue(dialog.waitForExistence(timeout: 5), "Swiping a meal to the right asks before deleting it")
-        capture(app, name: "native-meal-swipe-confirm")
-        // iOS 26 anchors the dialog to the card without a Cancel row: tapping elsewhere dismisses it.
-        if app.buttons["ביטול"].exists { app.buttons["ביטול"].tap() } else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5)).tap() }
-        XCTAssertTrue(dialog.waitForNonExistence(timeout: 5), "The dialog closes")
-        XCTAssertTrue(meal.waitForExistence(timeout: 5), "Cancelling leaves the meal in place")
+        XCTAssertTrue(meal.waitForNonExistence(timeout: 5), "Swiping a meal to the right removes it right away")
+        let undo = app.buttons["undo-meal-delete"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 5), "An Undo button appears instead of a confirmation dialog")
+        capture(app, name: "native-meal-removed-undo")
+        undo.tap()
+        XCTAssertTrue(meal.waitForExistence(timeout: 5), "Undo brings the meal back")
     }
     func testDateWheelScrollsAndChangesTheDay() {
         let app = launch("meal")

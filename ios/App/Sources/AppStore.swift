@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 import WellnessCore
 
 @MainActor
@@ -12,6 +13,8 @@ final class AppStore: ObservableObject {
     @Published var error: String?
     @Published var selectedDate = Date()
     @Published private(set) var meals: [HealthRow] = []
+    /// The meal that was just removed; shown with an Undo button for a few seconds.
+    @Published var undoableMeal: HealthRow?
     @Published private(set) var personalFoods: [HealthRow] = []
     @Published private(set) var recipes: [HealthRow] = []
     @Published private(set) var goals: [HealthRow] = []
@@ -534,6 +537,29 @@ final class AppStore: ObservableObject {
         return result
     }
     func finishedTimestamp() -> String { Self.iso(Date()) }
+    private var isFixtureSession: Bool { backend == nil && session?.accessToken == "ui-test" }
+    /// Removes a meal from the screen at once (animated) and deletes it on the server in the background; it comes back if that fails.
+    func removeMealWithUndo(_ row: HealthRow) async {
+        guard let index = meals.firstIndex(where: { $0.id == row.id }) else { return }
+        withAnimation(.snappy) { meals.remove(at: index) }
+        undoableMeal = row
+        if isFixtureSession { return }
+        let ok = await write("לא הצלחנו למחוק את הארוחה.") { backend, owner in try await backend.softDelete(table: "meals", row: row, owner: owner) }
+        if !ok {
+            withAnimation(.snappy) { meals.insert(row, at: min(index, meals.count)) }
+            if undoableMeal?.id == row.id { undoableMeal = nil }
+        }
+    }
+    /// Brings back the meal removed last, as a new row with the same content.
+    func undoMealRemoval() async {
+        guard let row = undoableMeal else { return }
+        undoableMeal = nil
+        if isFixtureSession { withAnimation(.snappy) { meals.append(row) }; return }
+        _ = await write("לא הצלחנו לשחזר את הארוחה.") { backend, owner in
+            let restored = try await backend.save(table: "meals", owner: owner, payload: row.data)
+            if session?.owner == owner { withAnimation(.snappy) { meals.append(restored) } }
+        }
+    }
     func deleteMeal(_ row: HealthRow) async -> Bool {
         await write("לא הצלחנו למחוק את הארוחה.") { backend, owner in
             try await backend.softDelete(table: "meals", row: row, owner: owner)

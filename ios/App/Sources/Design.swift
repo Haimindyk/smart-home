@@ -204,6 +204,7 @@ struct OfflineBanner: View {
 /// Swipe a card to the right to reveal a red delete action. Past the threshold the card springs back and `onConfirm` runs,
 /// so the caller can ask "delete?" and a cancel leaves the card exactly where it was.
 struct SwipeToConfirmDelete: ViewModifier {
+    var slideOut = false
     let onConfirm: () -> Void
     @State private var offset: CGFloat = 0
     @State private var armed = false
@@ -230,12 +231,19 @@ struct SwipeToConfirmDelete: ViewModifier {
                     }
                     .onEnded { _ in
                         let fire = armed
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { offset = 0; armed = false }
-                        if fire { onConfirm() }
+                        if fire && slideOut {
+                            // Slide the card away, then remove it; if it is still here a moment later (the delete was refused) bring it back.
+                            withAnimation(.easeIn(duration: 0.2)) { offset = 520 }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { onConfirm() }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { offset = 0; armed = false } }
+                        } else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { offset = 0; armed = false }
+                            if fire { onConfirm() }
+                        }
                     }
             )
             .sensoryFeedback(.impact(weight: .medium), trigger: armed) { _, now in now }
             .accessibilityAction(named: "מחיקה", onConfirm)
     }
 }
-extension View { func swipeToConfirmDelete(_ onConfirm: @escaping () -> Void) -> some View { modifier(SwipeToConfirmDelete(onConfirm: onConfirm)) } }
+extension View { func swipeToConfirmDelete(slideOut: Bool = false, _ onConfirm: @escaping () -> Void) -> some View { modifier(SwipeToConfirmDelete(slideOut: slideOut, onConfirm: onConfirm)) } }

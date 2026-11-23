@@ -4,7 +4,6 @@ import WellnessCore
 struct TodayScreen: View {
     @EnvironmentObject private var store: AppStore
     @State private var showCalendar = false
-    @State private var mealToDelete: HealthRow?
     @State private var showSettings = false
     @State private var showCoach = false
     @State private var addingMeal = false
@@ -56,8 +55,9 @@ struct TodayScreen: View {
                     } else {
                         ForEach(store.dayMeals) { meal in
                             NavigationLink { MealDetailScreen(initial: meal) } label: { MealCard(meal: meal) }.buttonStyle(PressableStyle())
-                                .swipeToConfirmDelete { mealToDelete = meal }
-                                .contextMenu { Button(role: .destructive) { mealToDelete = meal } label: { Label("מחיקת הארוחה", systemImage: "trash") } }.accessibilityIdentifier("meal-\(meal.id)")
+                                .swipeToConfirmDelete(slideOut: true) { Task { await store.removeMealWithUndo(meal) } }
+                                .transition(.asymmetric(insertion: .opacity, removal: .opacity.combined(with: .scale(scale: 0.96))))
+                                .contextMenu { Button(role: .destructive) { Task { await store.removeMealWithUndo(meal) } } label: { Label("מחיקת הארוחה", systemImage: "trash") } }.accessibilityIdentifier("meal-\(meal.id)")
                         }
                     }
                 }.padding(16).shimmer(store.loading && store.meals.isEmpty && store.goals.isEmpty)
@@ -67,10 +67,7 @@ struct TodayScreen: View {
             .toolbar(.hidden, for: .navigationBar)
             .refreshable { await store.refresh() }
             .sensoryFeedback(.selection, trigger: store.selectedDate)
-            .confirmationDialog("למחוק את הארוחה?", isPresented: Binding(get: { mealToDelete != nil }, set: { if !$0 { mealToDelete = nil } }), titleVisibility: .visible) {
-                Button("מחיקה", role: .destructive) { if let meal = mealToDelete { Task { _ = await store.deleteMeal(meal) } }; mealToDelete = nil }
-                Button("ביטול", role: .cancel) { mealToDelete = nil }
-            }
+            .overlay(alignment: .bottom) { undoToast }
             .sheet(isPresented: $addingMeal) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }
             .sheet(isPresented: $showCoach) { CoachChatView().environmentObject(store) }
             .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
@@ -83,6 +80,24 @@ struct TodayScreen: View {
                 }.presentationDetents([.medium])
             }
         }.environment(\.timeZone, store.timeZone)
+    }
+}
+
+extension TodayScreen {
+    @ViewBuilder fileprivate var undoToast: some View {
+        if let removed = store.undoableMeal {
+            HStack(spacing: 12) {
+                Text("הארוחה נמחקה").font(.hb(.subheadline, .semibold)).foregroundStyle(Color.wellnessOnPrimary)
+                Spacer(minLength: 8)
+                Button { Task { await store.undoMealRemoval() } } label: {
+                    Text("ביטול").font(.hb(.subheadline, .bold)).foregroundStyle(Color.wellnessOnPrimary).padding(.horizontal, 14).frame(minHeight: 36).background(.white.opacity(0.18), in: Capsule())
+                }.accessibilityIdentifier("undo-meal-delete")
+            }
+            .padding(.horizontal, 18).padding(.vertical, 8).background(Color.wellnessPrimary, in: Capsule())
+            .shadow(color: .black.opacity(0.2), radius: 12, y: 4).padding(.horizontal, 16).padding(.bottom, 112)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .task(id: removed.id) { try? await Task.sleep(for: .seconds(6)); if store.undoableMeal?.id == removed.id { withAnimation(.snappy) { store.undoableMeal = nil } } }
+        }
     }
 }
 

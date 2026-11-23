@@ -12,7 +12,6 @@ struct MealDetailScreen: View {
     @State private var addingIngredient = false
     @State private var quantityIndex: Int?
     @State private var removeIndex: Int?
-    @State private var confirmDelete = false
     @State private var copying = false
     @State private var toast: String?
     @AppStorage("mealDetailHintHidden") private var hintHidden = false
@@ -46,10 +45,6 @@ struct MealDetailScreen: View {
         .sheet(isPresented: $copying) { CopyMealSheet(mealID: initial.id) { show("הארוחה הועתקה") }.environmentObject(store).presentationDetents([.medium]) }
         .sheet(isPresented: Binding(get: { quantityIndex != nil }, set: { if !$0 { quantityIndex = nil } })) {
             if let index = quantityIndex { QuantitySheet(mealID: initial.id, index: index).environmentObject(store).presentationDetents([.fraction(0.66)]).presentationDragIndicator(.visible) }
-        }
-        .confirmationDialog("למחוק את הארוחה?", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("מחיקה", role: .destructive) { Task { if await store.deleteMeal(meal) { dismiss() } } }
-            Button("ביטול", role: .cancel) {}
         }
         .confirmationDialog("להסיר את הרכיב?", isPresented: Binding(get: { removeIndex != nil }, set: { if !$0 { removeIndex = nil } }), titleVisibility: .visible) {
             Button("הסרה", role: .destructive) { if let index = removeIndex { removeItem(index) }; removeIndex = nil }
@@ -88,7 +83,7 @@ struct MealDetailScreen: View {
             circle("doc.on.doc", "העתקה ליום אחר", id: "meal-copy") { copying = true }
             circle("book", "שמירה כמתכון", id: "meal-recipe") { Task { if await store.saveRecipe(name: mealName(meal), servings: 1, items: items) { show("נשמר בספרייה") } } }
             ShareLink(item: shareText) { circleLabel("square.and.arrow.up") }.accessibilityLabel("שיתוף").accessibilityIdentifier("meal-share")
-            circle("trash", "מחיקת הארוחה", id: "meal-delete") { confirmDelete = true }
+            circle("trash", "מחיקת הארוחה", id: "meal-delete") { Task { await store.removeMealWithUndo(meal) }; dismiss() }
         }
     }
     private func circle(_ symbol: String, _ label: String, id: String, action: @escaping () -> Void) -> some View {
