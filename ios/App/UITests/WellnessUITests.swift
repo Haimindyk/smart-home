@@ -226,7 +226,9 @@ final class WellnessUITests: XCTestCase {
         app.buttons["סגור"].tap()
         app.buttons["home-search"].tap()
         let search = app.searchFields.firstMatch
-        XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("חלב")
+        XCTAssertTrue(search.waitForExistence(timeout: 5)); var focusTries = 0
+        repeat { search.tap(); focusTries += 1 } while !app.keyboards.firstMatch.waitForExistence(timeout: 3) && focusTries < 3
+        search.typeText("חלב")
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "חלב")).firstMatch.waitForExistence(timeout: 5))
         capture(app, name: "native-home-search")
     }
