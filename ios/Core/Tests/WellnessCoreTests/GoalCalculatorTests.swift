@@ -24,4 +24,9 @@ final class GoalCalculatorTests: XCTestCase {
         XCTAssertThrowsError(try GoalCalculator.calculate(.init(birthDate: "1990-06-15", height: nil, weight: 80, physiology: "male"), on: "2026-06-15"))
         XCTAssertThrowsError(try GoalCalculator.calculate(.init(), on: "2026-06-15"))
     }
+    func testImplausibleMeasurementsNeedManualTargets() {
+        for (h, w) in [(-170.0, 70.0), (170, 0), (170, -5), (30, 70), (170, 900)] {
+            XCTAssertThrowsError(try GoalCalculator.calculate(.init(birthDate: "1990-06-15", height: h, weight: w, physiology: "male"), on: "2026-06-15")) { XCTAssertEqual($0 as? GoalCalculator.Failure, .adultProfileRequired) }
+        }
+    }
 }
