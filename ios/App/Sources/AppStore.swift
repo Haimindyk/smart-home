@@ -606,7 +606,7 @@ final class AppStore: ObservableObject {
             let path = try await backend.uploadImage(jpeg, owner: owner)
             // The AI provider fails now and then; one automatic retry (with a fresh request id) hides most of those.
             func analyze() async throws -> JSONValue {
-                try await backend.invoke("nutrition-analyze", body: .object(["imagePath": .string(path), "requestId": .string(UUID().uuidString.lowercased()), "mode": .string("meal"), "description": .string(description)]), owner: owner)
+                try await backend.invoke("nutrition-analyze", body: .object(["imagePath": .string(path), "requestId": .string(UUID().uuidString.lowercased()), "mode": .string("meal"), "automatic": .bool(true), "description": .string(description)]), owner: owner)
             }
             let raw: JSONValue
             do { raw = try await analyze() } catch is CancellationError { throw CancellationError() } catch { raw = try await analyze() }
