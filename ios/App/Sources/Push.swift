@@ -57,32 +57,52 @@ struct NotificationSettingsScreen: View {
     @Environment(\.openURL) private var openURL
     @State private var prefs: [String: Bool] = [:]
     @State private var loaded = false
-    private static let rows: [(key: String, title: String)] = [
-        ("on_create", "פריט חדש נוצר"), ("on_complete", "פריט סומן כבוצע"), ("on_assigned_me", "שויכתי לפריט"),
-        ("on_shopping", "עדכונים ברשימת הקניות"), ("on_delete", "פריט נמחק"), ("on_broadcast", "הודעות מבני הבית")]
+    private static let rows: [(key: String, title: String, icon: String, color: Color)] = [
+        ("on_create", "פריט חדש נוצר", "plus.circle.fill", Color.proteinBlue), ("on_complete", "פריט סומן כבוצע", "checkmark.circle.fill", Color.kcalAmber),
+        ("on_assigned_me", "שויכתי לפריט", "person.crop.circle.badge.checkmark", Color.carbsGold), ("on_shopping", "עדכונים ברשימת הקניות", "cart.fill", Color.proteinBlue),
+        ("on_delete", "פריט נמחק", "trash.fill", Color.fatCoral), ("on_broadcast", "הודעות מבני הבית", "megaphone.fill", Color.fatCoral)]
     private var enabled: Bool { push.authorization == .authorized || push.authorization == .provisional }
+    private func tile(_ symbol: String, _ color: Color, size: CGFloat = 34) -> some View {
+        Image(systemName: symbol).font(.system(size: size * 0.44, weight: .semibold)).foregroundStyle(color).frame(width: size, height: size)
+            .background(color.opacity(0.16), in: RoundedRectangle(cornerRadius: size * 0.32, style: .continuous))
+    }
     var body: some View {
-        List {
-            Section {
-                if push.authorization == .denied {
-                    Text("התראות חסומות להגדרות המכשיר.").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)
-                    Button("פתיחת הגדרות המכשיר") { if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) } }
-                } else {
-                    Toggle(isOn: Binding(get: { enabled }, set: { on in if on { Task { await push.enable() } } })) { Label("קבלת התראות", systemImage: enabled ? "bell.fill" : "bell.slash") }
-                        .tint(Color.wellnessPrimary).disabled(enabled).accessibilityIdentifier("push-enable")
-                }
-                if push.failed { Text("ההרשמה להתראות נכשלה. נסה שוב בעוד רגע.").font(.hb(.footnote)).foregroundStyle(Color.fatCoralText) }
-            } footer: { Text("ההתראות מגיעות על שינויים של בני הבית אחרים, ולא על שינויים שעשית בעצמך.") }
-            if enabled {
-                Section("על מה להתריע") {
-                    ForEach(Self.rows, id: \.key) { row in
-                        Toggle(row.title, isOn: Binding(get: { (prefs[row.key] ?? true) && prefs["muted"] != true }, set: { on in prefs[row.key] = on; save([row.key: on]) })).tint(Color.wellnessPrimary).disabled(prefs["muted"] == true)
+        ScrollView {
+            VStack(spacing: 16) {
+                VStack(spacing: 14) {
+                    tile(enabled ? "bell.badge.fill" : "bell.slash.fill", Color.fatCoral, size: 64)
+                    Text(enabled ? "ההתראות פעילות" : "קבל התראות מהבית").font(.hb(.title3, .bold))
+                    Text("ההתראות מגיעות על שינויים של בני הבית אחרים, ולא על שינויים שעשית בעצמך.").font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary).multilineTextAlignment(.center)
+                    if push.authorization == .denied {
+                        Text("התראות חסומות להגדרות המכשיר.").font(.hb(.footnote)).foregroundStyle(Color.fatCoralText)
+                        Button("פתיחת הגדרות המכשיר") { if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) } }.buttonStyle(PrimaryButton())
+                    } else if !enabled {
+                        Button { Task { await push.enable() } } label: { Label("הפעלת התראות", systemImage: "bell.fill") }.buttonStyle(PrimaryButton()).accessibilityIdentifier("push-enable")
+                    } else {
+                        Label("מופעל במכשיר הזה", systemImage: "checkmark.circle.fill").font(.hb(.subheadline, .semibold)).foregroundStyle(Color.proteinBlue).accessibilityIdentifier("push-enable")
                     }
-                    Toggle("השתקת כל ההתראות", isOn: Binding(get: { prefs["muted"] ?? false }, set: { on in prefs["muted"] = on; save(["muted": on]) })).tint(Color.wellnessPrimary).accessibilityIdentifier("push-mute")
+                    if push.failed { Text("ההרשמה להתראות נכשלה. נסה שוב בעוד רגע.").font(.hb(.footnote)).foregroundStyle(Color.fatCoralText) }
+                }.frame(maxWidth: .infinity).wellnessCard(padding: 20)
+                if enabled {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("על מה להתריע").sectionTitle().padding(.bottom, 6)
+                        ForEach(Array(Self.rows.enumerated()), id: \.element.key) { index, row in
+                            HStack(spacing: 12) {
+                                tile(row.icon, row.color)
+                                Toggle(row.title, isOn: Binding(get: { (prefs[row.key] ?? true) && prefs["muted"] != true }, set: { on in prefs[row.key] = on; save([row.key: on]) })).tint(Color.wellnessPrimary).disabled(prefs["muted"] == true)
+                            }.padding(.vertical, 6)
+                            if index < Self.rows.count - 1 { Divider().padding(.leading, 46) }
+                        }
+                    }.frame(maxWidth: .infinity, alignment: .leading).wellnessCard(padding: 16)
+                    HStack(spacing: 12) {
+                        tile("moon.zzz.fill", Color.proteinBlue)
+                        Toggle("השתקת כל ההתראות", isOn: Binding(get: { prefs["muted"] ?? false }, set: { on in prefs["muted"] = on; save(["muted": on]) })).tint(Color.wellnessPrimary).accessibilityIdentifier("push-mute")
+                    }.wellnessCard(padding: 14)
                 }
-            }
+                Color.clear.frame(height: 24)
+            }.padding(.horizontal, 16).padding(.top, 8)
         }
-        .wellnessList().navigationTitle("התראות").navigationBarTitleDisplayMode(.inline)
+        .background(Color.wellnessCanvas.ignoresSafeArea()).navigationTitle("התראות").navigationBarTitleDisplayMode(.inline)
         .task { await push.refresh(); if !loaded { prefs = await store.notificationPrefs(); loaded = true } }
     }
     private func save(_ change: [String: Bool]) { Task { _ = await store.saveNotificationPrefs(change) } }

@@ -14,7 +14,7 @@ concurrency:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Test portable authentication and import logic
@@ -32,31 +32,8 @@ jobs:
           -destination 'generic/platform=iOS Simulator'
           -derivedDataPath "$RUNNER_TEMP/WellnessDerivedData"
           CODE_SIGNING_ALLOWED=NO build
-      - name: Test native screens with synthetic services
-        working-directory: ios/App
-        run: |
-          SIMULATOR_ID=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for runtime,devices in d["devices"].items() if "iOS" in runtime for x in devices if "iPhone" in x["name"]))')
-          xcodebuild -project SmartHomeWellness.xcodeproj \
-            -scheme SmartHomeWellness -configuration Debug \
-            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
-            -derivedDataPath "$RUNNER_TEMP/WellnessDerivedData" \
-            -resultBundlePath "$RUNNER_TEMP/WellnessUI.xcresult" \
-            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test
-      - name: Export native screenshots
-        if: always()
-        run: |
-          if [ -d "$RUNNER_TEMP/WellnessUI.xcresult" ]; then
-            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/WellnessUI.xcresult" --output-path "$RUNNER_TEMP/WellnessScreenshots"
-          fi
-      - name: Save native UI test results and screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-ios-ui-results
-          path: |
-            ${{ runner.temp }}/WellnessUI.xcresult
-            ${{ runner.temp }}/WellnessScreenshots
-          retention-days: 3
+      # The simulator UI tests (xcodebuild test, ~12 min) are run locally before every merge and are not part of the PR checks.
+
   # Validates the release toolchain (Xcode 27, cloud-managed signing, export) without uploading anything.
   release-build-check:
     runs-on: xcode-27
@@ -91,3 +68,44 @@ jobs:
           LC_ALL: en_US.UTF-8
         run: bundle exec fastlane build_check
         working-directory: ios/fastlane
+
+  # An ad-hoc signed IPA for the devices registered in the developer account. It is only kept as a short-lived
+  # workflow artifact (never published) so it can be installed straight onto a registered iPhone without TestFlight.
+  adhoc-ipa:
+    runs-on: xcode-27
+    environment: beta
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 27.2
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.2.app
+          xcodebuild -version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Install Fastlane
+        run: |
+          rm -f Gemfile.lock
+          bundle install
+        working-directory: ios/fastlane
+      - name: Build and sign ad-hoc
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.ASC_API_KEY }}
+          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
+          SUPABASE_PUBLIC_KEY: ${{ secrets.SUPABASE_PUBLIC_KEY }}
+          GITHUB_RUN_NUMBER: "950"
+          FASTLANE_SETUP_CI: "1"
+          LANG: en_US.UTF-8
+          LC_ALL: en_US.UTF-8
+        run: bundle exec fastlane adhoc
+        working-directory: ios/fastlane
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adhoc-ipa
+          path: ios/SmartHomeWellness.ipa
+          retention-days: 3

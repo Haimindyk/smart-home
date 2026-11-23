@@ -7,6 +7,7 @@ struct TodayScreen: View {
     @State private var mealToDelete: HealthRow?
     @State private var showSettings = false
     @State private var showCoach = false
+    @State private var addingMeal = false
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -45,7 +46,13 @@ struct TodayScreen: View {
                         if store.loading { ProgressView().accessibilityLabel("מעדכן ארוחות") }
                     }.padding(.top, 8)
                     if store.dayMeals.isEmpty {
-                        ContentUnavailableView("עוד אין ארוחות ביום הזה", systemImage: "fork.knife", description: Text("הארוחות שלך מהחשבון יופיעו כאן."))
+                        ContentUnavailableView {
+                            Label("עוד אין ארוחות ביום הזה", systemImage: "fork.knife")
+                        } description: {
+                            Text("הוסף ארוחה כדי לעקוב אחרי הקלוריות והמאקרו.")
+                        } actions: {
+                            Button { addingMeal = true } label: { Label("הוסף ארוחה", systemImage: "plus") }.buttonStyle(.borderedProminent).tint(Color.wellnessPrimary).accessibilityIdentifier("empty-add-meal")
+                        }
                     } else {
                         ForEach(store.dayMeals) { meal in
                             NavigationLink { MealDetail(initial: meal) } label: { MealCard(meal: meal) }.buttonStyle(PressableStyle())
@@ -62,6 +69,7 @@ struct TodayScreen: View {
             .confirmationDialog("למחוק את הארוחה?", isPresented: Binding(get: { mealToDelete != nil }, set: { if !$0 { mealToDelete = nil } }), titleVisibility: .visible) {
                 Button("מחיקה", role: .destructive) { if let meal = mealToDelete { Task { _ = await store.deleteMeal(meal) } }; mealToDelete = nil }
             }
+            .sheet(isPresented: $addingMeal) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }
             .sheet(isPresented: $showCoach) { CoachChatView().environmentObject(store) }
             .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
             .sheet(isPresented: $showCalendar) {
@@ -165,11 +173,11 @@ private struct SummaryCarousel: View {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) { macroCards }
                     ScrollView { VStack(spacing: 10) { macroCards } }
-                }.padding(.vertical, 8).tag(0)
-                WaterCard().padding(.vertical, 8).tag(1)
-                if hasActivity { StepsCard().padding(.vertical, 8).tag(2) }
+                }.padding(.top, 4).padding(.bottom, 16).tag(0)
+                WaterCard().padding(.top, 4).padding(.bottom, 16).tag(1)
+                if hasActivity { StepsCard().padding(.top, 4).padding(.bottom, 16).tag(2) }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never)).frame(height: height)
+            .tabViewStyle(.page(indexDisplayMode: .never)).frame(height: height + 16)
             .sensoryFeedback(.selection, trigger: page)
             HStack(spacing: 7) {
                     ForEach(0..<(hasActivity ? 3 : 2), id: \.self) { index in
@@ -286,16 +294,19 @@ private struct MealDetail: View {
                 if mealPhotoPath(meal) != nil { PrivateMealPhoto(meal: meal, thumbnail: false).clipShape(RoundedRectangle(cornerRadius: 24)) }
                 Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded())) קק״ל").font(.hb(.largeTitle, .bold))
                 VStack(spacing: 0) {
-                    ForEach(Array(meal.data["items"].arrayValue.enumerated()), id: \.offset) { _, item in
+                    let items = meal.data["items"].arrayValue
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                         HStack {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(item["food"]["name"].stringValue ?? "רכיב").font(.hb(.headline, .semibold))
                                 Text("\(Int((item["quantity"].doubleValue ?? 0).rounded())) \(item["food"]["basis"].stringValue == "ml" ? "מ״ל" : "גרם")").foregroundStyle(Color.wellnessSecondary)
                             }
                             Spacer()
-                            if item["food"]["source"].stringValue == "ai" { Text("הערכה").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }
+                            if item["food"]["source"].stringValue == "ai" { Text("הערכה").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).padding(.trailing, 8) }
+                            let kcal = (item["food"]["per100"]["kcal"].doubleValue ?? 0) * (item["quantity"].doubleValue ?? 0) / 100
+                            if kcal > 0 { Text("\(Int(kcal.rounded())) קק״ל").font(.hb(.subheadline, .semibold)).foregroundStyle(Color.kcalAmberText) }
                         }.padding(.vertical, 16)
-                        Divider()
+                        if index < items.count - 1 { Divider() }
                     }
                 }.wellnessCard()
             }.padding(16)

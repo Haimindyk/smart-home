@@ -563,8 +563,12 @@ final class AppStore: ObservableObject {
         guard aiEligible, aiConsented, let owner = session?.owner, let backend else { return nil }
         do {
             let path = try await backend.uploadImage(jpeg, owner: owner)
-            let requestID = UUID().uuidString.lowercased()
-            let raw = try await backend.invoke("nutrition-analyze", body: .object(["imagePath": .string(path), "requestId": .string(requestID), "mode": .string("meal"), "description": .string(description)]), owner: owner)
+            // The AI provider fails now and then; one automatic retry (with a fresh request id) hides most of those.
+            func analyze() async throws -> JSONValue {
+                try await backend.invoke("nutrition-analyze", body: .object(["imagePath": .string(path), "requestId": .string(UUID().uuidString.lowercased()), "mode": .string("meal"), "description": .string(description)]), owner: owner)
+            }
+            let raw: JSONValue
+            do { raw = try await analyze() } catch is CancellationError { throw CancellationError() } catch { raw = try await analyze() }
             guard session?.owner == owner else { return nil }
             let items = raw["items"].arrayValue.compactMap { item -> JSONValue? in
                 guard let name = item["name"].stringValue, let quantity = item["quantity"].doubleValue, quantity > 0, item["per100"] != .null else { return nil }
