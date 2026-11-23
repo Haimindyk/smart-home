@@ -686,6 +686,8 @@ final class AppStore: ObservableObject {
                 return .ready(MealAnalysis(items: items, needsClarification: raw["needsClarification"].boolValue == true, question: raw["question"].stringValue ?? "", analysisId: analysisId, imagePath: imagePath ?? ""))
             } catch let error as BackendError {
                 if case .server(409) = error, busyWaits < 40 { busyWaits += 1; try? await Task.sleep(for: .seconds(3)); continue }
+                // A dropped connection may have reached the server: ask again with the SAME id so the job is not analysed (and counted) twice.
+                if error == .connection, !retried { retried = true; try? await Task.sleep(for: .seconds(2)); continue }
                 if !retried { retried = true; id = UUID().uuidString.lowercased(); continue }
                 return .failed("הניתוח לא הושלם. בדוק חיבור ונסה שוב.")
             } catch is CancellationError { return .failed("") }
