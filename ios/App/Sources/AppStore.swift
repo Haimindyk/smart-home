@@ -77,7 +77,7 @@ final class AppStore: ObservableObject {
         goals.filter { ($0.data["date"].stringValue ?? "9999") <= dateKey }
             .max { ($0.data["date"].stringValue ?? "") < ($1.data["date"].stringValue ?? "") }?.data ?? .null
     }
-    var dayMeals: [HealthRow] { meals.filter { $0.data["date"].stringValue == dateKey }.reversed() }
+    var dayMeals: [HealthRow] { Array(meals.filter { $0.data["date"].stringValue == dateKey }.reversed()).sorted { ($0.data["time"].stringValue ?? "") > ($1.data["time"].stringValue ?? "") } }
     var activePlans: [HealthRow] { plans.filter { $0.data["archived"].boolValue != true } }
     var importedIDs: Set<String> { Set(workouts.compactMap { $0.data["appleHealth"]["uuid"].stringValue }) }
 
@@ -720,15 +720,43 @@ final class AppStore: ObservableObject {
             return true
         } catch { if session?.owner == owner { self.error = "התיקון לא הושלם. בדוק חיבור ונסה שוב." }; return false }
     }
+    static func timeKey(_ date: Date, zone: TimeZone) -> String {
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = zone; f.dateFormat = "HH:mm"; return f.string(from: date)
+    }
+    static func mealKind(forTime time: String) -> String {
+        let hour = Int(time.prefix(2)) ?? 12
+        return hour < 11 ? "breakfast" : hour < 16 ? "lunch" : hour < 21 ? "dinner" : "snack"
+    }
     func saveAnalyzedMeal(_ analysis: MealAnalysis, items: [JSONValue], kind: String) async -> Bool {
-        guard !items.isEmpty else { return false }
+        await saveAnalyzedMealRow(analysis, items: items, kind: kind, date: nil, time: nil) != nil
+    }
+    /// Saves an analyzed meal and returns the stored row. `date`/`time` are when the meal was entered (default: the shown day, now).
+    func saveAnalyzedMealRow(_ analysis: MealAnalysis, items: [JSONValue], kind: String, date: String?, time: String?) async -> HealthRow? {
+        guard !items.isEmpty else { return nil }
         let name = items.first?["food"]["name"].stringValue ?? ""
-        var fields: [String: JSONValue] = ["date": .string(dateKey), "kind": .string(kind), "name": .string(name), "items": .array(items), "aiEstimate": .object(["analysisId": .string(analysis.analysisId)])]
+        var fields: [String: JSONValue] = ["date": .string(date ?? dateKey), "kind": .string(kind), "name": .string(name), "time": .string(time ?? Self.timeKey(Date(), zone: timeZone)), "items": .array(items), "aiEstimate": .object(["analysisId": .string(analysis.analysisId)])]
         if !analysis.imagePath.isEmpty { fields["imagePath"] = .string(analysis.imagePath) }
         let payload: JSONValue = .object(fields)
-        return await write("לא הצלחנו לשמור את הארוחה.") { backend, owner in
+        if isFixtureSession {
+            let row = HealthRow(id: UUID().uuidString.lowercased(), owner_user_id: "ui-test", data: payload, version: 1)
+            meals.append(row); return row
+        }
+        var saved: HealthRow?
+        _ = await write("לא הצלחנו לשמור את הארוחה.") { backend, owner in
             let row = try await backend.save(table: "meals", owner: owner, payload: payload)
-            if session?.owner == owner { meals.append(row) }
+            if session?.owner == owner { meals.append(row); saved = row }
+        }
+        return saved
+    }
+    /// Changes the time the meal was eaten (shown on the card and used to order the day).
+    func updateMealTime(_ row: HealthRow, time: String) async -> Bool {
+        guard case .object(var fields) = row.data else { return false }
+        fields["time"] = .string(time); fields["kind"] = .string(Self.mealKind(forTime: time))
+        let payload = JSONValue.object(fields)
+        if isFixtureSession, let index = meals.firstIndex(where: { $0.id == row.id }) { meals[index] = HealthRow(id: row.id, owner_user_id: row.owner_user_id, data: payload, version: row.version + 1); return true }
+        return await write("לא הצלחנו לעדכן את השעה.") { backend, owner in
+            let saved = try await backend.save(table: "meals", owner: owner, payload: payload, existing: row)
+            if session?.owner == owner, let index = meals.firstIndex(where: { $0.id == row.id }) { meals[index] = saved }
         }
     }
     func imageData(_ path: String) async -> Data? {

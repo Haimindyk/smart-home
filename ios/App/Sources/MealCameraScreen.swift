@@ -134,7 +134,7 @@ struct MealCameraScreen: View {
         .onAppear { camera.start() }
         .onDisappear { camera.stop() }
         .onChange(of: center.phase) { _, phase in
-            if phase == .ready { dismiss(); DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { center.presenting = true } }
+            if phase == .ready { dismiss(); DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { center.openResult() } }
         }
         .onChange(of: photoItem) { _, item in Task { await loadFromGallery(item) } }
         .sheet(isPresented: $showMore) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }

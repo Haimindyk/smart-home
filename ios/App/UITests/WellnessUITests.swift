@@ -488,10 +488,15 @@ final class WellnessUITests: XCTestCase {
         capture(app, name: "native-meal-aftershutter")
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "מנתח את הארוחה")).firstMatch.waitForExistence(timeout: 5), "After the shot the photo is scanned")
         capture(app, name: "native-meal-scanning")
-        XCTAssertTrue(app.buttons["review-save"].waitForExistence(timeout: 20), "When the analysis is ready the review opens")
+        XCTAssertTrue(app.buttons["meal-time"].waitForExistence(timeout: 20), "When the analysis is ready the meal is already saved and opens for editing")
         capture(app, name: "native-meal-review")
-        app.buttons["review-save"].tap()
-        XCTAssertTrue(app.buttons["add-meal"].waitForExistence(timeout: 8), "Saving returns to the health screen")
+        app.buttons["meal-time"].tap()
+        XCTAssertTrue(app.buttons["meal-time-save"].waitForExistence(timeout: 5), "The time of the meal can be edited")
+        capture(app, name: "native-meal-time")
+        app.buttons["meal-time-save"].tap()
+        XCTAssertTrue(app.buttons["meal-time-save"].waitForNonExistence(timeout: 5))
+        app.buttons["meal-back"].tap()
+        XCTAssertTrue(app.buttons["add-meal"].waitForExistence(timeout: 8), "Closing the meal returns to the health screen")
     }
     func testAnalysisKeepsRunningWhenTheCameraIsClosed() {
         let app = launch("meal-ai")
@@ -502,7 +507,7 @@ final class WellnessUITests: XCTestCase {
         capture(app, name: "native-analysis-banner")
         XCTAssertTrue(app.buttons["analysis-review"].waitForExistence(timeout: 20), "The banner offers the review when the analysis finishes")
         app.buttons["analysis-review"].tap()
-        XCTAssertTrue(app.buttons["review-save"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["meal-time"].waitForExistence(timeout: 8), "The banner opens the meal that was saved automatically")
     }
     func testNotificationSettingsScreenOpens() {
         let app = launch("meal")

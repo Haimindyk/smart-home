@@ -115,10 +115,10 @@ export function createProvider(
       if (mealNormalization && env("WELLNESS_MODEL_SOURCE") === "owned")
         throw new Error("not_configured");
       const own = ownModel(task, env);
-      const result = await run(
+      const primary =
         own?.cloudflareModel ??
-          (mealNormalization ? MODELS.mealText : MODELS.text),
-        {
+        (mealNormalization ? MODELS.mealText : MODELS.text);
+      const body = {
           ...(own ? { lora: own.lora } : {}),
           messages: [
             {
@@ -132,9 +132,17 @@ export function createProvider(
           response_format: schema
             ? { type: "json_schema", json_schema: schema }
             : { type: "json_object" },
-        },
-        mealNormalization ? 60000 : 35000,
-      );
+        };
+      const timeout = mealNormalization ? 60000 : 35000;
+      let result;
+      try {
+        result = await run(primary, body, timeout);
+      } catch (error) {
+        // A hosted model can fail instantly (capacity, transient gateway error). Try the other free hosted
+        // text model once; quota errors and owned adapters never fall back.
+        if (own || (error as Error).message !== "provider_failed") throw error;
+        result = await run(primary === MODELS.text ? MODELS.mealText : MODELS.text, body, timeout);
+      }
       return parseModelJson(textOf(result));
     },
     async vision(image: Uint8Array, prompt: string) {
