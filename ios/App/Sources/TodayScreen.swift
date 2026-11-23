@@ -294,16 +294,19 @@ private struct MealDetail: View {
                 if mealPhotoPath(meal) != nil { PrivateMealPhoto(meal: meal, thumbnail: false).clipShape(RoundedRectangle(cornerRadius: 24)) }
                 Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded())) קק״ל").font(.hb(.largeTitle, .bold))
                 VStack(spacing: 0) {
-                    ForEach(Array(meal.data["items"].arrayValue.enumerated()), id: \.offset) { _, item in
+                    let items = meal.data["items"].arrayValue
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                         HStack {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(item["food"]["name"].stringValue ?? "רכיב").font(.hb(.headline, .semibold))
                                 Text("\(Int((item["quantity"].doubleValue ?? 0).rounded())) \(item["food"]["basis"].stringValue == "ml" ? "מ״ל" : "גרם")").foregroundStyle(Color.wellnessSecondary)
                             }
                             Spacer()
-                            if item["food"]["source"].stringValue == "ai" { Text("הערכה").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary) }
+                            if item["food"]["source"].stringValue == "ai" { Text("הערכה").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).padding(.trailing, 8) }
+                            let kcal = (item["food"]["per100"]["kcal"].doubleValue ?? 0) * (item["quantity"].doubleValue ?? 0) / 100
+                            if kcal > 0 { Text("\(Int(kcal.rounded())) קק״ל").font(.hb(.subheadline, .semibold)).foregroundStyle(Color.kcalAmberText) }
                         }.padding(.vertical, 16)
-                        Divider()
+                        if index < items.count - 1 { Divider() }
                     }
                 }.wellnessCard()
             }.padding(16)
