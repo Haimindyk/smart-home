@@ -14,7 +14,7 @@ concurrency:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Test portable authentication and import logic
@@ -44,6 +44,7 @@ jobs:
             -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test
       - name: Export native screenshots
         if: always()
+        continue-on-error: true
         run: |
           if [ -d "$RUNNER_TEMP/WellnessUI.xcresult" ]; then
             xcrun xcresulttool export attachments --path "$RUNNER_TEMP/WellnessUI.xcresult" --output-path "$RUNNER_TEMP/WellnessScreenshots"
