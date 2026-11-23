@@ -13,8 +13,8 @@ enum UITestFixtures {
     static func goals(date: String) -> [HealthRow] {
         row(id: "22222222-2222-4222-8222-222222222222", data: "{\"date\":\"\(date)\",\"kcal\":1800,\"protein\":120,\"carbs\":200,\"fat\":60,\"method\":\"manual\"}")
     }
-    static func meals(date: String) -> [HealthRow] {
-        row(id: "33333333-3333-4333-8333-333333333333", data: "{\"date\":\"\(date)\",\"kind\":\"lunch\",\"name\":\"ארוחת בדיקה\",\"imagePath\":null,\"items\":[{\"id\":\"44444444-4444-4444-8444-444444444444\",\"quantity\":100,\"food\":{\"id\":\"test-tuna\",\"name\":\"טונה\",\"basis\":\"g\",\"source\":\"manual\",\"per100\":{\"kcal\":150,\"protein\":25,\"carbs\":0,\"fat\":5}}}]}")
+    static func meals(date: String, estimated: Bool = false) -> [HealthRow] {
+        row(id: "33333333-3333-4333-8333-333333333333", data: "{\"date\":\"\(date)\",\"kind\":\"lunch\",\"name\":\"ארוחת בדיקה\",\"imagePath\":null,\"items\":[{\"id\":\"44444444-4444-4444-8444-444444444444\",\"quantity\":100,\"food\":{\"id\":\"test-tuna\",\"name\":\"טונה\",\"basis\":\"g\",\"source\":\"\(estimated ? "ai" : "manual")\",\"per100\":{\"kcal\":150,\"protein\":25,\"carbs\":0,\"fat\":5}}}\(estimated ? ",{\"id\":\"88888888-8888-4888-8888-888888888888\",\"quantity\":8,\"assumption\":\"שמן משוער למנה שנאכלה. ניתן לתקן לפי המתכון שלך.\",\"food\":{\"id\":\"test-oil\",\"name\":\"שמן בישול — הערכת מתכון\",\"basis\":\"g\",\"source\":\"ai\",\"per100\":{\"kcal\":900,\"protein\":0,\"carbs\":0,\"fat\":100}}}" : "")]}")
     }
     static func recipes() -> [HealthRow] {
         row(id: "55555555-5555-4555-8555-555555555555", data: "{\"name\":\"סלט טונה\",\"servings\":2,\"items\":[{\"id\":\"66666666-6666-4666-8666-666666666666\",\"quantity\":200,\"food\":{\"id\":\"test-tuna\",\"name\":\"טונה\",\"basis\":\"g\",\"source\":\"manual\",\"per100\":{\"kcal\":150,\"protein\":25,\"carbs\":0,\"fat\":5}}}]}")

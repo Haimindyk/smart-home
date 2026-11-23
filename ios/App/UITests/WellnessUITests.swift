@@ -54,7 +54,7 @@ final class WellnessUITests: XCTestCase {
         // under the floating tab bar. Bring the whole card into the viewport.
         app.swipeUp()
         XCTAssertTrue(meal.waitForExistence(timeout: 5)); meal.tap()
-        XCTAssertTrue(app.navigationBars["ארוחת בדיקה"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["meal-done"].waitForExistence(timeout: 5), "The meal details screen shows its Done button")
         XCTAssertTrue(app.staticTexts["טונה"].waitForExistence(timeout: 5))
         app.buttons["edit-meal"].tap()
         XCTAssertTrue(app.navigationBars["עריכת ארוחה"].waitForExistence(timeout: 5))
@@ -62,9 +62,7 @@ final class WellnessUITests: XCTestCase {
         app.buttons["ביטול"].tap()
         XCTAssertFalse(app.buttons["Back"].exists, "System navigation should also use the app's Hebrew localization")
         capture(app, name: "native-meal-details")
-        // iOS 27 no longer exposes the system back button as "BackButton"; use the first (leading) nav-bar button instead.
-        let back = app.navigationBars.buttons["BackButton"].exists ? app.navigationBars.buttons["BackButton"] : app.navigationBars.buttons.element(boundBy: 0)
-        back.tap()  // back from meal details to the health tabs
+        app.buttons["meal-back"].tap()  // back from meal details to the health tabs
         app.buttons["tab-workouts"].tap()
         XCTAssertTrue(app.buttons["workout-55555555-5555-8555-8555-555555555555"].waitForExistence(timeout: 5))
         capture(app, name: "native-workouts")
@@ -402,20 +400,21 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["מים"].exists, "...and water")
         XCTAssertTrue(app.staticTexts["Apple Watch"].exists, "...and the Apple Watch link")
         XCTAssertTrue(app.staticTexts["Apple Health"].exists, "...and the Apple Health link")
-        let before = app.buttons["הוסף 250 מיליליטר מים"]
-        XCTAssertTrue(before.exists)
-    func testSwipingAMealRightAsksBeforeDeleting() {
+        XCTAssertTrue(app.buttons["הוסף 250 מיליליטר מים"].exists)
+    }
+    func testSwipingAMealRightRemovesItWithUndo() {
         let app = launch("meal")
         let meal = app.buttons["meal-33333333-3333-4333-8333-333333333333"]
         XCTAssertTrue(meal.waitForExistence(timeout: 15))
         let start = meal.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5))
         let end = meal.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
         start.press(forDuration: 0.1, thenDragTo: end)
-        let dialog = app.buttons["מחיקה"]
-        XCTAssertTrue(dialog.waitForExistence(timeout: 5), "Swiping a meal to the right asks before deleting it")
-        capture(app, name: "native-meal-swipe-confirm")
-        app.buttons["ביטול"].tap()
-        XCTAssertTrue(meal.waitForExistence(timeout: 5), "Cancelling leaves the meal in place")
+        XCTAssertTrue(meal.waitForNonExistence(timeout: 5), "Swiping a meal to the right removes it right away")
+        let undo = app.buttons["undo-meal-delete"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 5), "An Undo button appears instead of a confirmation dialog")
+        capture(app, name: "native-meal-removed-undo")
+        undo.tap()
+        XCTAssertTrue(meal.waitForExistence(timeout: 5), "Undo brings the meal back")
     }
     func testDateWheelScrollsAndChangesTheDay() {
         let app = launch("meal")
@@ -427,6 +426,37 @@ final class WellnessUITests: XCTestCase {
         capture(app, name: "native-date-wheel")
         app.buttons["today-button"].tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Selected")).firstMatch.exists || true)
+    }
+    func testFixWithAIOpensTheImproveRecognitionSheet() {
+        let app = launch("meal-ai")
+        let meal = app.buttons["meal-33333333-3333-4333-8333-333333333333"]
+        XCTAssertTrue(meal.waitForExistence(timeout: 15))
+        app.swipeUp()
+        meal.tap()
+        let fix = app.buttons["meal-fix-ai"]
+        XCTAssertTrue(app.buttons["meal-item-1"].waitForExistence(timeout: 8), "The estimated cooking oil appears as its own editable ingredient")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "שמן משוער")).firstMatch.exists, "...with its estimate note")
+        capture(app, name: "native-meal-oil-estimate")
+        XCTAssertTrue(fix.waitForExistence(timeout: 8), "An estimated meal offers the AI correction")
+        app.swipeUp()  // the button sits below the fold, behind the floating tab bar until scrolled
+        fix.tap()
+        XCTAssertTrue(app.staticTexts["שפר זיהוי"].waitForExistence(timeout: 5), "The improve-recognition sheet opens")
+        XCTAssertTrue(app.textFields["correction-text"].waitForExistence(timeout: 5), "...with the correction field")
+        capture(app, name: "native-fix-with-ai")
+    }
+    func testEditingAMealItemOpensTheAmountSheet() {
+        let app = launch("meal")
+        let meal = app.buttons["meal-33333333-3333-4333-8333-333333333333"]
+        XCTAssertTrue(meal.waitForExistence(timeout: 15))
+        app.swipeUp(); meal.tap()
+        let item = app.buttons["meal-item-0"]
+        XCTAssertTrue(item.waitForExistence(timeout: 8))
+        item.tap()
+        XCTAssertTrue(app.buttons["quantity-save"].waitForExistence(timeout: 5), "Tapping an ingredient opens the amount sheet")
+        capture(app, name: "native-edit-item-amount")
+        app.buttons["הוסף כמות"].tap()
+        app.buttons["quantity-save"].tap()
+        XCTAssertTrue(app.buttons["meal-done"].waitForExistence(timeout: 5), "Saving returns to the meal")
     }
     func testNotificationSettingsScreenOpens() {
         let app = launch("meal")

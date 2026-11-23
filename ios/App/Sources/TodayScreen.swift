@@ -4,7 +4,6 @@ import WellnessCore
 struct TodayScreen: View {
     @EnvironmentObject private var store: AppStore
     @State private var showCalendar = false
-    @State private var mealToDelete: HealthRow?
     @State private var showSettings = false
     @State private var showCoach = false
     @State private var addingMeal = false
@@ -55,9 +54,10 @@ struct TodayScreen: View {
                         }
                     } else {
                         ForEach(store.dayMeals) { meal in
-                            NavigationLink { MealDetail(initial: meal) } label: { MealCard(meal: meal) }.buttonStyle(PressableStyle())
-                                .swipeToConfirmDelete { mealToDelete = meal }
-                                .contextMenu { Button(role: .destructive) { mealToDelete = meal } label: { Label("מחיקת הארוחה", systemImage: "trash") } }.accessibilityIdentifier("meal-\(meal.id)")
+                            NavigationLink { MealDetailScreen(initial: meal) } label: { MealCard(meal: meal) }.buttonStyle(PressableStyle())
+                                .swipeToConfirmDelete(slideOut: true) { Task { await store.removeMealWithUndo(meal) } }
+                                .transition(.asymmetric(insertion: .opacity, removal: .opacity.combined(with: .scale(scale: 0.96))))
+                                .contextMenu { Button(role: .destructive) { Task { await store.removeMealWithUndo(meal) } } label: { Label("מחיקת הארוחה", systemImage: "trash") } }.accessibilityIdentifier("meal-\(meal.id)")
                         }
                     }
                 }.padding(16).shimmer(store.loading && store.meals.isEmpty && store.goals.isEmpty)
@@ -67,9 +67,7 @@ struct TodayScreen: View {
             .toolbar(.hidden, for: .navigationBar)
             .refreshable { await store.refresh() }
             .sensoryFeedback(.selection, trigger: store.selectedDate)
-            .confirmationDialog("למחוק את הארוחה?", isPresented: Binding(get: { mealToDelete != nil }, set: { if !$0 { mealToDelete = nil } }), titleVisibility: .visible) {
-                Button("מחיקה", role: .destructive) { if let meal = mealToDelete { Task { _ = await store.deleteMeal(meal) } }; mealToDelete = nil }
-            }
+            .overlay(alignment: .bottom) { undoToast }
             .sheet(isPresented: $addingMeal) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }
             .sheet(isPresented: $showCoach) { CoachChatView().environmentObject(store) }
             .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
@@ -82,6 +80,24 @@ struct TodayScreen: View {
                 }.presentationDetents([.medium])
             }
         }.environment(\.timeZone, store.timeZone)
+    }
+}
+
+extension TodayScreen {
+    @ViewBuilder fileprivate var undoToast: some View {
+        if let removed = store.undoableMeal {
+            HStack(spacing: 12) {
+                Text("הארוחה נמחקה").font(.hb(.subheadline, .semibold)).foregroundStyle(Color.wellnessOnPrimary)
+                Spacer(minLength: 8)
+                Button { Task { await store.undoMealRemoval() } } label: {
+                    Text("ביטול").font(.hb(.subheadline, .bold)).foregroundStyle(Color.wellnessOnPrimary).padding(.horizontal, 14).frame(minHeight: 36).background(.white.opacity(0.18), in: Capsule())
+                }.accessibilityIdentifier("undo-meal-delete")
+            }
+            .padding(.horizontal, 18).padding(.vertical, 8).background(Color.wellnessPrimary, in: Capsule())
+            .shadow(color: .black.opacity(0.2), radius: 12, y: 4).padding(.horizontal, 16).padding(.bottom, 112)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .task(id: removed.id) { try? await Task.sleep(for: .seconds(6)); if store.undoableMeal?.id == removed.id { withAnimation(.snappy) { store.undoableMeal = nil } } }
+        }
     }
 }
 
@@ -352,48 +368,15 @@ private struct MealCard: View {
     }
 }
 
-private struct MealDetail: View {
-    @EnvironmentObject private var store: AppStore
-    let initial: HealthRow
-    @State private var editing = false
-    private var meal: HealthRow { store.meals.first { $0.id == initial.id } ?? initial }
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                if mealPhotoPath(meal) != nil { PrivateMealPhoto(meal: meal, thumbnail: false).clipShape(RoundedRectangle(cornerRadius: 24)) }
-                Text("\(Int(nutrientTotal(meals: [meal], nutrient: "kcal").rounded())) קק״ל").font(.hb(.largeTitle, .bold))
-                VStack(spacing: 0) {
-                    let items = meal.data["items"].arrayValue
-                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(item["food"]["name"].stringValue ?? "רכיב").font(.hb(.headline, .semibold))
-                                Text("\(Int((item["quantity"].doubleValue ?? 0).rounded())) \(item["food"]["basis"].stringValue == "ml" ? "מ״ל" : "גרם")").foregroundStyle(Color.wellnessSecondary)
-                            }
-                            Spacer()
-                            if item["food"]["source"].stringValue == "ai" { Text("הערכה").font(.hb(.caption)).foregroundStyle(Color.wellnessSecondary).padding(.trailing, 8) }
-                            let kcal = (item["food"]["per100"]["kcal"].doubleValue ?? 0) * (item["quantity"].doubleValue ?? 0) / 100
-                            if kcal > 0 { Text("\(Int(kcal.rounded())) קק״ל").font(.hb(.subheadline, .semibold)).foregroundStyle(Color.kcalAmberText) }
-                        }.padding(.vertical, 16)
-                        if index < items.count - 1 { Divider() }
-                    }
-                }.wellnessCard()
-            }.padding(16)
-        }.wellnessScreen().navigationTitle(mealName(meal)).navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("עריכה") { editing = true }.accessibilityIdentifier("edit-meal") } }
-            .sheet(isPresented: $editing) { EditMealSheet(meal: meal).environmentObject(store) }
-    }
-}
-
-private func mealName(_ meal: HealthRow) -> String {
+func mealName(_ meal: HealthRow) -> String {
     let name = meal.data["name"].stringValue ?? ""
     return name.isEmpty ? meal.data["items"].arrayValue.compactMap { $0["food"]["name"].stringValue }.prefix(2).joined(separator: " ו") : name
 }
 
-private func mealPhotoPath(_ meal: HealthRow) -> String? {
+func mealPhotoPath(_ meal: HealthRow) -> String? {
     meal.data["imagePath"].stringValue ?? meal.data["items"].arrayValue.compactMap { $0["food"]["imagePath"].stringValue }.first
 }
-private struct PrivateMealPhoto: View {
+struct PrivateMealPhoto: View {
     @EnvironmentObject private var store: AppStore
     @State private var image: UIImage?
     let meal: HealthRow

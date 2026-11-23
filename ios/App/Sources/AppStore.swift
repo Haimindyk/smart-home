@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 import WellnessCore
 
 @MainActor
@@ -12,6 +13,8 @@ final class AppStore: ObservableObject {
     @Published var error: String?
     @Published var selectedDate = Date()
     @Published private(set) var meals: [HealthRow] = []
+    /// The meal that was just removed; shown with an Undo button for a few seconds.
+    @Published var undoableMeal: HealthRow?
     @Published private(set) var personalFoods: [HealthRow] = []
     @Published private(set) var recipes: [HealthRow] = []
     @Published private(set) var goals: [HealthRow] = []
@@ -39,10 +42,10 @@ final class AppStore: ObservableObject {
             phase = scenario == "--ui-test-login" ? .signedOut : .signedIn
             if phase == .signedIn {
                 session = Session(accessToken: "ui-test", refreshToken: "ui-test", owner: UITestFixtures.owner, member: "11111111-1111-4111-8111-111111111111")
-                profile = .object(["timezone": .string("UTC"), "birthDate": .string("1990-01-01"), "aiProviderConsent": .bool(scenario == "--ui-test-coach")])
+                profile = .object(["timezone": .string("UTC"), "birthDate": .string("1990-01-01"), "aiProviderConsent": .bool(scenario == "--ui-test-coach" || scenario == "--ui-test-meal-ai")])
                 goals = UITestFixtures.goals(date: dateKey)
-                if scenario == "--ui-test-meal" { steps = 1454; burnedKcal = 320 }
-                if scenario == "--ui-test-meal" || scenario == "--ui-test-coach" { meals = UITestFixtures.meals(date: dateKey); workouts = UITestFixtures.workouts(date: dateKey); plans = UITestFixtures.plans(); weightLogs = UITestFixtures.weights(zone: timeZone); recipes = UITestFixtures.recipes() }
+                if scenario == "--ui-test-meal" || scenario == "--ui-test-meal-ai" { steps = 1454; burnedKcal = 320 }
+                if scenario == "--ui-test-meal" || scenario == "--ui-test-meal-ai" || scenario == "--ui-test-coach" { meals = UITestFixtures.meals(date: dateKey, estimated: scenario == "--ui-test-meal-ai"); workouts = UITestFixtures.workouts(date: dateKey); plans = UITestFixtures.plans(); weightLogs = UITestFixtures.weights(zone: timeZone); recipes = UITestFixtures.recipes() }
             }
             return
         }
@@ -534,6 +537,29 @@ final class AppStore: ObservableObject {
         return result
     }
     func finishedTimestamp() -> String { Self.iso(Date()) }
+    private var isFixtureSession: Bool { backend == nil && session?.accessToken == "ui-test" }
+    /// Removes a meal from the screen at once (animated) and deletes it on the server in the background; it comes back if that fails.
+    func removeMealWithUndo(_ row: HealthRow) async {
+        guard let index = meals.firstIndex(where: { $0.id == row.id }) else { return }
+        withAnimation(.snappy) { meals.remove(at: index) }
+        undoableMeal = row
+        if isFixtureSession { return }
+        let ok = await write("לא הצלחנו למחוק את הארוחה.") { backend, owner in try await backend.softDelete(table: "meals", row: row, owner: owner) }
+        if !ok {
+            withAnimation(.snappy) { meals.insert(row, at: min(index, meals.count)) }
+            if undoableMeal?.id == row.id { undoableMeal = nil }
+        }
+    }
+    /// Brings back the meal removed last, as a new row with the same content.
+    func undoMealRemoval() async {
+        guard let row = undoableMeal else { return }
+        undoableMeal = nil
+        if isFixtureSession { withAnimation(.snappy) { meals.append(row) }; return }
+        _ = await write("לא הצלחנו לשחזר את הארוחה.") { backend, owner in
+            let restored = try await backend.save(table: "meals", owner: owner, payload: row.data)
+            if session?.owner == owner { withAnimation(.snappy) { meals.append(restored) } }
+        }
+    }
     func deleteMeal(_ row: HealthRow) async -> Bool {
         await write("לא הצלחנו למחוק את הארוחה.") { backend, owner in
             try await backend.softDelete(table: "meals", row: row, owner: owner)
@@ -596,6 +622,27 @@ final class AppStore: ObservableObject {
             guard let analysisId = raw["analysisId"].stringValue, !items.isEmpty else { self.error = "לא הצלחנו לזהות את הארוחה. אפשר לנסות תמונה אחרת או להוסיף ידנית."; return nil }
             return MealAnalysis(items: items, needsClarification: raw["needsClarification"].boolValue == true, question: raw["question"].stringValue ?? "", analysisId: analysisId, imagePath: path)
         } catch { if session?.owner == owner { self.error = "הניתוח לא הושלם. בדוק חיבור ונסה שוב." }; return nil }
+    }
+    /// "Fix with AI": sends the user's correction ("this is rice, not pasta") to the server, which re-estimates the saved meal's items.
+    func correctMeal(_ row: HealthRow, text: String) async -> Bool {
+        let note = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !note.isEmpty, aiEligible, aiConsented, let owner = session?.owner, let backend, case .object(var fields) = row.data else { return false }
+        busy = true; defer { busy = false }
+        let requestID = UUID().uuidString.lowercased()
+        do {
+            let raw = try await backend.invoke("wellness-ai", body: .object(["action": .string("correct_meal"), "mealId": .string(row.id), "expectedVersion": .number(Double(row.version)), "description": .string(String(note.prefix(2000))), "requestId": .string(requestID)]), owner: owner)
+            let items = raw["items"].arrayValue
+            guard session?.owner == owner else { return false }
+            guard !items.isEmpty else { self.error = "לא הצלחנו לתקן את הארוחה. נסה לנסח אחרת."; return false }
+            fields["items"] = .array(items)
+            var estimate: [String: JSONValue] = [:]
+            if case .object(let old) = row.data["aiEstimate"] { estimate = old }
+            estimate["lastCorrectionId"] = .string(requestID)
+            fields["aiEstimate"] = .object(estimate)
+            let saved = try await backend.save(table: "meals", owner: owner, payload: .object(fields), existing: row)
+            if session?.owner == owner, let index = meals.firstIndex(where: { $0.id == row.id }) { meals[index] = saved }
+            return true
+        } catch { if session?.owner == owner { self.error = "התיקון לא הושלם. בדוק חיבור ונסה שוב." }; return false }
     }
     func saveAnalyzedMeal(_ analysis: MealAnalysis, items: [JSONValue], kind: String) async -> Bool {
         guard !items.isEmpty else { return false }
