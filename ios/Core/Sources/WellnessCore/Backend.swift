@@ -57,7 +57,9 @@ public actor Backend {
         var parts = URLComponents(url: root, resolvingAgainstBaseURL: false)!
         parts.path = path; parts.queryItems = query.isEmpty ? nil : query; parts.fragment = nil
         guard let url = parts.url else { throw BackendError.configuration }
-        var req = URLRequest(url: url); req.httpMethod = method; req.timeoutInterval = 20
+        var req = URLRequest(url: url); req.httpMethod = method
+        // Edge functions that call the AI provider (meal photos, coach, plans) routinely take 30-60 s.
+        req.timeoutInterval = path.hasPrefix("/functions/v1/") ? 120 : 20
         req.setValue(key, forHTTPHeaderField: "apikey"); req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("return=representation", forHTTPHeaderField: "Prefer")
         if let token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
