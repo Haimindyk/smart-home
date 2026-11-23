@@ -68,6 +68,7 @@ struct ProgressScreen: View {
                         }
                     }
                 }.padding(16)
+            .contentMargins(.bottom, 110, for: .scrollContent)  // clear of the floating tab bar and add button
             }.wellnessScreen().safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }.toolbar(.hidden, for: .navigationBar).refreshable { await store.refresh() }
         }
     }

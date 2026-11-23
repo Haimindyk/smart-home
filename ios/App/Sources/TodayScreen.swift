@@ -62,6 +62,7 @@ struct TodayScreen: View {
                     }
                 }.padding(16).shimmer(store.loading && store.meals.isEmpty && store.goals.isEmpty)
             }
+            .contentMargins(.bottom, 110, for: .scrollContent)  // clear of the floating tab bar and add button
             .wellnessScreen()
             .safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }
             .toolbar(.hidden, for: .navigationBar)

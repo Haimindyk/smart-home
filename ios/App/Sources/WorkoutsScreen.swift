@@ -57,6 +57,7 @@ struct WorkoutsScreen: View {
                         }.buttonStyle(PressableStyle()).accessibilityIdentifier("workout-\(workout.id)")
                     }
                 }.padding(16)
+            .contentMargins(.bottom, 110, for: .scrollContent)  // clear of the floating tab bar and add button
             }.wellnessScreen().safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }.toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $trainer) { TrainerSheet().environmentObject(store) }
             .sheet(isPresented: $creating) { PlanEditorSheet().environmentObject(store) }
