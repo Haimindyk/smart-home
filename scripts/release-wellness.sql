@@ -45,3 +45,13 @@ select exists(select 1 from supabase_migrations.schema_migrations where version=
 insert into supabase_migrations.schema_migrations(version,name,statements)
 values('20261115230302','private_product_photos',array['Applied from reviewed Git merge; see repository migration']);
 \endif
+
+select exists(select 1 from supabase_migrations.schema_migrations where version='20261118120000') as apns_applied \gset
+\if :apns_applied
+\echo 'APNs device table already applied.'
+\else
+\ir ../supabase/migrations/20261118120000_apns_devices.sql
+insert into supabase_migrations.schema_migrations(version,name,statements)
+values('20261118120000','apns_devices',array['Applied from reviewed Git merge; see repository migration 20261118120000_apns_devices.sql']);
+\endif
+

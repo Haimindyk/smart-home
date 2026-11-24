@@ -64,7 +64,7 @@ struct WorkoutsScreen: View {
             .confirmationDialog("להעביר את התוכנית לארכיון?", isPresented: Binding(get: { planToArchive != nil }, set: { if !$0 { planToArchive = nil } }), titleVisibility: .visible) {
                 Button("העבר לארכיון", role: .destructive) { if let plan = planToArchive { Task { _ = await store.archivePlan(plan) } }; planToArchive = nil }
             } message: { Text("האימונים שכבר נרשמו נשארים ביומן.") }
-            .refreshable { await store.refresh() }
+            .refreshable { await Task { await store.refresh() }.value }
         }
     }
 }

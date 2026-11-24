@@ -66,7 +66,7 @@ struct TodayScreen: View {
             .wellnessScreen()
             .safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }
             .toolbar(.hidden, for: .navigationBar)
-            .refreshable { await store.refresh() }
+            .refreshable { await Task { await store.refresh() }.value }
             .sensoryFeedback(.selection, trigger: store.selectedDate)
             .overlay(alignment: .bottom) { undoToast }
             .sheet(isPresented: $addingMeal) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }

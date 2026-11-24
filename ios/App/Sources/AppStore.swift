@@ -125,6 +125,8 @@ final class AppStore: ObservableObject {
             candidates = pendingAppleWorkouts(candidates, existing: importedIDs)
             selection.formIntersection(Set(candidates.map(\.id)))
             publishToWatch()
+        } catch is CancellationError {
+            return   // cancelled (for example the pull to refresh was interrupted): not an error to show
         } catch {
             if request == revision, session?.owner == owner, await handleSessionLoss(error) { return }
             if request == revision, session?.owner == owner { self.error = Self.message(error) }

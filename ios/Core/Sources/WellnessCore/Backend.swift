@@ -71,6 +71,8 @@ public actor Backend {
             guard let response = response as? HTTPURLResponse else { throw BackendError.invalidResponse }
             return (data, response.statusCode)
         } catch is CancellationError { throw CancellationError() }
+        // URLSession reports a cancelled request as URLError.cancelled: that is not a lost connection (a pull to refresh can be cancelled by SwiftUI).
+        catch let e as URLError where e.code == .cancelled { throw CancellationError() }
         catch let e as BackendError { throw e }
         catch { throw BackendError.connection }
     }

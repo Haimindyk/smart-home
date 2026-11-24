@@ -33,6 +33,7 @@ final class HomeStore: ObservableObject {
 
     // MARK: Loading
     /// Background refresh: only against the real backend, and never while a write is in flight (it would flicker optimistic rows).
+    private static let loadFailedMessage = "לא הצלחנו לטעון את נתוני הבית. אפשר למשוך לרענון."
     func refreshIfLive() async { guard app?.backend != nil, !loading else { return }; await refresh() }
     func refresh() async {
         guard let app, let owner = app.session?.owner else { return }
@@ -59,9 +60,13 @@ final class HomeStore: ObservableObject {
             events = result.3.compactMap(HEvent.init); members = result.4.compactMap(HMember.init)
             suggestions = assistant.0.compactMap(HSuggestion.init); notes = assistant.1.compactMap(HPrivateNote.init); attachments = files.compactMap(HAttachment.init)
             if selectedSectionID == nil || !sections.contains(where: { $0.id == selectedSectionID }) { selectedSectionID = sections.first?.id }
+            // A successful load makes an earlier load error obsolete.
+            if self.error == Self.loadFailedMessage { self.error = nil }
+        } catch is CancellationError {
+            return   // cancelled (for example the pull to refresh was interrupted): not an error to show
         } catch {
             if request == revision, app.session?.owner == owner, await app.handleSessionLoss(error) { return }
-            if request == revision, app.session?.owner == owner { self.error = "לא הצלחנו לטעון את נתוני הבית. אפשר למשוך לרענון." }
+            if request == revision, app.session?.owner == owner { self.error = Self.loadFailedMessage }
         }
     }
     func reset() { revision += 1; sections = []; tasks = []; chores = []; events = []; members = []; suggestions = []; notes = []; selectedSectionID = nil; error = nil }

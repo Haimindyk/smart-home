@@ -76,7 +76,7 @@ struct ActivityScreen: View {
                     Button { privacy = true } label: { Text("מה נשמר בחשבון?").font(.hb(.footnote)).foregroundStyle(Color.wellnessSecondary).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle()) }
                 }.padding(16)
             .contentMargins(.bottom, 110, for: .scrollContent)  // clear of the floating tab bar and add button
-            }.wellnessScreen().safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }.toolbar(.hidden, for: .navigationBar).refreshable { await store.readHealth() }
+            }.wellnessScreen().safeAreaInset(edge: .top, spacing: 0) { HealthTabBar() }.toolbar(.hidden, for: .navigationBar).refreshable { await Task { await store.readHealth() }.value }
                 .sheet(isPresented: $privacy) { HealthPrivacySheet() }
         }
     }
