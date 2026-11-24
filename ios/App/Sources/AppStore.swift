@@ -259,7 +259,13 @@ final class AppStore: ObservableObject {
         do {
             let result = try await backend.invoke("food-lookup", body: .object(body), owner: owner)
             return session?.owner == owner ? result["foods"].arrayValue : nil
-        } catch { if session?.owner == owner { self.error = "החיפוש לא הושלם. בדוק חיבור ונסה שוב." }; return nil }
+        } catch {
+            if session?.owner == owner {
+                if case BackendError.server(let code) = error, code == 502 { self.error = "מאגר המוצרים (Open Food Facts) איטי או לא זמין כרגע. נסה שוב בעוד רגע, או הוסף ידנית." }
+                else { self.error = "החיפוש לא הושלם. בדוק חיבור ונסה שוב." }
+            }
+            return nil
+        }
     }
     func saveMeal(kind: String, name: String, food: JSONValue, quantity: Double) async -> Bool {
         guard !creatingMeal else { return false }; creatingMeal = true; defer { creatingMeal = false } // a double tap must not log the meal twice
