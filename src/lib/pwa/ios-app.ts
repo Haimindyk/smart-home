@@ -7,7 +7,7 @@ export const IOS_APP = {
   bundleId: "com.haimindyk.smarthome.wellness",
   title: "Wellness",
   version: "0.1.0",
-  build: "110",
+  build: "112",
   ipaPath: "/ios/SmartHomeWellness.ipa",
   manifestPath: "/ios/manifest.plist",
 } as const;
