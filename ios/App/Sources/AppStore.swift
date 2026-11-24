@@ -222,6 +222,7 @@ final class AppStore: ObservableObject {
 
     private var creatingMeal = false
     private var creatingTraining = false
+    private var loggingWeight = false
     private func write(_ failure: String, _ work: (Backend, String) async throws -> Void) async -> Bool {
         guard let owner = session?.owner, let backend else { return false }
         do { try await work(backend, owner); let ok = session?.owner == owner; if ok { publishToWatch() }; return ok }
@@ -242,7 +243,8 @@ final class AppStore: ObservableObject {
         }
     }
     func logWeight(_ kg: Double) async -> Bool {
-        guard kg >= 20, kg <= 400 else { return false }
+        guard kg.isFinite, kg >= 20, kg <= 400 else { error = "המשקל חייב להיות בין 20 ל־400 ק״ג."; return false }
+        guard !loggingWeight else { return false }; loggingWeight = true; defer { loggingWeight = false } // a double tap must not log it twice
         let date = dateKey
         return await write("לא הצלחנו לשמור את המשקל.") { backend, owner in
             let row = try await backend.save(table: "weight_logs", owner: owner, payload: .object(["date": .string(date), "weight": .number((kg * 10).rounded() / 10)]))
