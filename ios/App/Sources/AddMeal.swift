@@ -63,7 +63,7 @@ struct AddMealSheet: View {
                 }
                 else if results.isEmpty {
                     ContentUnavailableView(searched ? "לא נמצאו מוצרים" : "מה אכלת?", systemImage: searched ? "questionmark.circle" : "fork.knife",
-                        description: Text(searched ? "נסה שם אחר או סרוק ברקוד." : "חפש מוצר או סרוק ברקוד כדי להוסיף ארוחה."))
+                        description: Text(searched ? "המוצר לא נמצא במאגר המוצרים הפתוח (חלק מהמוצרים הישראליים חסרים בו). אפשר לנסות שם אחר, או להוסיף ידנית לפי התווית." : "חפש מוצר או סרוק ברקוד כדי להוסיף ארוחה."))
                 } else {
                     ScrollView { LazyVStack(spacing: 10) {
                         ForEach(results) { choice in

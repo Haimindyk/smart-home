@@ -158,6 +158,13 @@ describe("printed product data without generative estimates", () => {
     expect(food.per100.fiber).toBeNull();
     expect(food.source).toBe("openfoodfacts");
   });
+  it("converts energy given only in kJ to kcal (exact unit conversion) and still rejects a product with no energy", () => {
+    const { "energy-kcal_100g": _omit, ...rest } = off.product.nutriments as Record<string, number>;
+    const kjOnly = { ...off, product: { ...off.product, nutriments: { ...rest, "energy-kj_100g": 2092 } } };
+    expect(openFoodFactsProduct(kjOnly, "12345678")!.per100.kcal).toBe(500);
+    const noEnergy = { ...off, product: { ...off.product, nutriments: { ...rest } } };
+    expect(openFoodFactsProduct(noEnergy, "12345678")).toBeNull();
+  });
   it("returns no product for missing required values, ambiguous basis or malformed numbers", () => {
     expect(
       openFoodFactsProduct(

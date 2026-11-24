@@ -22,7 +22,10 @@ export function openFoodFactsProduct(raw: unknown, barcode: string) {
         ? "ml"
         : null;
   if (!basis) return null; // Per-serving/unknown basis needs the actual label.
-  const kcal = value("energy-kcal_100g", 1000),
+  // Some products only list energy in kJ: converting the unit is exact (1 kcal = 4.184 kJ), not an inference.
+  const kj = value("energy-kj_100g", 4200) ?? value("energy_100g", 4200);
+  const kcal = value("energy-kcal_100g", 1000) ??
+      (kj === null ? null : Math.round((kj / 4.184) * 10) / 10),
     protein = value("proteins_100g", 100),
     carbs = value("carbohydrates_100g", 100),
     fat = value("fat_100g", 100);
