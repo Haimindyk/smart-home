@@ -178,7 +178,10 @@ struct MealReviewView: View {
     private func kcal(_ item: JSONValue) -> Double { (item["food"]["per100"]["kcal"].doubleValue ?? 0) * (item["quantity"].doubleValue ?? 0) / 100 }
     private func change(_ index: Int, _ delta: Double) {
         guard items.indices.contains(index), case .object(var fields) = items[index] else { return }
-        fields["quantity"] = .number(min(10_000, max(1, (fields["quantity"]?.doubleValue ?? 0) + delta))); items[index] = .object(fields)
+        let value = min(10_000, max(1, (fields["quantity"]?.doubleValue ?? 0) + delta))
+        fields["quantity"] = .number(value)
+        if fields["quantityRange"] != nil { fields["quantityRange"] = .object(["low": .number(value), "high": .number(value)]) } // a user-set amount is exact: the old AI range must not contradict it
+        items[index] = .object(fields)
     }
 }
 

@@ -367,7 +367,10 @@ private struct QuantitySheet: View {
     }
     private func save() {
         guard let meal, var items = Optional(meal.data["items"].arrayValue), items.indices.contains(index), case .object(var fields) = items[index] else { return }
-        fields["quantity"] = .number((quantity * 10).rounded() / 10); items[index] = .object(fields)
+        let exact = (quantity * 10).rounded() / 10
+        fields["quantity"] = .number(exact)
+        if fields["quantityRange"] != nil { fields["quantityRange"] = .object(["low": .number(exact), "high": .number(exact)]) } // a user-set amount is exact: the old AI range must not contradict it
+        items[index] = .object(fields)
         Task { if await store.updateMeal(meal, name: meal.data["name"].stringValue ?? "", kind: meal.data["kind"].stringValue ?? "snack", items: items) { dismiss() } }
     }
 }
