@@ -118,3 +118,12 @@ enabled and an App Store Connect app record. The icon in `Sources/Assets.xcasset
 ## Releases
 
 Every merge to `main` that touches `ios/` uploads a new TestFlight build. If TestFlight lists a build that cannot be installed ("The app is not available or doesn't exist"), merge any change under `ios/` to produce a fresh build number; a re-run of the same workflow run reuses the same build number and Apple rejects the duplicate.
+
+## Installing from the website (ad-hoc, no TestFlight)
+
+The website offers iPhone visitors who have not installed it as a PWA a button that installs the native app over the air
+(`itms-services`). The IPA and its manifest are served from `public/ios/` and `/ios/manifest.plist`. To ship a newer build,
+run `scripts/update-ios-ipa.sh <run-id>` with a "Native iOS checks" run whose `adhoc-ipa` artifact has not expired
+(3 days), and commit the result in a pull request. An ad-hoc build installs only on iPhones registered in the Apple
+developer account (the provisioning profile lists them); register a new family iPhone's UDID, then rebuild.
+
