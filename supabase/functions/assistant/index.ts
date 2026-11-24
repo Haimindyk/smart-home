@@ -413,6 +413,11 @@ Deno.serve(async (req) => {
     return json({ error: "unsupported_intent" }, 400);
   }
 
+  // Reject an empty request before it is counted against the daily cap.
+  if (!body.message && !(body.imageBase64 && body.imageMimeType)) {
+    return json({ error: "empty_message" }, 400);
+  }
+
   const { data: callsToday, error: usageError } = await supabase.rpc("increment_ai_usage");
   if (usageError) {
     console.error("assistant: increment_ai_usage failed", usageError);
