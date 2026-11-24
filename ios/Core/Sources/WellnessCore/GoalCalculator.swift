@@ -28,7 +28,8 @@ public enum GoalCalculator {
     public static func calculate(_ p: Profile, on date: String) throws -> Goal {
         guard let birth = p.birthDate else { throw Failure.adultProfileRequired }
         let age = try calendarAge(birthDate: birth, on: date)
-        guard age >= 18, let weight = p.weight, let height = p.height, let physiology = p.physiology else { throw Failure.adultProfileRequired }
+        guard age >= 18, let weight = p.weight, let height = p.height, let physiology = p.physiology,
+              (20...400).contains(weight), (80...260).contains(height) else { throw Failure.adultProfileRequired }
         let sexTerm: Double = physiology == "male" ? 5 : -161
         let bmr: Double = 10 * weight + 6.25 * height - 5 * Double(age) + sexTerm
         let factors: [String: Double] = ["sedentary": 1.2, "light": 1.375, "moderate": 1.55, "high": 1.725]

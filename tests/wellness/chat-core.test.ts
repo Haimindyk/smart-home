@@ -121,3 +121,14 @@ describe("symptom routing", () => {
     expect(symptomReply("איך עושים סקוואט? ועצות לארוחת ערב" )).toBeNull();
   });
 });
+
+describe("diarySummary robustness", () => {
+  it("skips a malformed meal and an invalid goal instead of failing", () => {
+    const good = { data: { date: "2026-11-04", items: [{ quantity: 100, food: { per100: { kcal: 50, protein: 5, carbs: 1, fat: 1 } } }] } };
+    const bad = { data: { date: "2026-11-04", items: [{ quantity: -1, food: { per100: {} } }] } };
+    const s = diarySummary("2026-11-04", [bad, good], { kcal: "x" }, []);
+    expect(s.loggedMealCount).toBe(1);
+    expect(s.loggedTotals.kcal).toBe(50);
+    expect(s.confirmedTarget).toBeNull();
+  });
+});

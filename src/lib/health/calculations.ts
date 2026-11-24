@@ -41,7 +41,17 @@ export function calculateGoal(
   date: string,
 ): Payload<"nutrition_goals"> {
   const age = p.birthDate ? ageOnDate(p.birthDate, date) : p.age;
-  if (!age || age < 18 || !p.weight || !p.height || !p.physiology)
+  if (
+    !age ||
+    age < 18 ||
+    !p.weight ||
+    !p.height ||
+    !p.physiology ||
+    p.weight < 20 ||
+    p.weight > 400 ||
+    p.height < 80 ||
+    p.height > 260
+  )
     throw new Error("adult_profile_required");
   const bmr =
     10 * p.weight +
