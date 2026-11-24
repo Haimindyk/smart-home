@@ -223,6 +223,7 @@ final class AppStore: ObservableObject {
     private var creatingMeal = false
     private var creatingTraining = false
     private var loggingWeight = false
+    private var creatingRecipe = false
     private func write(_ failure: String, _ work: (Backend, String) async throws -> Void) async -> Bool {
         guard let owner = session?.owner, let backend else { return false }
         do { try await work(backend, owner); let ok = session?.owner == owner; if ok { publishToWatch() }; return ok }
@@ -377,6 +378,7 @@ final class AppStore: ObservableObject {
         let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty, clean.count <= 200, servings > 0, servings <= 1000, !items.isEmpty, items.count <= 100,
               items.allSatisfy({ ($0["food"]["basis"].stringValue ?? "g") == "g" }) else { error = "מתכון יכול להכיל רק מרכיבים שנמדדים בגרמים."; return false }
+        guard !creatingRecipe else { return false }; creatingRecipe = true; defer { creatingRecipe = false } // a double tap must not save it twice
         let payload: JSONValue = .object(["name": .string(clean), "servings": .number(servings), "items": .array(items)])
         return await write("לא הצלחנו לשמור את המתכון.") { backend, owner in
             let row = try await backend.save(table: "recipes", owner: owner, payload: payload)
@@ -385,7 +387,7 @@ final class AppStore: ObservableObject {
     }
     func updateRecipe(_ row: HealthRow, name: String, servings: Double, grams: [String: Double]) async -> Bool {
         let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard case .object(var fields) = row.data, !clean.isEmpty, clean.count <= 200, servings > 0, servings <= 1000, grams.values.allSatisfy({ $0 > 0 && $0 <= 10_000 }) else { return false }
+        guard case .object(var fields) = row.data, !clean.isEmpty, clean.count <= 200, servings > 0, servings <= 1000, grams.values.allSatisfy({ $0 > 0 && $0 <= 10_000 }) else { error = "בדוק את שם המתכון, מספר המנות והכמויות (עד 10,000 גרם לרכיב)."; return false }
         let items = row.data["items"].arrayValue.map { item -> JSONValue in
             guard case .object(var f) = item, let id = f["id"]?.stringValue, let g = grams[id] else { return item }
             f["quantity"] = .number(g); return .object(f)

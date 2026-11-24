@@ -87,9 +87,10 @@ struct RecipeEditorSheet: View {
     }
     private func number(_ s: String) -> Double? { Double(s.replacingOccurrences(of: ",", with: ".")) }
     private func save() async -> Bool {
-        guard let n = number(servings), n > 0 else { return false }
+        let invalid = "בדוק את מספר המנות ואת הכמויות: חייבים להיות מספרים גדולים מאפס."
+        guard let n = number(servings), n > 0 else { store.error = invalid; return false }
         var parsed: [String: Double] = [:]
-        for (id, text) in grams { guard let g = number(text), g > 0 else { return false }; parsed[id] = g }
+        for (id, text) in grams { guard let g = number(text), g > 0 else { store.error = invalid; return false }; parsed[id] = g }
         return await store.updateRecipe(row, name: name, servings: n, grams: parsed)
     }
 }
