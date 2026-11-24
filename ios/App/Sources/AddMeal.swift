@@ -274,16 +274,24 @@ struct ManualFoodSheet: View {
     @State private var fat = ""
     private func n(_ s: String) -> Double? { Double(s.replacingOccurrences(of: ",", with: ".")).flatMap { $0 >= 0 ? $0 : nil } }
     /// Per 100 g/ml the three macros cannot add up to more than 100 (a little slack for rounding on labels).
-    private var macrosPlausible: Bool { (n(protein) ?? 0) + (n(carbs) ?? 0) + (n(fat) ?? 0) <= 101 }
-    private var valid: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty && (n(kcal) ?? -1) >= 0 && (n(kcal) ?? 0) <= 2000 && n(protein) != nil && n(carbs) != nil && n(fat) != nil && macrosPlausible }
+    private var macrosPlausible: Bool {
+        let total: Double = (n(protein) ?? 0) + (n(carbs) ?? 0) + (n(fat) ?? 0)
+        return total <= 101
+    }
+    private var valid: Bool {
+        let named = !name.trimmingCharacters(in: .whitespaces).isEmpty
+        let energy = n(kcal) ?? -1
+        let numbersFilled = n(protein) != nil && n(carbs) != nil && n(fat) != nil
+        return named && energy >= 0 && energy <= 2000 && numbersFilled && macrosPlausible
+    }
     var body: some View {
         NavigationStack {
             List {
                 Section("שם המזון") { TextField("למשל: לחם מקמח מלא", text: $name).accessibilityIdentifier("manual-name") }
-                Section("ערכים תזונתיים") {
+                Section {
                     Picker("ל־100", selection: $basis) { Text("גרם").tag("g"); Text("מ״ל").tag("ml") }.pickerStyle(.segmented)
                     row("קלוריות ל־100", $kcal); row("חלבון (גרם)", $protein); row("פחמימות (גרם)", $carbs); row("שומן (גרם)", $fat)
-                } footer: {
+                } header: { Text("ערכים תזונתיים") } footer: {
                     if !macrosPlausible { Text("חלבון + פחמימות + שומן ל־100 לא יכולים לעבור 100 גרם. בדוק את הערכים.").foregroundStyle(Color.fatCoralText) }
                 }
             }
