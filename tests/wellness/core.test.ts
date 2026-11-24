@@ -76,6 +76,11 @@ describe("coach constraints", () => {
       ),
     ).toThrow("unbalanced_program");
   });
+  it("builds a bodyweight-only program even though no pulling movement exists for that equipment", () => {
+    const bodyweight = { ...prefs, equipment: ["bodyweight"], focus: ["back"] };
+    const plan = { ...template, exercises: ["Bodyweight_Squat", "Glute_Bridge", "Push_Up", "Plank"].map((catalogId) => ({ catalogId, sets: 2, reps: 10, rest: 60 })) };
+    expect(makeProgram({ plans: [plan] }, bodyweight, "2026-11-01").changes[0].data.exercises).toHaveLength(4);
+  });
   it("rejects a program that exceeds the available workout time", () => {
     expect(() =>
       makeProgram(

@@ -336,9 +336,22 @@ export function makeProgram(
         (e) => wellnessExercises.find((c) => c.id === e.catalogId)!.pattern,
       ),
     );
-  if (!["push", "pull", "squat", "hinge", "core"].every((k) => patterns.has(k)))
+  // Only require what the user's equipment and avoid list can actually provide: with bodyweight only there may be
+  // no pulling movement, and asking for one would make every attempt fail.
+  const offered = wellnessExercises.filter(
+    (c) => p.equipment.includes(c.equipment) && !p.avoid.includes(c.id),
+  );
+  if (
+    !["push", "pull", "squat", "hinge", "core"].every(
+      (k) => patterns.has(k) || !offered.some((c) => c.pattern === k),
+    )
+  )
     throw new Error("unbalanced_program");
-  if (p.focus.some((m) => !all.some((e) => e.muscle === m)))
+  if (
+    p.focus.some(
+      (m) => !all.some((e) => e.muscle === m) && offered.some((c) => c.muscle === m),
+    )
+  )
     throw new Error("unbalanced_program");
   return {
     kind: "program",
