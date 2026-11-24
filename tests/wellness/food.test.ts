@@ -172,6 +172,13 @@ describe("printed product data without generative estimates", () => {
     const caloric = { status: 1, product: { product_name: "Snack", nutrition_data_per: "100g", nutriments: { "energy-kcal_100g": 120, proteins_100g: 3 } } };
     expect(openFoodFactsProduct(caloric, "12345678")).toBeNull();
   });
+  it("reads an omitted macro as zero only when the listed macros explain the energy", () => {
+    const item = (nutriments: Record<string, number>) => ({ status: 1, product: { product_name: "Item", nutrition_data_per: "100g", nutriments } });
+    const juice = openFoodFactsProduct(item({ "energy-kcal_100g": 45, carbohydrates_100g: 10.5 }), "12345678")!;
+    expect(juice.per100).toMatchObject({ kcal: 45, protein: 0, carbs: 10.5, fat: 0 });
+    expect(openFoodFactsProduct(item({ "energy-kcal_100g": 600, proteins_100g: 20, carbohydrates_100g: 15 }), "12345678")).toBeNull();
+    expect(openFoodFactsProduct(item({ "energy-kcal_100g": 120 }), "12345678")).toBeNull();
+  });
   it("returns no product for missing required values, ambiguous basis or malformed numbers", () => {
     expect(
       openFoodFactsProduct(

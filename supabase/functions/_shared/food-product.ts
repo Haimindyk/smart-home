@@ -30,11 +30,14 @@ export function openFoodFactsProduct(raw: unknown, barcode: string) {
     carbs = value("carbohydrates_100g", 100),
     fat = value("fat_100g", 100);
   if (kcal === null) return null;
-  // Zero-calorie drinks (for example Sprite Zero) list energy but omit the macros that are zero. At 5 kcal/100 or
-  // less, the energy itself bounds every missing macro to about a gram, so a missing value is treated as 0.
-  // Any other product with a missing macro still needs the real label.
-  const nearZero = kcal <= 5;
-  const macro = (v: number | null) => (v === null && nearZero ? 0 : v);
+  // Open Food Facts often omits macros that are zero (diet drinks, juice without fat or protein, ...). A missing macro is
+  // read as 0 ONLY when the listed macros already account for the declared energy (4 kcal/g protein and carbs, 9 kcal/g
+  // fat, within 5 kcal or 12%). Otherwise the energy proves something is missing and the real label is needed.
+  const present = [protein, carbs, fat].filter((v) => v !== null).length;
+  const listed = 4 * (protein ?? 0) + 4 * (carbs ?? 0) + 9 * (fat ?? 0);
+  const energyExplained =
+    kcal <= 5 || (present > 0 && kcal - listed <= Math.max(5, 0.12 * kcal));
+  const macro = (v: number | null) => (v === null && energyExplained ? 0 : v);
   const [proteinG, carbsG, fatG] = [macro(protein), macro(carbs), macro(fat)];
   if ([proteinG, carbsG, fatG].some((v) => v === null)) return null;
   const name =
