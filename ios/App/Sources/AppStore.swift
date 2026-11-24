@@ -262,7 +262,7 @@ final class AppStore: ObservableObject {
         guard quantity > 0, quantity <= 10_000 else { return false }
         let date = dateKey
         let item: JSONValue = .object(["id": .string(UUID().uuidString.lowercased()), "food": food, "quantity": .number(quantity)])
-        let payload: JSONValue = .object(["date": .string(date), "kind": .string(kind), "name": .string(name), "items": .array([item]), "imagePath": .null])
+        let payload: JSONValue = .object(["date": .string(date), "kind": .string(kind), "name": .string(name), "items": .array([item]), "time": .string(Self.timeKey(Date(), zone: timeZone)), "imagePath": .null])
         let ok = await write("לא הצלחנו לשמור את הארוחה.") { backend, owner in
             let row = try await backend.save(table: "meals", owner: owner, payload: payload)
             if session?.owner == owner { meals.append(row) }
@@ -285,7 +285,7 @@ final class AppStore: ObservableObject {
             fields["id"] = .string(UUID().uuidString.lowercased()); return .object(fields)
         }
         guard !items.isEmpty else { return false }
-        let payload: JSONValue = .object(["date": .string(dateKey), "kind": .string(kind), "name": .string(source.data["name"].stringValue ?? ""), "items": .array(items), "imagePath": source.data["imagePath"]])
+        let payload: JSONValue = .object(["date": .string(dateKey), "kind": .string(kind), "name": .string(source.data["name"].stringValue ?? ""), "items": .array(items), "time": .string(Self.timeKey(Date(), zone: timeZone)), "imagePath": source.data["imagePath"]])
         return await write("לא הצלחנו להוסיף את הארוחה.") { backend, owner in
             let row = try await backend.save(table: "meals", owner: owner, payload: payload)
             if session?.owner == owner { meals.append(row) }
@@ -311,7 +311,7 @@ final class AppStore: ObservableObject {
             f["id"] = .string(UUID().uuidString.lowercased()); return .object(f)
         }
         guard !items.isEmpty else { return false }
-        let payload: JSONValue = .object(["date": .string(Self.dateKey(date, zone: timeZone)), "kind": source.data["kind"], "name": .string(source.data["name"].stringValue ?? ""), "items": .array(items), "imagePath": .null])
+        let payload: JSONValue = .object(["date": .string(Self.dateKey(date, zone: timeZone)), "kind": source.data["kind"], "name": .string(source.data["name"].stringValue ?? ""), "items": .array(items), "time": source.data["time"], "imagePath": .null])
         return await write("לא הצלחנו להעתיק את הארוחה.") { backend, owner in
             let row = try await backend.save(table: "meals", owner: owner, payload: payload)
             if session?.owner == owner { meals.append(row) }
@@ -409,7 +409,7 @@ final class AppStore: ObservableObject {
             f["id"] = .string(UUID().uuidString.lowercased()); f["quantity"] = .number(((f["quantity"]?.doubleValue ?? 0) / servings * 100).rounded() / 100); return .object(f)
         }
         guard !items.isEmpty else { return false }
-        let payload: JSONValue = .object(["date": .string(dateKey), "kind": .string(kind), "name": .string(row.data["name"].stringValue ?? ""), "items": .array(items), "imagePath": .null])
+        let payload: JSONValue = .object(["date": .string(dateKey), "kind": .string(kind), "name": .string(row.data["name"].stringValue ?? ""), "items": .array(items), "time": .string(Self.timeKey(Date(), zone: timeZone)), "imagePath": .null])
         return await write("לא הצלחנו להוסיף את הארוחה.") { backend, owner in
             let saved = try await backend.save(table: "meals", owner: owner, payload: payload)
             if session?.owner == owner { meals.append(saved) }
