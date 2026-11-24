@@ -91,6 +91,42 @@ final class BackendTests: XCTestCase {
         XCTAssertTrue(rows.isEmpty)
         XCTAssertEqual(try vault.load()?.refreshToken, "rotated")
     }
+    func testRefreshFailureDistinguishesAServerHiccupFromALostSignIn() async throws {
+        let owner = owner
+        for (status, expected) in [(503, BackendError.server(503)), (429, BackendError.server(429)), (400, BackendError.sessionRequired)] {
+            let vault = MemoryVault()
+            try vault.save(Session(accessToken: "expired", refreshToken: "old", owner: owner, member: member))
+            let api = try backend(vault: vault) { request in
+                if request.url!.path == "/auth/v1/token" { return (status, status == 400 ? "{\"error\":\"invalid_grant\"}" : "<html>busy</html>") }
+                return (401, "{}")
+            }
+            do { _ = try await api.restore(); XCTFail("Refresh with status \(status) was accepted") }
+            catch { XCTAssertEqual(error as? BackendError, expected, "status \(status)") }
+        }
+    }
+    func testACancelledRequestIsACancellationNotALostConnection() async throws {
+        let owner = owner, vault = MemoryVault()
+        try vault.save(Session(accessToken: "token", refreshToken: "refresh", owner: owner, member: member))
+        let api = try backend(vault: vault) { request in
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            throw URLError(.cancelled)
+        }
+        _ = try await api.restore()
+        do { _ = try await api.householdRows(table: "tasks", owner: owner); XCTFail("A cancelled request returned rows") }
+        catch is CancellationError {}
+        catch { XCTFail("A cancelled request must not become \(error)") }
+    }
+    func testAFailedConnectionIsStillAConnectionError() async throws {
+        let owner = owner, vault = MemoryVault()
+        try vault.save(Session(accessToken: "token", refreshToken: "refresh", owner: owner, member: member))
+        let api = try backend(vault: vault) { request in
+            if request.url!.path == "/auth/v1/user" { return (200, "{\"id\":\"\(owner)\"}") }
+            throw URLError(.notConnectedToInternet)
+        }
+        _ = try await api.restore()
+        do { _ = try await api.householdRows(table: "tasks", owner: owner); XCTFail("Offline request returned rows") }
+        catch { XCTAssertEqual(error as? BackendError, .connection) }
+    }
     func testCannotReadAnotherOwnerOrReturnForeignRows() async throws {
         let owner = owner, vault = MemoryVault(), foreign = "33333333-3333-4333-8333-333333333333"
         try vault.save(Session(accessToken: "token", refreshToken: "refresh", owner: owner, member: member))

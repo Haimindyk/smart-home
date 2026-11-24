@@ -71,6 +71,8 @@ public actor Backend {
             guard let response = response as? HTTPURLResponse else { throw BackendError.invalidResponse }
             return (data, response.statusCode)
         } catch is CancellationError { throw CancellationError() }
+        // URLSession reports a cancelled request as URLError.cancelled: that is not a lost connection (a pull to refresh can be cancelled by SwiftUI).
+        catch let e as URLError where e.code == .cancelled { throw CancellationError() }
         catch let e as BackendError { throw e }
         catch { throw BackendError.connection }
     }
@@ -114,6 +116,8 @@ public actor Backend {
     }
     private func performRefresh(_ old: Session) async throws -> Session {
         let (data, status) = try await raw("/auth/v1/token", method: "POST", body: .object(["refresh_token": .string(old.refreshToken)]), query: [.init(name: "grant_type", value: "refresh_token")])
+        // A server hiccup is not a lost sign-in: the caller must not sign the member out because of it.
+        if status >= 500 || status == 429 { throw BackendError.server(status) }
         let result = try json(data)
         guard status == 200, let token = result["access_token"].stringValue, let refresh = result["refresh_token"].stringValue else { throw BackendError.sessionRequired }
         let (user, userStatus) = try await raw("/auth/v1/user", token: token)

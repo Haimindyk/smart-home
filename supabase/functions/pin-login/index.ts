@@ -60,11 +60,25 @@ Deno.serve(async (req) => {
     if (pepperError || !pepper) return json({ error: "not_configured" });
     const password = await derivePassword(pepper, member.id);
     let userId = member.user_id;
+    const anon = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { auth: { persistSession: false } },
+    );
+    const signIn = () =>
+      anon.auth.signInWithPassword({ email: member.email, password });
+    let session: { access_token: string; refresh_token: string } | null = null;
     if (userId) {
-      const { error } = await admin.auth.admin.updateUserById(userId, {
-        password,
-      });
-      if (error) return json({ error: "sign_in_failed" });
+      // The password is derived, not chosen. Resetting it on every login signs the member out everywhere else (the
+      // phone app and the web app kept logging each other out), so only reset it when signing in fails.
+      session = (await signIn()).data.session;
+      if (!session) {
+        const { error } = await admin.auth.admin.updateUserById(userId, {
+          password,
+        });
+        if (error) return json({ error: "sign_in_failed" });
+        session = (await signIn()).data.session;
+      }
     } else {
       const { data, error } = await admin.auth.admin.createUser({
         email: member.email,
@@ -80,21 +94,13 @@ Deno.serve(async (req) => {
         .eq("id", member.id)
         .is("user_id", null);
       if (linkError) return json({ error: "provisioning_failed" });
+      session = (await signIn()).data.session;
     }
-    const anon = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { auth: { persistSession: false } },
-    );
-    const { data, error: signError } = await anon.auth.signInWithPassword({
-      email: member.email,
-      password,
-    });
-    if (signError || !data.session) return json({ error: "sign_in_failed" });
+    if (!session) return json({ error: "sign_in_failed" });
     return json({
       memberId: member.id,
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
     });
   } catch {
     return json({ error: "unexpected" });

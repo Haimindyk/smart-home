@@ -47,8 +47,16 @@ jobs:
           PGDATABASE: ${{ secrets.SUPABASE_DB_URL }}
           PGSSLMODE: require
         run: psql --dbname="$PGDATABASE" -X --set=ON_ERROR_STOP=1 --single-transaction --file=scripts/release-wellness.sql
+      - name: Set the APNs key for iOS push (function secret; skipped when no key is configured)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || secrets.SUPABASE_PROJECT_REF }}
+          APNS_KEY_P8: ${{ secrets.APNS_KEY_P8 }}
+        run: |
+          if [ -z "$APNS_KEY_P8" ]; then echo 'No APNS_KEY_P8 production secret; iOS push stays disabled.'; exit 0; fi
+          pnpm dlx supabase@3.0.0 secrets set "APNS_KEY_P8=$APNS_KEY_P8" --project-ref "$PROJECT_REF"
       - name: Release only the functions from the merge commit
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || secrets.SUPABASE_PROJECT_REF }}
-        run: pnpm dlx supabase@3.0.0 functions deploy food-lookup nutrition-analyze wellness-chat wellness-training wellness-ai health-account health-maintenance --remote="$PROJECT_REF" --use-api --no-verify-jwt --yes
+        run: pnpm dlx supabase@3.0.0 functions deploy food-lookup nutrition-analyze wellness-chat wellness-training wellness-ai health-account health-maintenance pin-login send-push --remote="$PROJECT_REF" --use-api --no-verify-jwt --yes

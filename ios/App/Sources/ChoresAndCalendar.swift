@@ -187,7 +187,7 @@ struct CalendarScreen: View {
                         Button { editing = occ.event } label: { eventRow(occ) }.buttonStyle(PressableStyle()).accessibilityIdentifier("event-\(occ.event.id)")
                     }
                 }.padding(20).padding(.bottom, 90)
-            }.wellnessScreen().toolbar(.hidden, for: .navigationBar).refreshable { await home.refresh() }
+            }.wellnessScreen().toolbar(.hidden, for: .navigationBar).refreshable { await Task { await home.refresh() }.value }
             .sheet(isPresented: $subscribing) { SubscribeCalendarSheet().environmentObject(store) }
             .sheet(item: $editing) { EventEditorSheet(event: $0).environmentObject(home).presentationDragIndicator(.visible) }
         }

@@ -128,7 +128,7 @@ struct HomeScreen: View {
                     if home.selectedSectionID != best.key { home.selectedSectionID = best.key }
                 }
                 .safeAreaInset(edge: .top, spacing: 0) { chrome(proxy) }
-                .refreshable { await home.refresh() }
+                .refreshable { await Task { await home.refresh() }.value }
             }
             .wellnessScreen().toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
