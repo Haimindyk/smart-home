@@ -709,7 +709,8 @@ final class AppStore: ObservableObject {
             needsClarification: false, question: "", analysisId: "fixture-analysis", imagePath: imagePath)
     }
     /// "Fix with AI": sends the user's correction ("this is rice, not pasta") to the server, which re-estimates the saved meal's items.
-    func correctMeal(_ row: HealthRow, text: String) async -> Bool {
+    func correctMeal(_ staleRow: HealthRow, text: String) async -> Bool {
+        let row = meals.first(where: { $0.id == staleRow.id }) ?? staleRow
         let note = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !note.isEmpty, aiEligible, aiConsented, let owner = session?.owner, let backend, case .object(var fields) = row.data else { return false }
         busy = true; defer { busy = false }
@@ -765,7 +766,8 @@ final class AppStore: ObservableObject {
         return saved
     }
     /// Changes the time the meal was eaten (shown on the card and used to order the day).
-    func updateMealTime(_ row: HealthRow, time: String) async -> Bool {
+    func updateMealTime(_ staleRow: HealthRow, time: String) async -> Bool {
+        let row = meals.first(where: { $0.id == staleRow.id }) ?? staleRow
         guard case .object(var fields) = row.data else { return false }
         fields["time"] = .string(time); fields["kind"] = .string(Self.mealKind(forTime: time))
         let payload = JSONValue.object(fields)
