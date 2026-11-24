@@ -113,9 +113,9 @@ struct CoachChatView: View {
         version = Int(state["version"].doubleValue ?? 0); generation = state["generation"].stringValue ?? ""
         available = state["available"].boolValue ?? true; loaded = true
     }
-    @MainActor private func load() async {
+    @MainActor private func load(keepError: Bool = false) async {
         switch await store.call("wellness-chat", .object(["action": .string("state")])) {
-        case .success(let state): apply(state); error = available ? nil : "המאמן עדיין לא זמין."
+        case .success(let state): apply(state); if !available { error = "המאמן עדיין לא זמין." } else if !keepError { error = nil }
         case .failure(let e): loaded = true; error = message(for: e)
         }
     }
@@ -134,7 +134,9 @@ struct CoachChatView: View {
         case .failure(let e):
             self.error = self.message(for: e)
             if e == .conflict { retryID = nil }
-            await load()
+            let failure = self.error
+            await load(keepError: true)
+            if error == nil { error = failure }
         }
     }
     @MainActor private func clear() async {

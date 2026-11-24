@@ -221,6 +221,9 @@ final class AppStore: ObservableObject {
     var latestWeight: Double? { weightLogs.max { ($0.data["date"].stringValue ?? "") < ($1.data["date"].stringValue ?? "") }?.data["weight"].doubleValue }
 
     private var creatingMeal = false
+    private var creatingTraining = false
+    private var loggingWeight = false
+    private var creatingRecipe = false
     private func write(_ failure: String, _ work: (Backend, String) async throws -> Void) async -> Bool {
         guard let owner = session?.owner, let backend else { return false }
         do { try await work(backend, owner); let ok = session?.owner == owner; if ok { publishToWatch() }; return ok }
@@ -241,7 +244,8 @@ final class AppStore: ObservableObject {
         }
     }
     func logWeight(_ kg: Double) async -> Bool {
-        guard kg >= 20, kg <= 400 else { return false }
+        guard kg.isFinite, kg >= 20, kg <= 400 else { error = "המשקל חייב להיות בין 20 ל־400 ק״ג."; return false }
+        guard !loggingWeight else { return false }; loggingWeight = true; defer { loggingWeight = false } // a double tap must not log it twice
         let date = dateKey
         return await write("לא הצלחנו לשמור את המשקל.") { backend, owner in
             let row = try await backend.save(table: "weight_logs", owner: owner, payload: .object(["date": .string(date), "weight": .number((kg * 10).rounded() / 10)]))
@@ -374,6 +378,7 @@ final class AppStore: ObservableObject {
         let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty, clean.count <= 200, servings > 0, servings <= 1000, !items.isEmpty, items.count <= 100,
               items.allSatisfy({ ($0["food"]["basis"].stringValue ?? "g") == "g" }) else { error = "מתכון יכול להכיל רק מרכיבים שנמדדים בגרמים."; return false }
+        guard !creatingRecipe else { return false }; creatingRecipe = true; defer { creatingRecipe = false } // a double tap must not save it twice
         let payload: JSONValue = .object(["name": .string(clean), "servings": .number(servings), "items": .array(items)])
         return await write("לא הצלחנו לשמור את המתכון.") { backend, owner in
             let row = try await backend.save(table: "recipes", owner: owner, payload: payload)
@@ -382,7 +387,7 @@ final class AppStore: ObservableObject {
     }
     func updateRecipe(_ row: HealthRow, name: String, servings: Double, grams: [String: Double]) async -> Bool {
         let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard case .object(var fields) = row.data, !clean.isEmpty, clean.count <= 200, servings > 0, servings <= 1000, grams.values.allSatisfy({ $0 > 0 && $0 <= 10_000 }) else { return false }
+        guard case .object(var fields) = row.data, !clean.isEmpty, clean.count <= 200, servings > 0, servings <= 1000, grams.values.allSatisfy({ $0 > 0 && $0 <= 10_000 }) else { error = "בדוק את שם המתכון, מספר המנות והכמויות (עד 10,000 גרם לרכיב)."; return false }
         let items = row.data["items"].arrayValue.map { item -> JSONValue in
             guard case .object(var f) = item, let id = f["id"]?.stringValue, let g = grams[id] else { return item }
             f["quantity"] = .number(g); return .object(f)
@@ -472,6 +477,7 @@ final class AppStore: ObservableObject {
     // MARK: - Workout plans
     struct PlanExercise: Identifiable, Equatable { var id = UUID(); var name = ""; var catalogId: String?; var muscle = ""; var equipment = ""; var sets = 3; var reps = 10; var weight = 0.0; var rest = 90 }
     func savePlan(name: String, days: Set<Int>, exercises: [PlanExercise]) async -> Bool {
+        guard !creatingTraining else { return false }; creatingTraining = true; defer { creatingTraining = false } // a double tap must not create it twice
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let valid = exercises.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         guard !trimmed.isEmpty, trimmed.count <= 150, !valid.isEmpty, valid.count <= 100 else { return false }
@@ -512,6 +518,7 @@ final class AppStore: ObservableObject {
     private static func iso(_ date: Date) -> String { ISO8601DateFormatter().string(from: date) }
     /// Creates an active session from a plan: one unchecked set per planned set, same shape as the web app.
     func startWorkout(from plan: HealthRow) async -> HealthRow? {
+        guard !creatingTraining else { return nil }; creatingTraining = true; defer { creatingTraining = false } // a double tap must not create it twice
         let exercises = plan.data["exercises"].arrayValue.map { exercise -> JSONValue in
             guard case .object(var fields) = exercise else { return exercise }
             let sets = max(1, Int(fields["sets"]?.doubleValue ?? 3)), reps = fields["reps"]?.doubleValue ?? 10, weight = fields["weight"]?.doubleValue ?? 0
@@ -519,7 +526,7 @@ final class AppStore: ObservableObject {
             fields["skipped"] = .bool(false)
             return .object(fields)
         }
-        guard !exercises.isEmpty else { return nil }
+        guard !exercises.isEmpty else { error = "בתוכנית הזו אין תרגילים. הוסף תרגיל ונסה שוב."; return nil }
         let payload: JSONValue = .object(["date": .string(dateKey), "planId": .string(plan.id), "name": plan.data["name"].stringValue.map { .string($0) } ?? .string("אימון"), "status": .string("active"), "quick": .bool(false), "startedAt": .string(Self.iso(Date())), "endedAt": .null, "exercises": .array(exercises), "notes": .string("")])
         var result: HealthRow?
 #if DEBUG
@@ -686,6 +693,8 @@ final class AppStore: ObservableObject {
                 return .ready(MealAnalysis(items: items, needsClarification: raw["needsClarification"].boolValue == true, question: raw["question"].stringValue ?? "", analysisId: analysisId, imagePath: imagePath ?? ""))
             } catch let error as BackendError {
                 if case .server(409) = error, busyWaits < 40 { busyWaits += 1; try? await Task.sleep(for: .seconds(3)); continue }
+                // A dropped connection may have reached the server: ask again with the SAME id so the job is not analysed (and counted) twice.
+                if error == .connection, !retried { retried = true; try? await Task.sleep(for: .seconds(2)); continue }
                 if !retried { retried = true; id = UUID().uuidString.lowercased(); continue }
                 return .failed("הניתוח לא הושלם. בדוק חיבור ונסה שוב.")
             } catch is CancellationError { return .failed("") }
@@ -707,7 +716,8 @@ final class AppStore: ObservableObject {
             needsClarification: false, question: "", analysisId: "fixture-analysis", imagePath: imagePath)
     }
     /// "Fix with AI": sends the user's correction ("this is rice, not pasta") to the server, which re-estimates the saved meal's items.
-    func correctMeal(_ row: HealthRow, text: String) async -> Bool {
+    func correctMeal(_ staleRow: HealthRow, text: String) async -> Bool {
+        let row = meals.first(where: { $0.id == staleRow.id }) ?? staleRow
         let note = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !note.isEmpty, aiEligible, aiConsented, let owner = session?.owner, let backend, case .object(var fields) = row.data else { return false }
         busy = true; defer { busy = false }
@@ -763,7 +773,8 @@ final class AppStore: ObservableObject {
         return saved
     }
     /// Changes the time the meal was eaten (shown on the card and used to order the day).
-    func updateMealTime(_ row: HealthRow, time: String) async -> Bool {
+    func updateMealTime(_ staleRow: HealthRow, time: String) async -> Bool {
+        let row = meals.first(where: { $0.id == staleRow.id }) ?? staleRow
         guard case .object(var fields) = row.data else { return false }
         fields["time"] = .string(time); fields["kind"] = .string(Self.mealKind(forTime: time))
         let payload = JSONValue.object(fields)

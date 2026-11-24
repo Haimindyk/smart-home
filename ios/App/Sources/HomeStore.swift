@@ -283,7 +283,8 @@ final class HomeStore: ObservableObject {
     func clearCompleted(in section: HSection) async { for task in tasks.filter({ $0.sectionID == section.id && $0.isCompleted && $0.parentID == nil }) { await delete(task) } }
 
     func complete(_ chore: HChore) async {
-        guard let me else { return }
+        guard let me, completingChores.insert(chore.id).inserted else { return } // a double tap must not log the chore twice
+        defer { completingChores.remove(chore.id) }
         let ok = await run("לא הצלחנו לסמן את המטלה כבוצעה.", rollback: {}) { backend, owner in
             try await backend.householdRPC("complete_chore", owner: owner, args: ["p_chore_id": .string(chore.id), "p_completed_by": .string(me.id)])
         }
@@ -298,10 +299,13 @@ final class HomeStore: ObservableObject {
               let rows = try? await backend.householdRows(table: "chore_completions", owner: owner, filters: [.init(name: "chore_id", value: "eq.\(chore.id)")], order: "completed_at.desc", limit: 10, singlePage: true) else { return [] }
         return rows.compactMap { row in DateParsing.timestamp(row.str("completed_at")).map { (who: member(row.str("completed_by"))?.name ?? "?", when: $0) } }
     }
+    private var completingChores: Set<String> = []
+    private var addingChore = false
     func addChore(title: String, section: HSection, freq: String, interval: Int) async {
         let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty, clean.count <= 300, ["daily", "weekly", "monthly"].contains(freq),
               let position = try? FractionalIndex.atEnd(chores.filter { $0.sectionID == section.id }.map(\.position).max()) else { return }
+        guard !addingChore else { return }; addingChore = true; defer { addingChore = false } // a double tap must not add it twice
         let id = UUID().uuidString.lowercased()
         var fields: [String: JSONValue] = ["id": .string(id), "section_id": .string(section.id), "position": .string(position), "title": .string(clean), "freq": .string(freq),
                                            "interval_n": .number(Double(max(1, min(60, interval)))), "assignee_kind": .string("anyone"), "anchor_date": .string(DateParsing.dayString(Date(), zone: timeZone)), "next_due_at": .string(now())]

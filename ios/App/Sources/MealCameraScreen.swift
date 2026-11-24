@@ -70,8 +70,11 @@ final class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelega
         queue.async {
             guard let device = self.device(ultra: on), let new = try? AVCaptureDeviceInput(device: device) else { return }
             self.session.beginConfiguration()
-            if let old = self.input { self.session.removeInput(old) }
+            let old = self.input
+            if let old { self.session.removeInput(old) }
             if self.session.canAddInput(new) { self.session.addInput(new); self.input = new }
+            // Switching failed: put the previous lens back, or the viewfinder would stay black.
+            else if let old, self.session.canAddInput(old) { self.session.addInput(old) }
             self.session.commitConfiguration()
         }
     }

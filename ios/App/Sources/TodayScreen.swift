@@ -222,10 +222,13 @@ private struct SummaryCarousel: View {
 private struct ActivityPage: View {
     @EnvironmentObject private var store: AppStore
     var body: some View {
+        // Steps and active energy are read for today only: another day must not show today's numbers.
+        let isToday = Calendar.current.isDateInToday(store.selectedDate)
+        let steps = isToday ? store.steps : nil, burned = isToday ? store.burnedKcal : nil
         VStack(spacing: 12) {
             HStack(spacing: 12) {
-                StatTile(title: "צעדים", value: store.steps.map { Int($0.rounded()) }, unit: "/ 10,000", ring: (store.steps ?? 0, 10_000, Color.wellnessInk, "figure.walk"))
-                StatTile(title: "קלוריות שנשרפו", value: store.burnedKcal.map { Int($0.rounded()) }, unit: "קלוריות", ring: (store.burnedKcal ?? 0, nil, Color.kcalAmber, "flame.fill"))
+                StatTile(title: "צעדים", value: steps.map { Int($0.rounded()) }, unit: "/ 10,000", ring: (steps ?? 0, 10_000, Color.wellnessInk, "figure.walk"))
+                StatTile(title: "קלוריות שנשרפו", value: burned.map { Int($0.rounded()) }, unit: "קלוריות", ring: (burned ?? 0, nil, Color.kcalAmber, "flame.fill"))
             }
             WaterCard()
             LinkChips()

@@ -73,6 +73,8 @@ struct EditMealSheet: View {
     private func change(_ index: Int, _ delta: Double) {
         guard items.indices.contains(index), case .object(var fields) = items[index] else { return }
         let value = min(10_000, max(1, (fields["quantity"]?.doubleValue ?? 0) + delta))
-        fields["quantity"] = .number(value); items[index] = .object(fields)
+        fields["quantity"] = .number(value)
+        if fields["quantityRange"] != nil { fields["quantityRange"] = .object(["low": .number(value), "high": .number(value)]) } // a user-set amount is exact: the old AI range must not contradict it
+        items[index] = .object(fields)
     }
 }
