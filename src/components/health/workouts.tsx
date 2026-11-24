@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HealthSheet } from "./health-sheet";
 import { AiTrainer } from "./ai-trainer";
 import { isPlanScheduled } from "../../../supabase/functions/_shared/wellness-core";
@@ -37,6 +37,7 @@ export function Workouts({
   const h = useHealthText();
   const data = useHealthStore((s) => s.data),
     save = useHealthStore((s) => s.save);
+  const starting = useRef(false);
   const [editing, setEditing] = useState<HealthRow<"workout_plans"> | null>(
       null,
     ),
@@ -53,6 +54,9 @@ export function Workouts({
   const selectedPlan=plans.find(p=>p.id===selectedPlanId)??null;
   const sessions = data.workout_sessions.filter((s) => s.data.date === date && s.data.status!=="cancelled");
   async function start(plan: HealthRow<"workout_plans">, quick = false) {
+    // A double click must not create two sessions for the same plan.
+    if (starting.current) return;
+    starting.current = true;
     try {
       const now = new Date().toISOString();
       const exercises: PerformedExercise[] = quick
@@ -85,6 +89,8 @@ export function Workouts({
       if (!quick) setSession(row);
     } catch (e) {
       setError(e instanceof Error ? e.message : "failed");
+    } finally {
+      starting.current = false;
     }
   }
   if(session) return <SessionEditor key={session.id} row={session} onClose={()=>setSession(null)}/>;
