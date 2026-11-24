@@ -5,7 +5,9 @@ import { Share, SquarePlus, Plus, X } from "lucide-react";
 import { useT } from "@/lib/i18n/store";
 import { useInstallPrompt } from "@/lib/pwa/use-install-prompt";
 import { useStandalone } from "@/lib/pwa/use-standalone";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { iosInstallUrl } from "@/lib/pwa/ios-app";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const DISMISS_KEY = "kh-install-banner-dismissed";
@@ -75,12 +77,27 @@ export function InstallBanner() {
             💙
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{t("installBannerTitle")}</p>
-            <p className="truncate text-xs text-muted-foreground">{t("installBannerSubtitle")}</p>
+            <p className="truncate text-sm font-medium">{t(isIOS ? "installIosApp" : "installBannerTitle")}</p>
+            <p className="truncate text-xs text-muted-foreground">{t(isIOS ? "installIosAppSubtitle" : "installBannerSubtitle")}</p>
+            {isIOS && (
+              <button type="button" className="text-xs text-primary underline" onClick={handleInstallClick}>
+                {t("installViaHomeScreen")}
+              </button>
+            )}
           </div>
-          <Button size="sm" className="shrink-0 rounded-full" onClick={handleInstallClick}>
-            {t("installApp")}
-          </Button>
+          {isIOS ? (
+            // Not installed as a PWA on an iPhone: offer the native app (over-the-air ad-hoc install).
+            <a
+              href={iosInstallUrl(window.location.origin)}
+              className={cn(buttonVariants({ size: "sm" }), "shrink-0 rounded-full")}
+            >
+              {t("installApp")}
+            </a>
+          ) : (
+            <Button size="sm" className="shrink-0 rounded-full" onClick={handleInstallClick}>
+              {t("installApp")}
+            </Button>
+          )}
           <Button variant="ghost" size="icon-sm" className="shrink-0" onClick={dismiss} aria-label={t("close")}>
             <X className="size-4" />
           </Button>
