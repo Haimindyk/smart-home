@@ -78,7 +78,8 @@ struct TrainerSheet: View {
     }
     private func exerciseRow(_ e: JSONValue) -> some View {
         let sets = Int(e["sets"].doubleValue ?? 0), reps = Int(e["reps"].doubleValue ?? 0), weight = e["weight"].doubleValue ?? 0
-        let detail = "\(sets) סטים · \(reps) חזרות" + (weight > 0 ? " · \(weight.formatted()) ק״ג" : "")
+        let hold = Int(e["holdSeconds"].doubleValue ?? 0)
+        let detail = "\(sets) סטים · " + (hold > 0 ? "\(hold) שניות החזקה" : "\(reps) חזרות") + (weight > 0 ? " · \(weight.formatted()) ק״ג" : "")
         return VStack(alignment: .leading, spacing: 3) {
             Text(e["name"].stringValue ?? "תרגיל").font(.hb(.headline, .semibold))
             Text(detail).font(.hb(.subheadline)).foregroundStyle(Color.wellnessSecondary)

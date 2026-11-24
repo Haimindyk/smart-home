@@ -220,6 +220,7 @@ final class AppStore: ObservableObject {
     var dayWater: Double { dayWaterLogs.reduce(0) { $0 + ($1.data["amount"].doubleValue ?? 0) } }
     var latestWeight: Double? { weightLogs.max { ($0.data["date"].stringValue ?? "") < ($1.data["date"].stringValue ?? "") }?.data["weight"].doubleValue }
 
+    private var creatingMeal = false
     private func write(_ failure: String, _ work: (Backend, String) async throws -> Void) async -> Bool {
         guard let owner = session?.owner, let backend else { return false }
         do { try await work(backend, owner); let ok = session?.owner == owner; if ok { publishToWatch() }; return ok }
@@ -257,6 +258,7 @@ final class AppStore: ObservableObject {
         } catch { if session?.owner == owner { self.error = "החיפוש לא הושלם. בדוק חיבור ונסה שוב." }; return nil }
     }
     func saveMeal(kind: String, name: String, food: JSONValue, quantity: Double) async -> Bool {
+        guard !creatingMeal else { return false }; creatingMeal = true; defer { creatingMeal = false } // a double tap must not log the meal twice
         guard quantity > 0, quantity <= 10_000 else { return false }
         let date = dateKey
         let item: JSONValue = .object(["id": .string(UUID().uuidString.lowercased()), "food": food, "quantity": .number(quantity)])
@@ -277,6 +279,7 @@ final class AppStore: ObservableObject {
         }.prefix(8).map { $0 }
     }
     func relogMeal(_ source: HealthRow, kind: String) async -> Bool {
+        guard !creatingMeal else { return false }; creatingMeal = true; defer { creatingMeal = false } // a double tap must not log the meal twice
         let items = source.data["items"].arrayValue.map { item -> JSONValue in
             guard case .object(var fields) = item else { return item }
             fields["id"] = .string(UUID().uuidString.lowercased()); return .object(fields)
@@ -289,7 +292,9 @@ final class AppStore: ObservableObject {
         }
     }
     /// Edits name, kind and items of an existing meal; everything else (date, photo, favorite…) is preserved.
-    func updateMeal(_ row: HealthRow, name: String, kind: String, items: [JSONValue]) async -> Bool {
+    func updateMeal(_ staleRow: HealthRow, name: String, kind: String, items: [JSONValue]) async -> Bool {
+        // A sheet may hold an older copy of the meal (e.g. after an AI correction or a time edit): start from the store's latest.
+        let row = meals.first(where: { $0.id == staleRow.id }) ?? staleRow
         guard !items.isEmpty, case .object(var fields) = row.data else { return false }
         fields["name"] = .string(name); fields["kind"] = .string(kind); fields["items"] = .array(items)
         let payload = JSONValue.object(fields)
@@ -300,6 +305,7 @@ final class AppStore: ObservableObject {
     }
     /// Copies a meal to another day (new item ids, same items and photo).
     func copyMeal(_ source: HealthRow, to date: Date) async -> Bool {
+        guard !creatingMeal else { return false }; creatingMeal = true; defer { creatingMeal = false } // a double tap must not log the meal twice
         let items = source.data["items"].arrayValue.map { item -> JSONValue in
             guard case .object(var f) = item else { return item }
             f["id"] = .string(UUID().uuidString.lowercased()); return .object(f)
@@ -396,6 +402,7 @@ final class AppStore: ObservableObject {
     }
     /// Logs one serving of a recipe as a meal (each item scaled by 1/servings).
     func logRecipe(_ row: HealthRow, kind: String) async -> Bool {
+        guard !creatingMeal else { return false }; creatingMeal = true; defer { creatingMeal = false } // a double tap must not log the meal twice
         let servings = max(row.data["servings"].doubleValue ?? 1, 0.1)
         let items = row.data["items"].arrayValue.map { item -> JSONValue in
             guard case .object(var f) = item else { return item }
