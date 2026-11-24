@@ -8,6 +8,13 @@ struct SettingsScreen: View {
     @State private var confirmLogout = false
     @State private var showGoals = false
     @State private var weightText = ""
+    /// The real version and build number from the app bundle, not a hard-coded string.
+    private static var versionLabel: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String
+        return build.map { "\(version) (\($0))" } ?? version
+    }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -19,7 +26,7 @@ struct SettingsScreen: View {
                             Text(home.me?.name ?? "החשבון שלי").font(.hb(.title2, .bold)).tracking(-0.4)
                             HStack(spacing: 8) {
                                 chip(store.timeZone.identifier, "globe")
-                                chip("גרסה 0.1.0", "app.badge")
+                                chip("גרסה \(Self.versionLabel)", "app.badge")
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }.wellnessCard(padding: 18).accessibilityElement(children: .combine)
