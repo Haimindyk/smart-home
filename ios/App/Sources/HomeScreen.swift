@@ -374,15 +374,15 @@ struct SwipeToDelete: ViewModifier {
     @State private var dx: CGFloat = 0
     func body(content: Content) -> some View {
         ZStack(alignment: .leading) {
-            HStack { Image(systemName: "trash").font(.headline).foregroundStyle(.white).padding(.leading, 20); Spacer() }
+            HStack { if dx < 0 { Spacer() }; Image(systemName: "trash").font(.headline).foregroundStyle(.white).padding(dx < 0 ? .trailing : .leading, 20); if dx >= 0 { Spacer() } }
                 .frame(maxHeight: .infinity).background(Color.fatCoral, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .environment(\.layoutDirection, .leftToRight).opacity(dx > 6 ? 1 : 0)
+                .environment(\.layoutDirection, .leftToRight).opacity(abs(dx) > 6 ? 1 : 0)
             content.background(Color.wellnessCard).offset(x: dx)
                 .simultaneousGesture(DragGesture(minimumDistance: 28).onChanged { v in
                     guard abs(v.translation.width) > abs(v.translation.height) * 1.5 else { return }
-                    dx = max(0, v.translation.width)
+                    dx = max(-170, min(170, v.translation.width))
                 }.onEnded { v in
-                    if v.translation.width > 110 { UINotificationFeedbackGenerator().notificationOccurred(.warning); withAnimation(.easeIn(duration: 0.18)) { dx = 500 }; DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { onDelete() } }
+                    if abs(v.translation.width) > 110 { UINotificationFeedbackGenerator().notificationOccurred(.warning); withAnimation(.easeIn(duration: 0.18)) { dx = v.translation.width > 0 ? 500 : -500 }; DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { onDelete() } }
                     else { withAnimation(.snappy) { dx = 0 } }
                 })
         }.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
