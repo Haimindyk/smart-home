@@ -221,6 +221,7 @@ final class AppStore: ObservableObject {
     var latestWeight: Double? { weightLogs.max { ($0.data["date"].stringValue ?? "") < ($1.data["date"].stringValue ?? "") }?.data["weight"].doubleValue }
 
     private var creatingMeal = false
+    private var creatingTraining = false
     private func write(_ failure: String, _ work: (Backend, String) async throws -> Void) async -> Bool {
         guard let owner = session?.owner, let backend else { return false }
         do { try await work(backend, owner); let ok = session?.owner == owner; if ok { publishToWatch() }; return ok }
@@ -472,6 +473,7 @@ final class AppStore: ObservableObject {
     // MARK: - Workout plans
     struct PlanExercise: Identifiable, Equatable { var id = UUID(); var name = ""; var catalogId: String?; var muscle = ""; var equipment = ""; var sets = 3; var reps = 10; var weight = 0.0; var rest = 90 }
     func savePlan(name: String, days: Set<Int>, exercises: [PlanExercise]) async -> Bool {
+        guard !creatingTraining else { return false }; creatingTraining = true; defer { creatingTraining = false } // a double tap must not create it twice
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let valid = exercises.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         guard !trimmed.isEmpty, trimmed.count <= 150, !valid.isEmpty, valid.count <= 100 else { return false }
@@ -512,6 +514,7 @@ final class AppStore: ObservableObject {
     private static func iso(_ date: Date) -> String { ISO8601DateFormatter().string(from: date) }
     /// Creates an active session from a plan: one unchecked set per planned set, same shape as the web app.
     func startWorkout(from plan: HealthRow) async -> HealthRow? {
+        guard !creatingTraining else { return nil }; creatingTraining = true; defer { creatingTraining = false } // a double tap must not create it twice
         let exercises = plan.data["exercises"].arrayValue.map { exercise -> JSONValue in
             guard case .object(var fields) = exercise else { return exercise }
             let sets = max(1, Int(fields["sets"]?.doubleValue ?? 3)), reps = fields["reps"]?.doubleValue ?? 10, weight = fields["weight"]?.doubleValue ?? 0
