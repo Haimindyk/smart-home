@@ -125,7 +125,20 @@ final class AppStore: ObservableObject {
             candidates = pendingAppleWorkouts(candidates, existing: importedIDs)
             selection.formIntersection(Set(candidates.map(\.id)))
             publishToWatch()
-        } catch { if request == revision, session?.owner == owner { self.error = Self.message(error) } }
+        } catch {
+            if request == revision, session?.owner == owner, await handleSessionLoss(error) { return }
+            if request == revision, session?.owner == owner { self.error = Self.message(error) }
+        }
+    }
+    /// The server no longer accepts this sign-in (for example another sign-in replaced it): go back to the code screen
+    /// with an explanation, instead of a vague "could not load" while every request keeps failing.
+    @discardableResult
+    func handleSessionLoss(_ error: Error) async -> Bool {
+        guard let e = error as? BackendError, e == .sessionRequired, phase == .signedIn else { return false }
+        await backend?.signOut()
+        session = nil; phase = .signedOut
+        self.error = "ההתחברות פגה, כנראה כי נכנסת ממכשיר אחר. הקלד את הקוד שוב."
+        return true
     }
     /// Today's steps and active calories for the Today screen. Does nothing for the UI-test fixtures, and fails quietly when Health is unavailable or denied.
     func loadTodayActivity() async {

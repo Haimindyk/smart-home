@@ -114,6 +114,8 @@ public actor Backend {
     }
     private func performRefresh(_ old: Session) async throws -> Session {
         let (data, status) = try await raw("/auth/v1/token", method: "POST", body: .object(["refresh_token": .string(old.refreshToken)]), query: [.init(name: "grant_type", value: "refresh_token")])
+        // A server hiccup is not a lost sign-in: the caller must not sign the member out because of it.
+        if status >= 500 || status == 429 { throw BackendError.server(status) }
         let result = try json(data)
         guard status == 200, let token = result["access_token"].stringValue, let refresh = result["refresh_token"].stringValue else { throw BackendError.sessionRequired }
         let (user, userStatus) = try await raw("/auth/v1/user", token: token)
