@@ -15,7 +15,8 @@ export async function searchFoodNames<T extends { id: string }>(
       fetched: false as const,
     };
   }
-  const signal = AbortSignal.timeout(8000);
+  // Open Food Facts can take 10-25 s when it is busy; a short limit made name searches fail.
+  const signal = AbortSignal.timeout(25000);
   const headers = {
     "User-Agent":
       "KH-SmartHome/1.0 (personal nutrition; github.com/Haimindyk/smart-home)",

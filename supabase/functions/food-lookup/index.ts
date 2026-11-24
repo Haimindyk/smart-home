@@ -86,19 +86,27 @@ Deno.serve(async (req) => {
     ) {
       return json({ foods: [validCached.data] });
     }
-    let res: Response;
-    try {
-      res = await fetch(
-        `https://world.openfoodfacts.org/api/v2/product/${barcode}.json?fields=product_name,product_name_he,nutriments,nutrition_data_per`,
-        {
+    // Open Food Facts is sometimes very slow (9-25 s per product was measured): a short timeout turned slow answers into
+    // "not found". Allow a long wait, and one retry after a timeout or a transient server error.
+    const offUrl =
+      `https://world.openfoodfacts.org/api/v2/product/${barcode}.json?fields=product_name,product_name_he,nutriments,nutrition_data_per`;
+    let res: Response | null = null;
+    for (let attempt = 0; attempt < 2 && !res; attempt++) {
+      try {
+        const attemptRes = await fetch(offUrl, {
           headers: {
             "User-Agent":
               "KH-SmartHome/1.0 (personal nutrition; github.com/Haimindyk/smart-home)",
           },
-          signal: AbortSignal.timeout(6000),
-        },
-      );
-    } catch {
+          signal: AbortSignal.timeout(25000),
+        });
+        if (attemptRes.ok || attemptRes.status < 500) res = attemptRes;
+        else console.error("food-lookup: open food facts status", attemptRes.status);
+      } catch (error) {
+        console.error("food-lookup: open food facts request failed", String(error));
+      }
+    }
+    if (!res) {
       if (validCached) return json({ foods: [validCached.data], stale: true });
       throw new Error("provider_failed");
     }
