@@ -50,7 +50,7 @@ export function calculateGoal(
     p.weight < 20 ||
     p.weight > 400 ||
     p.height < 80 ||
-    p.height > 260
+    p.height > 250
   )
     throw new Error("adult_profile_required");
   const bmr =

@@ -20,6 +20,8 @@ struct ProfileGoalsSheet: View {
     @State private var saving = false
     private var zone: TimeZone { store.timeZone }
     private func day(_ d: Date) -> String { AppStore.dateKey(d, zone: zone) }
+    /// Pasted text such as "99999999999999999999" must not trap in Int(): clamp first, validation then rejects it.
+    private func wholeNumber(_ s: String) -> Int { guard let d = number(s), d.isFinite else { return 0 }; return Int(min(max(d, 0), 1_000_000)) }
     private func number(_ s: String) -> Double? { Double(s.replacingOccurrences(of: ",", with: ".")) }
     private var profile: GoalCalculator.Profile { .init(birthDate: hasBirth ? day(birth) : nil, height: number(height), weight: number(weight), physiology: physiology, activity: activity, objective: objective) }
     private var suggested: GoalCalculator.Goal? { try? GoalCalculator.calculate(profile, on: day(effective)) }
@@ -133,7 +135,7 @@ struct ProfileGoalsSheet: View {
         if step == 1, !manual, suggested == nil { message = "צריך תאריך לידה (18 ומעלה), גובה, משקל ונתון פיזיולוגי, או לבחור יעדים ידניים."; return }
         if step < 2 { withAnimation { step += 1 }; return }
         let goal: (date: String, kcal: Int, protein: Int, carbs: Int, fat: Int, method: String)
-        if manual { goal = (day(effective), Int(number(custom.kcal) ?? 0), Int(number(custom.protein) ?? 0), Int(number(custom.carbs) ?? 0), Int(number(custom.fat) ?? 0), "manual") }
+        if manual { goal = (day(effective), wholeNumber(custom.kcal), wholeNumber(custom.protein), wholeNumber(custom.carbs), wholeNumber(custom.fat), "manual") }
         else if let g = suggested { goal = (g.date, g.kcal, g.protein, g.carbs, g.fat, "calculated") }
         else { message = "השלמת הפרופיל תפתח חישוב אוטומטי. אפשר גם לבחור יעדים ידניים."; return }
         saving = true; defer { saving = false }
