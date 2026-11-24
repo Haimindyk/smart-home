@@ -213,10 +213,10 @@ struct SwipeToConfirmDelete: ViewModifier {
         content
             .offset(x: offset)
             .background {
-                if offset > 4 {
+                if abs(offset) > 4 {
                     RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Color.red.opacity(armed ? 0.95 : 0.72))
-                        .overlay(alignment: .leading) {
-                            Image(systemName: "trash.fill").font(.title3.weight(.semibold)).foregroundStyle(.white).scaleEffect(armed ? 1.15 : 1).padding(.leading, 28)
+                        .overlay(alignment: offset > 0 ? .leading : .trailing) {
+                            Image(systemName: "trash.fill").font(.title3.weight(.semibold)).foregroundStyle(.white).scaleEffect(armed ? 1.15 : 1).padding(offset > 0 ? .leading : .trailing, 28)
                         }
                         .environment(\.layoutDirection, .leftToRight)
                 }
@@ -225,15 +225,15 @@ struct SwipeToConfirmDelete: ViewModifier {
                 DragGesture(minimumDistance: 18)
                     .onChanged { value in
                         guard abs(value.translation.width) > abs(value.translation.height) * 1.3 else { return }
-                        offset = max(0, min(170, value.translation.width))
-                        let now = offset >= threshold
+                        offset = max(-170, min(170, value.translation.width))
+                        let now = abs(offset) >= threshold
                         if now != armed { armed = now }
                     }
                     .onEnded { _ in
                         let fire = armed
                         if fire && slideOut {
                             // Slide the card away, then remove it; if it is still here a moment later (the delete was refused) bring it back.
-                            withAnimation(.easeIn(duration: 0.2)) { offset = 520 }
+                            withAnimation(.easeIn(duration: 0.2)) { offset = offset > 0 ? 520 : -520 }
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { onConfirm() }
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { offset = 0; armed = false } }
                         } else {
