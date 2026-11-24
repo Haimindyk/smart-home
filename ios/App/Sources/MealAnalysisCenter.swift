@@ -88,6 +88,8 @@ final class MealAnalysisCenter: ObservableObject {
                 let time = pending.entryTime ?? AppStore.timeKey(pending.createdAt, zone: store.timeZone)
                 let row = await store.saveAnalyzedMealRow(result, items: result.items, kind: AppStore.mealKind(forTime: time), date: pending.entryDate, time: time)
                 self.savedMealID = row?.id
+                // Saved: the interrupted-job record must go, or the next launch would analyze and save the same meal again.
+                if row != nil { UserDefaults.standard.removeObject(forKey: self.defaultsKey) }
             }
             self.finishWith(outcome)
         }
