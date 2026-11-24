@@ -164,7 +164,7 @@ private struct PortionSheet: View {
                         stepper("minus", -10)
                     }
                     if let serving = food["servingSize"].doubleValue, serving > 0 {
-                        Button("מנה (\(Int(serving)) \(unit))") { withAnimation(.snappy) { quantity = serving } }.buttonStyle(.bordered).tint(Color.wellnessPrimary)
+                        Button("מנה (\(Int(min(serving, 1_000_000))) \(unit))") { withAnimation(.snappy) { quantity = serving } }.buttonStyle(.bordered).tint(Color.wellnessPrimary)
                     }
                 }.frame(maxWidth: .infinity).wellnessCard()
                 Picker("ארוחה", selection: $kind) {
