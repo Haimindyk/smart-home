@@ -526,7 +526,7 @@ final class AppStore: ObservableObject {
             fields["skipped"] = .bool(false)
             return .object(fields)
         }
-        guard !exercises.isEmpty else { return nil }
+        guard !exercises.isEmpty else { error = "בתוכנית הזו אין תרגילים. הוסף תרגיל ונסה שוב."; return nil }
         let payload: JSONValue = .object(["date": .string(dateKey), "planId": .string(plan.id), "name": plan.data["name"].stringValue.map { .string($0) } ?? .string("אימון"), "status": .string("active"), "quick": .bool(false), "startedAt": .string(Self.iso(Date())), "endedAt": .null, "exercises": .array(exercises), "notes": .string("")])
         var result: HealthRow?
 #if DEBUG
