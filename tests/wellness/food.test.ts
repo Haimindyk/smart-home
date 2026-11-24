@@ -165,6 +165,13 @@ describe("printed product data without generative estimates", () => {
     const noEnergy = { ...off, product: { ...off.product, nutriments: { ...rest } } };
     expect(openFoodFactsProduct(noEnergy, "12345678")).toBeNull();
   });
+  it("accepts a near-zero-calorie drink that omits its zero macros, but not a caloric product missing a macro", () => {
+    const zero = { status: 1, product: { product_name: "Sprite zero", nutrition_data_per: "100g", nutriments: { "energy-kcal_100g": 0.9 } } };
+    const food = openFoodFactsProduct(zero, "7290013585257")!;
+    expect(food.per100).toMatchObject({ kcal: 0.9, protein: 0, carbs: 0, fat: 0 });
+    const caloric = { status: 1, product: { product_name: "Snack", nutrition_data_per: "100g", nutriments: { "energy-kcal_100g": 120, proteins_100g: 3 } } };
+    expect(openFoodFactsProduct(caloric, "12345678")).toBeNull();
+  });
   it("returns no product for missing required values, ambiguous basis or malformed numbers", () => {
     expect(
       openFoodFactsProduct(
