@@ -695,7 +695,7 @@ final class AppStore: ObservableObject {
             return .ready(Self.fixtureAnalysis(imagePath: imagePath ?? ""))
         }
         guard let owner = session?.owner, let backend else { return .failed("לא מחובר. התחבר מחדש ונסה שוב.") }
-        var id = requestID, retried = false, busyWaits = 0
+        var id = requestID, busyWaits = 0, connectionRetries = 0, aiRetries = 0
         while !Task.isCancelled {
             do {
                 var body: [String: JSONValue] = ["requestId": .string(id), "mode": .string(imagePath == nil ? "text" : "meal"), "automatic": .bool(true), "description": .string(description)]
@@ -714,12 +714,28 @@ final class AppStore: ObservableObject {
                 return .ready(MealAnalysis(items: items, needsClarification: raw["needsClarification"].boolValue == true, question: raw["question"].stringValue ?? "", analysisId: analysisId, imagePath: imagePath ?? ""))
             } catch let error as BackendError {
                 if case .server(409) = error, busyWaits < 40 { busyWaits += 1; try? await Task.sleep(for: .seconds(3)); continue }
-                // A dropped connection may have reached the server: ask again with the SAME id so the job is not analysed (and counted) twice.
-                if error == .connection, !retried { retried = true; try? await Task.sleep(for: .seconds(2)); continue }
-                if !retried { retried = true; id = UUID().uuidString.lowercased(); continue }
-                return .failed("הניתוח לא הושלם. בדוק חיבור ונסה שוב.")
+                switch error {
+                case .sessionRequired:
+                    // The sign-in itself was lost (another device signed in): the analysis never reached the AI.
+                    if await handleSessionLoss(error) { return .failed("") }
+                    return .failed("צריך להתחבר מחדש.")
+                case .sessionChanged:
+                    return .failed("")
+                case .rateLimited, .server(429):
+                    return .failed("מכסת הניתוחים היומית של ה־AI נגמרה. אפשר להוסיף ידנית או לנסות מחר.")
+                case .connection:
+                    // A dropped connection may have reached the server: ask again with the SAME id so the job is not analysed (and counted) twice.
+                    if connectionRetries < 2 { connectionRetries += 1; try? await Task.sleep(for: .seconds(2)); continue }
+                    return .failed("אין חיבור יציב לשרת. בדוק את הרשת ונסה שוב.")
+                case .server(let code) where code == 400 || code >= 500:
+                    // The AI provider failed or returned something unusable: usually transient, so try again with a fresh job.
+                    if aiRetries < (code == 400 ? 1 : 2) { aiRetries += 1; try? await Task.sleep(for: .seconds(Double(aiRetries) * 3)); id = UUID().uuidString.lowercased(); continue }
+                    return .failed(code == 400 ? "ה־AI לא הצליח לנתח את התמונה הזו. נסה תמונה אחרת או הוסף ידנית." : "שירות ה־AI איטי או לא זמין כרגע. נסה שוב בעוד רגע, או הוסף ידנית.")
+                default:
+                    return .failed("הניתוח לא הושלם. נסה שוב, או הוסף ידנית.")
+                }
             } catch is CancellationError { return .failed("") }
-            catch { if !retried { retried = true; id = UUID().uuidString.lowercased(); continue }; return .failed("הניתוח לא הושלם. בדוק חיבור ונסה שוב.") }
+            catch { return .failed("הניתוח לא הושלם. נסה שוב, או הוסף ידנית.") }
         }
         return .failed("")
     }
