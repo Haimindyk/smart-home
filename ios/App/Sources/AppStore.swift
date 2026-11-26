@@ -11,6 +11,8 @@ final class AppStore: ObservableObject {
     @Published private(set) var loading = false
     @Published private(set) var busy = false
     @Published var error: String?
+    /// Set by any "add a meal" button; the root shell opens the same camera-first screen as the + button.
+    @Published var addMealRequested = false
     @Published var selectedDate = Date()
     @Published private(set) var meals: [HealthRow] = []
     /// The meal that was just removed; shown with an Undo button for a few seconds.
