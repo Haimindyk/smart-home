@@ -24,4 +24,16 @@ final class ReorderTests: XCTestCase {
     func testSelfDropAndUnknownIdsDoNothing() {
         XCTAssertNil(Reorder.position(list(), moving: "a", onto: "a")); XCTAssertNil(Reorder.position(list(), moving: "x", onto: "a"))
     }
+    func testDroppingIntoAnotherListPlacesBeforeTheTargetOrAtTheEnd() throws {
+        let list = [("a", "a1"), ("b", "a2"), ("c", "a3")].map { (id: $0.0, position: $0.1) }
+        let beforeB = try XCTUnwrap(Reorder.positionInOtherList(list, before: "b"))
+        XCTAssertTrue(beforeB > "a1" && beforeB < "a2", "between a and b: \(beforeB)")
+        let beforeFirst = try XCTUnwrap(Reorder.positionInOtherList(list, before: "a"))
+        XCTAssertTrue(beforeFirst < "a1")
+        let atEnd = try XCTUnwrap(Reorder.positionInOtherList(list, before: nil))
+        XCTAssertTrue(atEnd > "a3")
+        let unknown = try XCTUnwrap(Reorder.positionInOtherList(list, before: "missing"))
+        XCTAssertTrue(unknown > "a3", "an unknown target falls back to the end")
+        XCTAssertNotNil(Reorder.positionInOtherList([], before: nil), "an empty list still gets a position")
+    }
 }

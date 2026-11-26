@@ -138,6 +138,24 @@ final class HomeStore: ObservableObject {
         await update(moving, fields: ["position": .string(position)]) { $0.position = position }
     }
 
+    /// Drag and drop of a task onto a task: reorders inside the same category, or moves it into the other task's category (just before it).
+    func drop(_ taskID: String, onto targetID: String) async {
+        guard let moving = tasks.first(where: { $0.id == taskID }), let target = tasks.first(where: { $0.id == targetID }) else { return }
+        if moving.sectionID == target.sectionID { await reorder(taskID, onto: targetID); return }
+        guard let section = sections.first(where: { $0.id == target.sectionID }) else { return }
+        await moveToSection(taskID, section: section, before: targetID)
+    }
+    /// Moves a top-level task (and its subtasks) into another category. Only task and shopping categories accept tasks.
+    func moveToSection(_ taskID: String, section: HSection, before targetID: String? = nil) async {
+        guard section.kind == "tasks" || section.kind == "shopping",
+              let moving = tasks.first(where: { $0.id == taskID }), moving.parentID == nil, !moving.isNote, moving.sectionID != section.id else { return }
+        let siblings = tasks.filter { $0.sectionID == section.id && $0.parentID == nil && !$0.isCompleted }.sorted { $0.position < $1.position }
+        guard let position = Reorder.positionInOtherList(siblings.map { ($0.id, $0.position) }, before: targetID) else { return }
+        let subtasks = tasks.filter { $0.parentID == moving.id }
+        await update(moving, fields: ["section_id": .string(section.id), "position": .string(position)]) { $0.sectionID = section.id; $0.position = position }
+        for sub in subtasks { await update(sub, fields: ["section_id": .string(section.id)]) { $0.sectionID = section.id } }
+    }
+
     // MARK: Assistant suggestions and notes
     func dismiss(_ suggestion: HSuggestion) async {
         let backup = suggestions; suggestions.removeAll { $0.id == suggestion.id }
