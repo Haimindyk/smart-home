@@ -111,6 +111,14 @@ public enum FractionalIndex {
 
 /// Drag-and-drop ordering: the new position for the dragged item so it lands where the target is.
 public enum Reorder {
+    /// Position for a task dropped into ANOTHER list: just before `target` when it was dropped on a task there, otherwise at the end.
+    /// `siblings` are the `(id, position)` pairs of that list sorted by position.
+    public static func positionInOtherList(_ siblings: [(id: String, position: String)], before target: String?) -> String? {
+        if let target, let index = siblings.firstIndex(where: { $0.id == target }) {
+            return try? FractionalIndex.between(index > 0 ? siblings[index - 1].position : nil, siblings[index].position)
+        }
+        return try? FractionalIndex.atEnd(siblings.last?.position)
+    }
     /// `siblings` are `(id, position)` pairs sorted by position. Dropping downward puts the item after the target, upward before it.
     public static func position(_ siblings: [(id: String, position: String)], moving: String, onto target: String) -> String? {
         guard moving != target, let from = siblings.firstIndex(where: { $0.id == moving }), let to = siblings.firstIndex(where: { $0.id == target }) else { return nil }

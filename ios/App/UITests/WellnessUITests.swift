@@ -257,6 +257,27 @@ final class WellnessUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["לצלם את החשבון"].waitForExistence(timeout: 5))
         capture(app, name: "native-home-subtask")
     }
+    func testInlinePlusButtonAddsASubtaskUnderTheTask() {
+        let app = launch("home")
+        let id = "b0000000-0000-4000-8000-000000000002"
+        let row = app.buttons["task-open-\(id)"]
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        var scrolls = 0
+        while (row.frame.minY > app.frame.height * 0.6 || row.frame.minY < app.frame.height * 0.28) && scrolls < 10 {
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: row.frame.minY > app.frame.height * 0.6 ? 0.7 : 0.4))
+            let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: row.frame.minY > app.frame.height * 0.6 ? 0.5 : 0.6))
+            from.press(forDuration: 0.1, thenDragTo: to); scrolls += 1
+        }
+        dismissSystemAlerts(for: app)
+        let plus = app.buttons["task-add-sub-\(id)"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5), "The row has a + button for a subtask")
+        plus.tap()
+        let field = app.textFields["inline-subtask-\(id)"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "The + opens the inline subtask field")
+        field.tap(); field.typeText("לבדוק תת משימה\n")
+        let shown = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "לבדוק תת משימה")).firstMatch
+        XCTAssertTrue(shown.waitForExistence(timeout: 5), "The new subtask is shown under its task")
+    }
     func testHomeAssistantProposesActionsAndWaitsForConfirmation() {
         let app = launch("home")
         XCTAssertTrue(app.buttons["assistant-button"].waitForExistence(timeout: 15))

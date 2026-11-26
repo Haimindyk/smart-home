@@ -6,7 +6,6 @@ struct TodayScreen: View {
     @State private var showCalendar = false
     @State private var showSettings = false
     @State private var showCoach = false
-    @State private var addingMeal = false
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -50,7 +49,7 @@ struct TodayScreen: View {
                         } description: {
                             Text("הוסף ארוחה כדי לעקוב אחרי הקלוריות והמאקרו.")
                         } actions: {
-                            Button { addingMeal = true } label: { Label("הוסף ארוחה", systemImage: "plus") }.buttonStyle(.borderedProminent).tint(Color.wellnessPrimary).accessibilityIdentifier("empty-add-meal")
+                            Button { store.addMealRequested = true } label: { Label("הוסף ארוחה", systemImage: "plus") }.buttonStyle(.borderedProminent).tint(Color.wellnessPrimary).accessibilityIdentifier("empty-add-meal")
                         }
                     } else {
                         ForEach(store.dayMeals) { meal in
@@ -69,7 +68,6 @@ struct TodayScreen: View {
             .refreshable { await Task { await store.refresh() }.value }
             .sensoryFeedback(.selection, trigger: store.selectedDate)
             .overlay(alignment: .bottom) { undoToast }
-            .sheet(isPresented: $addingMeal) { AddMealSheet().environmentObject(store).presentationDragIndicator(.visible) }
             .sheet(isPresented: $showCoach) { CoachChatView().environmentObject(store) }
             .sheet(isPresented: $showSettings) { SettingsScreen(isSheet: true).environmentObject(store) }
             .sheet(isPresented: $showCalendar) {

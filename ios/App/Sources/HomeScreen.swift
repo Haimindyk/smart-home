@@ -310,6 +310,11 @@ struct SectionPanel: View {
         }
                 .background(GeometryReader { geo in Color.clear.preference(key: PanelOffsetKey.self, value: [section.id: geo.frame(in: .named("home-scroll")).minY]) })
         .accessibilityElement(children: .contain).accessibilityLabel(section.name)
+        // Dropping a task on a category (not on one of its tasks) moves it there, to the end of the list.
+        .dropDestination(for: String.self) { ids, _ in
+            guard let id = ids.first, section.kind == "tasks" || section.kind == "shopping" else { return false }
+            Task { await home.moveToSection(id, section: section) }; return true
+        }
         .sheet(isPresented: $comparing) { PriceComparisonSheet(section: section).environmentObject(home) }
         .fullScreenCover(isPresented: $scanning) {
             ZStack(alignment: .topLeading) {
@@ -476,7 +481,7 @@ private struct ReorderDrag: ViewModifier {
             content.draggable(task.id) { Text(task.title).font(.hb(.body)).padding(10).background(Color.wellnessCard, in: RoundedRectangle(cornerRadius: 12, style: .continuous)) }
                 .dropDestination(for: String.self) { ids, _ in
                     guard let id = ids.first else { return false }
-                    Task { await home.reorder(id, onto: task.id) }; return true
+                    Task { await home.drop(id, onto: task.id) }; return true
                 }
         } else { content }
     }

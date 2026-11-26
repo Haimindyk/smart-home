@@ -93,7 +93,11 @@ extension HomeStore {
         chores = [j("{\"id\":\"c0000000-0000-4000-8000-000000000001\",\"section_id\":\"a0000000-0000-4000-8000-000000000003\",\"title\":\"להוציא את הזבל\",\"emoji\":\"🗑️\",\"freq\":\"daily\",\"interval_n\":1,\"next_due_at\":\"\(f.string(from: day))\",\"position\":\"a0\"}"),
                   j("{\"id\":\"c0000000-0000-4000-8000-000000000002\",\"section_id\":\"a0000000-0000-4000-8000-000000000003\",\"title\":\"לשטוף את הרצפה\",\"emoji\":\"🧽\",\"freq\":\"weekly\",\"interval_n\":1,\"next_due_at\":\"\(yesterday)\",\"position\":\"a1\"}")].compactMap(HChore.init)
         let ymd = DateFormatter(); ymd.dateFormat = "yyyy-MM-dd"; ymd.locale = Locale(identifier: "en_US_POSIX")
-        let soon = ymd.string(from: day.addingTimeInterval(5 * 86_400)), later = ymd.string(from: day.addingTimeInterval(11 * 86_400))
+        // The calendar opens on the current month: keep the sample events inside it, or the UI tests fail in the last days of a month.
+        let cal = Calendar.current
+        let monthEnd = cal.date(byAdding: DateComponents(month: 1, day: -1), to: cal.date(from: cal.dateComponents([.year, .month], from: day)) ?? day) ?? day
+        func inThisMonth(_ days: Double) -> String { ymd.string(from: min(day.addingTimeInterval(days * 86_400), monthEnd)) }
+        let soon = inThisMonth(5), later = inThisMonth(11)
         events = [j("{\"id\":\"d0000000-0000-4000-8000-000000000001\",\"title\":\"יום הולדת לנועה\",\"emoji\":\"🎂\",\"kind\":\"birthday\",\"event_date\":\"\(soon)\",\"recurrence\":\"yearly\"}"),
                   j("{\"id\":\"d0000000-0000-4000-8000-000000000002\",\"title\":\"בדיקת דם\",\"emoji\":\"🩺\",\"kind\":\"medical\",\"event_date\":\"\(later)\",\"recurrence\":\"none\"}")].compactMap(HEvent.init)
         suggestions = [j("{\"id\":\"e0000000-0000-4000-8000-000000000001\",\"emoji\":\"🥛\",\"summary\":\"נגמר החלב מהקנייה האחרונה. להוסיף לרשימה?\",\"status\":\"open\",\"action\":{\"type\":\"create_task\",\"sectionId\":\"a0000000-0000-4000-8000-000000000002\",\"title\":\"חלב\"}}")].compactMap(HSuggestion.init)
